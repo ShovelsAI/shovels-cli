@@ -48,6 +48,7 @@ internal/
 | Layer | Command | Notes |
 |-------|---------|-------|
 | Unit | `go test ./...` | No network calls, mock HTTP client |
+| E2E | `go test -tags=e2e ./e2e/...` | Builds binary, invokes as subprocess, requires `SHOVELS_API_KEY` |
 | Integration | `go test -tags=integration ./...` | Hits live API, requires `SHOVELS_API_KEY` |
 
 ## Build & Release
