@@ -12,6 +12,12 @@ type Envelope struct {
 	Meta map[string]any `json:"meta"`
 }
 
+// ErrorPayload is the structured JSON error written to stderr.
+type ErrorPayload struct {
+	Error string `json:"error"`
+	Code  int    `json:"code"`
+}
+
 // PrintData writes a JSON envelope with data and empty meta to the writer.
 func PrintData(w io.Writer, data any) {
 	env := Envelope{
@@ -21,4 +27,15 @@ func PrintData(w io.Writer, data any) {
 	enc := json.NewEncoder(w)
 	enc.SetEscapeHTML(false)
 	_ = enc.Encode(env)
+}
+
+// PrintError writes a structured JSON error to the writer.
+func PrintError(w io.Writer, msg string, code int) {
+	payload := ErrorPayload{
+		Error: msg,
+		Code:  code,
+	}
+	enc := json.NewEncoder(w)
+	enc.SetEscapeHTML(false)
+	_ = enc.Encode(payload)
 }

@@ -55,3 +55,40 @@ func TestPrintDataMetaIsEmptyObject(t *testing.T) {
 		t.Errorf("expected meta to be {}, got %s", string(raw["meta"]))
 	}
 }
+
+func TestPrintErrorProducesValidJSON(t *testing.T) {
+	var buf bytes.Buffer
+	PrintError(&buf, "unknown command", 1)
+
+	var payload ErrorPayload
+	if err := json.Unmarshal(buf.Bytes(), &payload); err != nil {
+		t.Fatalf("output is not valid JSON: %v\nraw: %s", err, buf.String())
+	}
+
+	if payload.Error != "unknown command" {
+		t.Errorf("expected error %q, got %q", "unknown command", payload.Error)
+	}
+	if payload.Code != 1 {
+		t.Errorf("expected code 1, got %d", payload.Code)
+	}
+}
+
+func TestPrintErrorContainsOnlyErrorAndCode(t *testing.T) {
+	var buf bytes.Buffer
+	PrintError(&buf, "test error", 2)
+
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(buf.Bytes(), &raw); err != nil {
+		t.Fatalf("output is not valid JSON: %v", err)
+	}
+
+	if len(raw) != 2 {
+		t.Errorf("expected exactly 2 keys, got %d: %v", len(raw), raw)
+	}
+	if _, ok := raw["error"]; !ok {
+		t.Error("missing 'error' key")
+	}
+	if _, ok := raw["code"]; !ok {
+		t.Error("missing 'code' key")
+	}
+}
