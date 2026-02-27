@@ -1,0 +1,17 @@
+{
+  "plugin_version": "5.9.1",
+  "linear": {
+    "id": "ENG-1889",
+    "url": "https://linear.app/shovels/issue/ENG-1889/shovels-cli-agent-first-rest-api-cli-go",
+    "title": "Shovels CLI — Agent-first REST API CLI (Go)",
+    "description": "Agent-first CLI for the Shovels REST API. Go + cobra. Single binary, JSON output, --limit N pagination, meaningful exit codes.",
+    "branch": "luka/eng-1889-shovels-cli-agent-first-rest-api-cli-go",
+    "created_at": "2026-02-27T15:43:56Z"
+  },
+  "execution": {
+    "guard_mode": null,
+    "current_step": null,
+    "total_steps": 13
+  },
+  "steps": {}
+}
