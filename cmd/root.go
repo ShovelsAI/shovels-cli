@@ -1,6 +1,9 @@
 package cmd
 
 import (
+	"os"
+
+	"github.com/shovels-ai/shovels-cli/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -20,6 +23,7 @@ Authentication: set SHOVELS_API_KEY env var, pass --api-key flag, or run: shovel
 // Execute runs the root command and returns the exit code.
 func Execute() int {
 	if err := rootCmd.Execute(); err != nil {
+		output.PrintError(os.Stderr, err.Error(), 1)
 		return 1
 	}
 	return 0
