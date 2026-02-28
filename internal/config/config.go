@@ -78,8 +78,12 @@ func SaveToFile(key, value string) error {
 
 	data, err := os.ReadFile(path)
 	if err == nil {
-		// Preserve existing keys by unmarshalling into a generic map.
-		_ = yaml.Unmarshal(data, &existing)
+		// File exists and is readable — parse it to preserve existing keys.
+		if parseErr := yaml.Unmarshal(data, &existing); parseErr != nil {
+			return fmt.Errorf("parsing existing config: %w", parseErr)
+		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("reading existing config: %w", err)
 	}
 
 	existing[key] = value
