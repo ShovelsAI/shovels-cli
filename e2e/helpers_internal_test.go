@@ -7,7 +7,6 @@ import (
 )
 
 func TestCLIHelperCapturesStdoutAndStderrIndependently(t *testing.T) {
-	requireAPIKey(t)
 	// The version command writes JSON to stdout and nothing to stderr.
 	// This verifies the harness captures them as separate streams.
 	result := runCLI(t, "version")
