@@ -3,13 +3,34 @@ package cmd
 import (
 	"os"
 
+	"github.com/shovels-ai/shovels-cli/internal/config"
 	"github.com/shovels-ai/shovels-cli/internal/output"
 	"github.com/spf13/cobra"
 )
 
+// AnnotationRequiresAuth is the cobra annotation key used to mark commands
+// that need a valid API key. Commands without this annotation skip auth checks.
+const AnnotationRequiresAuth = "requires_auth"
+
+// resolvedConfig holds the config resolved during PersistentPreRun, available
+// to all subcommands within the same execution.
+var resolvedConfig config.Config
+
+// ResolvedConfig returns the config resolved during PersistentPreRun.
+func ResolvedConfig() config.Config {
+	return resolvedConfig
+}
+
 // flagErrPrinted tracks whether SetFlagErrorFunc already emitted JSON to
 // stderr, preventing Execute from printing a duplicate error.
 var flagErrPrinted bool
+
+// exitError carries a specific exit code through cobra's error chain.
+type exitError struct {
+	code int
+}
+
+func (e *exitError) Error() string { return "" }
 
 var rootCmd = &cobra.Command{
 	Use:   "shovels",
@@ -22,6 +43,45 @@ Pipe output to jq, parse it programmatically, or feed it to another AI agent.
 Authentication: set SHOVELS_API_KEY env var, pass --api-key flag, or run: shovels config set api-key <key>`,
 	SilenceUsage:  true,
 	SilenceErrors: true,
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		flagAPIKey, _ := cmd.Flags().GetString("api-key")
+		flagBaseURL, _ := cmd.Flags().GetString("base-url")
+
+		o := config.Overrides{
+			APIKey:     flagAPIKey,
+			APIKeySet:  cmd.Flags().Changed("api-key"),
+			BaseURL:    flagBaseURL,
+			BaseURLSet: cmd.Flags().Changed("base-url"),
+		}
+
+		cfg, err := config.Resolve(o)
+		if err != nil {
+			output.PrintError(os.Stderr, err.Error(), 1)
+			return &exitError{code: 1}
+		}
+		resolvedConfig = cfg
+
+		if requiresAuth(cmd) && cfg.APIKey == "" {
+			msg := "API key not configured. Set SHOVELS_API_KEY or run: shovels config set api-key <key>"
+			output.PrintError(os.Stderr, msg, 2)
+			return &exitError{code: 2}
+		}
+
+		return nil
+	},
+}
+
+// requiresAuth checks whether the command (or any of its parents) is
+// annotated as requiring authentication.
+func requiresAuth(cmd *cobra.Command) bool {
+	for c := cmd; c != nil; c = c.Parent() {
+		if c.Annotations != nil {
+			if _, ok := c.Annotations[AnnotationRequiresAuth]; ok {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func init() {
@@ -45,6 +105,9 @@ func init() {
 func Execute() int {
 	flagErrPrinted = false
 	if err := rootCmd.Execute(); err != nil {
+		if e, ok := err.(*exitError); ok {
+			return e.code
+		}
 		if !flagErrPrinted {
 			output.PrintError(os.Stderr, err.Error(), 1)
 		}
