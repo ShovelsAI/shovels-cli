@@ -64,5 +64,6 @@ Key decisions from expert convergence (3 rounds):
 ## § Steps Log
 <!-- Populated during /strike execution -->
 
+- Step 1: E2E test infrastructure -> eb7da6e (3 commits)
 ## § Amendments
 <!-- For post-strike work discovered during execution -->

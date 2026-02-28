@@ -1,0 +1,97 @@
+//go:build e2e
+
+package e2e
+
+import (
+	"encoding/json"
+	"strings"
+	"testing"
+)
+
+func TestHelpShowsCommandsAndGlobalFlags(t *testing.T) {
+	result := runCLI(t, "--help")
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	// Verify available commands are listed.
+	if !strings.Contains(result.Stdout, "version") {
+		t.Error("--help output should list the version command")
+	}
+
+	// Verify global flags are present.
+	requiredFlags := []string{"--api-key", "--limit", "--max-records", "--base-url", "--no-retry", "--timeout"}
+	for _, flag := range requiredFlags {
+		if !strings.Contains(result.Stdout, flag) {
+			t.Errorf("--help output should contain global flag %q", flag)
+		}
+	}
+}
+
+func TestNoArgsShowsHelp(t *testing.T) {
+	result := runCLI(t)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0 with no args, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	// No-args output should match --help output.
+	helpResult := runCLI(t, "--help")
+	if result.Stdout != helpResult.Stdout {
+		t.Error("no-args output should match --help output")
+	}
+}
+
+func TestUnknownCommandProducesJSONStderr(t *testing.T) {
+	result := runCLI(t, "foobar")
+
+	if result.ExitCode != 1 {
+		t.Fatalf("expected exit 1 for unknown command, got %d", result.ExitCode)
+	}
+
+	var payload struct {
+		Error string `json:"error"`
+		Code  int    `json:"code"`
+	}
+	if err := json.Unmarshal([]byte(result.Stderr), &payload); err != nil {
+		t.Fatalf("stderr is not valid JSON: %v\nstderr: %s", err, result.Stderr)
+	}
+
+	if payload.Code != 1 {
+		t.Errorf("expected error code 1, got %d", payload.Code)
+	}
+
+	if !strings.Contains(payload.Error, "unknown command") {
+		t.Errorf("expected error to mention 'unknown command', got: %s", payload.Error)
+	}
+}
+
+func TestUnknownFlagProducesJSONStderr(t *testing.T) {
+	result := runCLI(t, "--unknown-flag")
+
+	if result.ExitCode != 1 {
+		t.Fatalf("expected exit 1 for unknown flag, got %d", result.ExitCode)
+	}
+
+	var payload struct {
+		Error string `json:"error"`
+		Code  int    `json:"code"`
+	}
+	if err := json.Unmarshal([]byte(result.Stderr), &payload); err != nil {
+		t.Fatalf("stderr is not valid JSON: %v\nstderr: %s", err, result.Stderr)
+	}
+
+	if payload.Code != 1 {
+		t.Errorf("expected error code 1, got %d", payload.Code)
+	}
+
+	if !strings.Contains(payload.Error, "unknown flag") {
+		t.Errorf("expected error to mention 'unknown flag', got: %s", payload.Error)
+	}
+
+	// Verify stdout is empty (no plain text leakage).
+	if strings.TrimSpace(result.Stdout) != "" {
+		t.Errorf("stdout should be empty for flag error, got: %s", result.Stdout)
+	}
+}

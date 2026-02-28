@@ -1,5 +1,5 @@
 {
-  "plugin_version": "5.9.1",
+  "plugin_version": "5.9.3",
   "linear": {
     "id": "ENG-1889",
     "url": "https://linear.app/shovels/issue/ENG-1889/shovels-cli-agent-first-rest-api-cli-go",
@@ -9,9 +9,78 @@
     "created_at": "2026-02-27T15:43:56Z"
   },
   "execution": {
-    "guard_mode": null,
-    "current_step": null,
+    "guard_mode": "codex",
+    "user_instructions": "",
+    "current_step": 2,
     "total_steps": 13
   },
-  "steps": {}
+  "steps": {
+    "1": {
+      "status": "approved",
+      "range_base": "8955fdf96f15a250b9f628feeeb58cd234daa378",
+      "head_sha": "eb7da6e9c9b11b9dc843a05b55230eaad925fb5f",
+      "head_tree": "ce3cfc1748703734df29f874908cd7b4bae66480"
+    },
+    "2": {
+      "status": "blocked",
+      "range_base": "eb7da6e9c9b11b9dc843a05b55230eaad925fb5f",
+      "head_sha": "1307025f6bd6d4b0ed117c0bcdff17d0aa6fb984",
+      "head_tree": "695e42146cb73d95bb0ae64cbfadd23c8c59d2ae"
+    },
+    "3": {
+      "status": "pending",
+      "range_base": null,
+      "head_sha": null
+    },
+    "4": {
+      "status": "pending",
+      "range_base": null,
+      "head_sha": null
+    },
+    "5": {
+      "status": "pending",
+      "range_base": null,
+      "head_sha": null
+    },
+    "6": {
+      "status": "pending",
+      "range_base": null,
+      "head_sha": null
+    },
+    "7": {
+      "status": "pending",
+      "range_base": null,
+      "head_sha": null
+    },
+    "8": {
+      "status": "pending",
+      "range_base": null,
+      "head_sha": null
+    },
+    "9": {
+      "status": "pending",
+      "range_base": null,
+      "head_sha": null
+    },
+    "10": {
+      "status": "pending",
+      "range_base": null,
+      "head_sha": null
+    },
+    "11": {
+      "status": "pending",
+      "range_base": null,
+      "head_sha": null
+    },
+    "12": {
+      "status": "pending",
+      "range_base": null,
+      "head_sha": null
+    },
+    "13": {
+      "status": "pending",
+      "range_base": null,
+      "head_sha": null
+    }
+  }
 }
