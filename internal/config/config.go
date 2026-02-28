@@ -116,9 +116,9 @@ func SaveToFile(key, value string) error {
 // Overrides holds flag values that were explicitly set by the user.
 // Only values where Set is true participate in the precedence chain.
 type Overrides struct {
-	APIKey    string
-	APIKeySet bool
-	BaseURL   string
+	APIKey     string
+	APIKeySet  bool
+	BaseURL    string
 	BaseURLSet bool
 }
 
