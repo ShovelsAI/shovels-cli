@@ -162,7 +162,10 @@ func TestSaveCreatesDirectoryAndFile(t *testing.T) {
 		t.Fatalf("SaveToFile failed: %v", err)
 	}
 
-	path := ConfigFilePath()
+	path, err := ConfigFilePath()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		t.Error("config file was not created")
 	}
@@ -292,8 +295,52 @@ func TestResolveFlagSetWinsOverEnvEvenWhenEmpty(t *testing.T) {
 func TestConfigFilePath(t *testing.T) {
 	withTempConfigDir(t)
 
-	path := ConfigFilePath()
+	path, err := ConfigFilePath()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if filepath.Base(path) != configFileName {
 		t.Errorf("expected filename %q, got %q", configFileName, filepath.Base(path))
+	}
+}
+
+func TestConfigDirErrorWhenHomeDirUnavailable(t *testing.T) {
+	// Unset XDG_CONFIG_HOME so configDir falls through to os.UserHomeDir.
+	t.Setenv("XDG_CONFIG_HOME", "")
+	// Unset HOME so os.UserHomeDir fails.
+	t.Setenv("HOME", "")
+
+	_, err := ConfigFilePath()
+	if err == nil {
+		t.Fatal("expected error when HOME and XDG_CONFIG_HOME are both unset, got nil")
+	}
+	if !strings.Contains(err.Error(), "cannot determine config directory") {
+		t.Errorf("expected 'cannot determine config directory' error, got: %v", err)
+	}
+}
+
+func TestLoadFromFileErrorWhenHomeDirUnavailable(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", "")
+	t.Setenv("HOME", "")
+
+	_, err := LoadFromFile()
+	if err == nil {
+		t.Fatal("expected error from LoadFromFile when config dir unavailable, got nil")
+	}
+	if !strings.Contains(err.Error(), "cannot determine config directory") {
+		t.Errorf("expected config dir error, got: %v", err)
+	}
+}
+
+func TestSaveToFileErrorWhenHomeDirUnavailable(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", "")
+	t.Setenv("HOME", "")
+
+	err := SaveToFile("api_key", "sk-test")
+	if err == nil {
+		t.Fatal("expected error from SaveToFile when config dir unavailable, got nil")
+	}
+	if !strings.Contains(err.Error(), "cannot determine config directory") {
+		t.Errorf("expected config dir error, got: %v", err)
 	}
 }

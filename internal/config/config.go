@@ -29,27 +29,38 @@ type Config struct {
 
 // configDir returns the XDG-compliant config directory path.
 // It respects XDG_CONFIG_HOME if set, otherwise defaults to ~/.config.
-func configDir() string {
+// Returns an error if neither XDG_CONFIG_HOME is set nor the home
+// directory can be determined.
+func configDir() (string, error) {
 	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
-		return filepath.Join(xdg, configDirName)
+		return filepath.Join(xdg, configDirName), nil
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return filepath.Join(".", configDirName)
+		return "", fmt.Errorf("cannot determine config directory: %w", err)
 	}
-	return filepath.Join(home, ".config", configDirName)
+	return filepath.Join(home, ".config", configDirName), nil
 }
 
 // ConfigFilePath returns the absolute path to the config file.
-func ConfigFilePath() string {
-	return filepath.Join(configDir(), configFileName)
+// Returns an error if the config directory cannot be determined.
+func ConfigFilePath() (string, error) {
+	dir, err := configDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, configFileName), nil
 }
 
 // LoadFromFile reads the YAML config file. Returns zero Config if the
 // file does not exist (not an error). Returns an error only if the file
-// exists but cannot be read or parsed.
+// exists but cannot be read or parsed, or if the config directory cannot
+// be determined.
 func LoadFromFile() (Config, error) {
-	path := ConfigFilePath()
+	path, err := ConfigFilePath()
+	if err != nil {
+		return Config{}, err
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -68,12 +79,15 @@ func LoadFromFile() (Config, error) {
 // SaveToFile writes the given key-value pair to the config file,
 // preserving any existing keys. Creates the directory and file if needed.
 func SaveToFile(key, value string) error {
-	dir := configDir()
+	dir, err := configDir()
+	if err != nil {
+		return err
+	}
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("creating config directory: %w", err)
 	}
 
-	path := ConfigFilePath()
+	path := filepath.Join(dir, configFileName)
 	existing := make(map[string]any)
 
 	data, err := os.ReadFile(path)
