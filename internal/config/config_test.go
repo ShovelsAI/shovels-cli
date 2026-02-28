@@ -54,6 +54,27 @@ func TestLoadFromFileNotExist(t *testing.T) {
 	}
 }
 
+func TestLoadFromFileCorruptYAML(t *testing.T) {
+	tmpDir := withTempConfigDir(t)
+
+	dir := filepath.Join(tmpDir, configDirName)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	corrupt := []byte(":\n  :\n    - [\ninvalid yaml {{{\n")
+	if err := os.WriteFile(filepath.Join(dir, configFileName), corrupt, 0o600); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	_, err := LoadFromFile()
+	if err == nil {
+		t.Fatal("expected error for corrupt YAML, got nil")
+	}
+	if !strings.Contains(err.Error(), "parsing config") {
+		t.Errorf("expected parse error, got: %v", err)
+	}
+}
+
 func TestSaveAndLoadAPIKey(t *testing.T) {
 	withTempConfigDir(t)
 
@@ -100,6 +121,37 @@ func TestSavePreservesOtherKeys(t *testing.T) {
 	}
 	if !strings.Contains(content, "new-key") {
 		t.Error("api_key was not updated to new-key")
+	}
+}
+
+func TestSaveCorruptYAMLReturnsError(t *testing.T) {
+	tmpDir := withTempConfigDir(t)
+
+	// Write a corrupt YAML file that cannot be parsed.
+	dir := filepath.Join(tmpDir, configDirName)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	corrupt := []byte(":\n  :\n    - [\ninvalid yaml {{{\n")
+	if err := os.WriteFile(filepath.Join(dir, configFileName), corrupt, 0o600); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	err := SaveToFile("api_key", "sk-new")
+	if err == nil {
+		t.Fatal("expected error for corrupt YAML, got nil")
+	}
+	if !strings.Contains(err.Error(), "parsing existing config") {
+		t.Errorf("expected parse error, got: %v", err)
+	}
+
+	// Verify the corrupt file was NOT overwritten.
+	data, readErr := os.ReadFile(filepath.Join(dir, configFileName))
+	if readErr != nil {
+		t.Fatalf("read: %v", readErr)
+	}
+	if string(data) != string(corrupt) {
+		t.Error("corrupt config file was overwritten despite parse error")
 	}
 }
 
