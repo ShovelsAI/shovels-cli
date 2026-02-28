@@ -396,14 +396,15 @@ func TestAuthConfigFileKeyResolves(t *testing.T) {
 	}
 
 	var envelope struct {
-		Data string         `json:"data"`
-		Meta map[string]any `json:"meta"`
+		Data struct {
+			APIKey string `json:"api_key"`
+		} `json:"data"`
 	}
 	if err := json.Unmarshal([]byte(result.Stdout), &envelope); err != nil {
 		t.Fatalf("stdout is not valid JSON: %v\nstdout: %s", err, result.Stdout)
 	}
-	if envelope.Data != "ok" {
-		t.Errorf("expected data %q, got %q", "ok", envelope.Data)
+	if envelope.Data.APIKey != "sk-from-file-1234" {
+		t.Errorf("expected config file key %q, got %q", "sk-from-file-1234", envelope.Data.APIKey)
 	}
 }
 
@@ -428,6 +429,18 @@ func TestAuthEnvVarOverridesConfigFile(t *testing.T) {
 	if result.ExitCode != 0 {
 		t.Fatalf("expected exit 0 with env var key, got %d; stderr: %s", result.ExitCode, result.Stderr)
 	}
+
+	var envelope struct {
+		Data struct {
+			APIKey string `json:"api_key"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(result.Stdout), &envelope); err != nil {
+		t.Fatalf("stdout is not valid JSON: %v\nstdout: %s", err, result.Stdout)
+	}
+	if envelope.Data.APIKey != "sk-from-env-5678" {
+		t.Errorf("expected env var key %q, got %q", "sk-from-env-5678", envelope.Data.APIKey)
+	}
 }
 
 func TestAuthFlagOverridesEnvVar(t *testing.T) {
@@ -440,5 +453,17 @@ func TestAuthFlagOverridesEnvVar(t *testing.T) {
 	result := runCLIWithEnv(t, env, "--api-key", "sk-from-flag-9999", "_test-auth")
 	if result.ExitCode != 0 {
 		t.Fatalf("expected exit 0 with flag key, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	var envelope struct {
+		Data struct {
+			APIKey string `json:"api_key"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(result.Stdout), &envelope); err != nil {
+		t.Fatalf("stdout is not valid JSON: %v\nstdout: %s", err, result.Stdout)
+	}
+	if envelope.Data.APIKey != "sk-from-flag-9999" {
+		t.Errorf("expected flag key %q, got %q", "sk-from-flag-9999", envelope.Data.APIKey)
 	}
 }

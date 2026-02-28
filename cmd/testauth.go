@@ -6,17 +6,20 @@ import (
 )
 
 // testAuthCmd is a hidden command used solely by e2e tests to verify
-// that the auth gating middleware (PersistentPreRunE + AnnotationRequiresAuth)
-// correctly enforces API key presence before command execution.
+// auth gating and credential precedence. It outputs the resolved API key
+// so tests can assert which source (flag, env, file) won the chain.
 var testAuthCmd = &cobra.Command{
 	Use:    "_test-auth",
-	Short:  "Test fixture: verify auth gating",
+	Short:  "Test fixture: verify auth gating and credential precedence",
 	Hidden: true,
 	Annotations: map[string]string{
 		AnnotationRequiresAuth: "true",
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		output.PrintData(cmd.OutOrStdout(), "ok")
+		cfg := ResolvedConfig()
+		output.PrintData(cmd.OutOrStdout(), map[string]string{
+			"api_key": cfg.APIKey,
+		})
 	},
 }
 
