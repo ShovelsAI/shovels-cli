@@ -8,7 +8,6 @@ import (
 )
 
 func TestVersionOutputIsValidJSON(t *testing.T) {
-	requireAPIKey(t)
 	result := runCLI(t, "version")
 
 	if result.ExitCode != 0 {
@@ -32,13 +31,20 @@ func TestVersionOutputIsValidJSON(t *testing.T) {
 		t.Error("data.version is empty")
 	}
 
+	if envelope.Data.Commit == "" {
+		t.Error("data.commit is empty")
+	}
+
+	if envelope.Data.Date == "" {
+		t.Error("data.date is empty")
+	}
+
 	if envelope.Meta == nil {
 		t.Error("meta field is missing")
 	}
 }
 
 func TestVersionExitCodeZero(t *testing.T) {
-	requireAPIKey(t)
 	result := runCLI(t, "version")
 
 	if result.ExitCode != 0 {
