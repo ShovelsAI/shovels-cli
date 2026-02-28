@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"testing"
+
+	"github.com/spf13/cobra"
 )
 
 func TestGlobalFlagsRegistered(t *testing.T) {
@@ -81,5 +83,55 @@ func TestNoRetryDefaultFalse(t *testing.T) {
 	}
 	if val {
 		t.Error("expected --no-retry default to be false")
+	}
+}
+
+func TestRequiresAuthWithAnnotation(t *testing.T) {
+	cmd := &cobra.Command{
+		Annotations: map[string]string{AnnotationRequiresAuth: "true"},
+	}
+	if !requiresAuth(cmd) {
+		t.Error("requiresAuth should return true for annotated command")
+	}
+}
+
+func TestRequiresAuthWithoutAnnotation(t *testing.T) {
+	cmd := &cobra.Command{}
+	if requiresAuth(cmd) {
+		t.Error("requiresAuth should return false for unannotated command")
+	}
+}
+
+func TestRequiresAuthInheritsFromParent(t *testing.T) {
+	parent := &cobra.Command{
+		Annotations: map[string]string{AnnotationRequiresAuth: "true"},
+	}
+	child := &cobra.Command{}
+	parent.AddCommand(child)
+
+	if !requiresAuth(child) {
+		t.Error("requiresAuth should return true when parent is annotated")
+	}
+}
+
+func TestVersionDoesNotRequireAuth(t *testing.T) {
+	if requiresAuth(versionCmd) {
+		t.Error("version command should not require auth")
+	}
+}
+
+func TestConfigDoesNotRequireAuth(t *testing.T) {
+	if requiresAuth(configCmd) {
+		t.Error("config command should not require auth")
+	}
+}
+
+func TestExitErrorCode(t *testing.T) {
+	err := &exitError{code: 2}
+	if err.code != 2 {
+		t.Errorf("expected code 2, got %d", err.code)
+	}
+	if err.Error() != "" {
+		t.Errorf("expected empty error string, got %q", err.Error())
 	}
 }

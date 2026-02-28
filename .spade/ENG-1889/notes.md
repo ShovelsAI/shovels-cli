@@ -65,5 +65,6 @@ Key decisions from expert convergence (3 rounds):
 <!-- Populated during /strike execution -->
 
 - Step 1: E2E test infrastructure -> eb7da6e (3 commits)
+- Step 2: Project scaffold + root command + version -> 6df9c61 (2 commits)
 ## § Amendments
 <!-- For post-strike work discovered during execution -->
