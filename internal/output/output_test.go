@@ -92,3 +92,31 @@ func TestPrintErrorContainsOnlyErrorAndCode(t *testing.T) {
 		t.Error("missing 'code' key")
 	}
 }
+
+func TestPrintErrorTypedIncludesErrorType(t *testing.T) {
+	var buf bytes.Buffer
+	PrintErrorTyped(&buf, "Unauthorized", 2, "auth_error")
+
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(buf.Bytes(), &raw); err != nil {
+		t.Fatalf("output is not valid JSON: %v", err)
+	}
+
+	if len(raw) != 3 {
+		t.Errorf("expected exactly 3 keys, got %d: %v", len(raw), raw)
+	}
+
+	var payload ErrorPayload
+	if err := json.Unmarshal(buf.Bytes(), &payload); err != nil {
+		t.Fatalf("cannot unmarshal: %v", err)
+	}
+	if payload.ErrorType != "auth_error" {
+		t.Errorf("expected error_type %q, got %q", "auth_error", payload.ErrorType)
+	}
+	if payload.Error != "Unauthorized" {
+		t.Errorf("expected error %q, got %q", "Unauthorized", payload.Error)
+	}
+	if payload.Code != 2 {
+		t.Errorf("expected code 2, got %d", payload.Code)
+	}
+}
