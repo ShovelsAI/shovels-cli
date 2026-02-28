@@ -24,8 +24,8 @@ func TestMain(m *testing.M) {
 
 	binaryPath = filepath.Join(tmpDir, "shovels")
 
-	// Build the binary from the project root (one directory up from e2e/).
-	build := exec.Command("go", "build", "-o", binaryPath, ".")
+	// Build the binary with e2e tag to include test fixtures like _test-auth.
+	build := exec.Command("go", "build", "-tags=e2e", "-o", binaryPath, ".")
 	build.Dir = moduleRoot()
 	build.Stderr = os.Stderr
 	if err := build.Run(); err != nil {
