@@ -452,7 +452,142 @@ func TestPaginateMidPaginationErrorNoPartialOutput(t *testing.T) {
 	}
 }
 
+// --- Edge cases (non-paginated) ---
+
+func TestNonPaginatedEnvelopeHasNoCountOrHasMore(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Credits-Request", "1")
+		w.Header().Set("X-Credits-Remaining", "9999")
+		w.WriteHeader(200)
+		w.Write([]byte(`{"credits_used":5432,"credit_limit":10000,"is_over_limit":false}`))
+	}))
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--api-key", "sk-test",
+		"--base-url", srv.URL,
+		"_test-single", "/usage",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	parsed := parseEnvelope(t, result.Stdout)
+
+	// Data should be an object (not an array).
+	var data map[string]any
+	if err := json.Unmarshal(parsed.Data, &data); err != nil {
+		t.Fatalf("expected data object: %v", err)
+	}
+
+	// Meta must contain credits but NOT count or has_more.
+	if _, exists := parsed.Meta["count"]; exists {
+		t.Error("non-paginated response must not contain count in meta")
+	}
+	if _, exists := parsed.Meta["has_more"]; exists {
+		t.Error("non-paginated response must not contain has_more in meta")
+	}
+
+	cu, ok := parsed.Meta["credits_used"]
+	if !ok {
+		t.Fatal("expected credits_used in meta")
+	}
+	if int(cu.(float64)) != 1 {
+		t.Errorf("expected credits_used=1, got %v", cu)
+	}
+
+	cr, ok := parsed.Meta["credits_remaining"]
+	if !ok {
+		t.Fatal("expected credits_remaining in meta")
+	}
+	if int(cr.(float64)) != 9999 {
+		t.Errorf("expected credits_remaining=9999, got %v", cr)
+	}
+}
+
 // --- Boundary conditions ---
+
+func TestPaginateLimitAllDefaultCap10K(t *testing.T) {
+	// Server reports 15,000 items available. With --limit all (default cap 10K),
+	// the paginator must stop at 10,000 and report has_more=true.
+	srv := httptest.NewServer(makePaginatedHandler(15000, 50, 5000))
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--api-key", "sk-test",
+		"--base-url", srv.URL,
+		"--limit", "all",
+		"_test-paginate", "/search",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	parsed := parseEnvelope(t, result.Stdout)
+
+	var data []json.RawMessage
+	if err := json.Unmarshal(parsed.Data, &data); err != nil {
+		t.Fatalf("expected data array: %v", err)
+	}
+	if len(data) != 10000 {
+		t.Errorf("expected 10000 items (default cap), got %d", len(data))
+	}
+
+	count := int(parsed.Meta["count"].(float64))
+	if count != 10000 {
+		t.Errorf("expected count=10000, got %d", count)
+	}
+
+	hasMore := parsed.Meta["has_more"].(bool)
+	if !hasMore {
+		t.Error("expected has_more=true when more results exist beyond the 10K cap")
+	}
+}
+
+func TestPaginateLimitAllMaxRecordsOverride(t *testing.T) {
+	// Server has 200 items. --max-records 100 overrides the default 10K cap,
+	// capping collection at 100. This proves --max-records controls the actual
+	// ceiling: only 100 items returned despite 200 available.
+	srv := httptest.NewServer(makePaginatedHandler(200, 10, 9800))
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--api-key", "sk-test",
+		"--base-url", srv.URL,
+		"--limit", "all",
+		"--max-records", "100",
+		"_test-paginate", "/search",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	parsed := parseEnvelope(t, result.Stdout)
+
+	var data []json.RawMessage
+	if err := json.Unmarshal(parsed.Data, &data); err != nil {
+		t.Fatalf("expected data array: %v", err)
+	}
+	if len(data) != 100 {
+		t.Errorf("expected 100 items (max-records cap), got %d", len(data))
+	}
+
+	count := int(parsed.Meta["count"].(float64))
+	if count != 100 {
+		t.Errorf("expected count=100, got %d", count)
+	}
+
+	hasMore := parsed.Meta["has_more"].(bool)
+	if !hasMore {
+		t.Error("expected has_more=true when more results exist beyond max-records cap")
+	}
+}
 
 func TestPaginateCountEqualsActualDataLength(t *testing.T) {
 	// Server returns exactly 30 items, less than the default limit of 50.
