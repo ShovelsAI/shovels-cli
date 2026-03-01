@@ -63,8 +63,12 @@ func ValidateMaxRecords(maxRecords int) error {
 }
 
 // WithMaxRecords sets the MaxRecords cap on the config. Only meaningful when
-// All is true. The caller must validate with ValidateMaxRecords first.
+// All is true. Values exceeding MaxCeiling are clamped silently to prevent
+// unbounded memory growth regardless of how the caller obtained the value.
 func (lc LimitConfig) WithMaxRecords(maxRecords int) LimitConfig {
+	if maxRecords > MaxCeiling {
+		maxRecords = MaxCeiling
+	}
 	lc.MaxRecords = maxRecords
 	return lc
 }
@@ -96,6 +100,9 @@ type PaginatedResult struct {
 // the full result or an error -- partial results are never exposed.
 func (c *Client) Paginate(ctx context.Context, path string, query map[string]string, lc LimitConfig) (*PaginatedResult, error) {
 	effective := lc.EffectiveLimit()
+	if effective > MaxCeiling {
+		effective = MaxCeiling
+	}
 	collected := make([]json.RawMessage, 0, min(effective, apiPageSizeMax))
 
 	// Clone query map to avoid mutating the caller's map.
