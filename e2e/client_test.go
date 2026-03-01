@@ -459,6 +459,11 @@ func TestHTTPClient429RetriesExhaustExitsCode3(t *testing.T) {
 	if !strings.Contains(p.Error, "Rate limited after 3 retries") {
 		t.Errorf("expected message about exhausted retries, got: %s", p.Error)
 	}
+
+	// Verify exactly 4 requests were made: 1 initial + 3 retries.
+	if got := calls.Load(); got != 4 {
+		t.Errorf("expected 4 requests (1 initial + 3 retries), got %d", got)
+	}
 }
 
 func TestHTTPClientTimeoutExitsCode5(t *testing.T) {
