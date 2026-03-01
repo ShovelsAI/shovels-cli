@@ -3,7 +3,6 @@
 package e2e
 
 import (
-	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -50,20 +49,15 @@ func TestUnknownCommandProducesJSONStderr(t *testing.T) {
 		t.Fatalf("expected exit 1 for unknown command, got %d", result.ExitCode)
 	}
 
-	var payload struct {
-		Error string `json:"error"`
-		Code  int    `json:"code"`
+	p := parseStderrError(t, result.Stderr)
+	if p.Code != 1 {
+		t.Errorf("expected error code 1, got %d", p.Code)
 	}
-	if err := json.Unmarshal([]byte(result.Stderr), &payload); err != nil {
-		t.Fatalf("stderr is not valid JSON: %v\nstderr: %s", err, result.Stderr)
+	if p.ErrorType != "client_error" {
+		t.Errorf("expected error_type %q, got %q", "client_error", p.ErrorType)
 	}
-
-	if payload.Code != 1 {
-		t.Errorf("expected error code 1, got %d", payload.Code)
-	}
-
-	if !strings.Contains(payload.Error, "unknown command") {
-		t.Errorf("expected error to mention 'unknown command', got: %s", payload.Error)
+	if !strings.Contains(p.Error, "unknown command") {
+		t.Errorf("expected error to mention 'unknown command', got: %s", p.Error)
 	}
 }
 
@@ -74,20 +68,15 @@ func TestUnknownFlagProducesJSONStderr(t *testing.T) {
 		t.Fatalf("expected exit 1 for unknown flag, got %d", result.ExitCode)
 	}
 
-	var payload struct {
-		Error string `json:"error"`
-		Code  int    `json:"code"`
+	p := parseStderrError(t, result.Stderr)
+	if p.Code != 1 {
+		t.Errorf("expected error code 1, got %d", p.Code)
 	}
-	if err := json.Unmarshal([]byte(result.Stderr), &payload); err != nil {
-		t.Fatalf("stderr is not valid JSON: %v\nstderr: %s", err, result.Stderr)
+	if p.ErrorType != "client_error" {
+		t.Errorf("expected error_type %q, got %q", "client_error", p.ErrorType)
 	}
-
-	if payload.Code != 1 {
-		t.Errorf("expected error code 1, got %d", payload.Code)
-	}
-
-	if !strings.Contains(payload.Error, "unknown flag") {
-		t.Errorf("expected error to mention 'unknown flag', got: %s", payload.Error)
+	if !strings.Contains(p.Error, "unknown flag") {
+		t.Errorf("expected error to mention 'unknown flag', got: %s", p.Error)
 	}
 
 	// Verify stdout is empty (no plain text leakage).

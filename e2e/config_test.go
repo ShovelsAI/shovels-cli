@@ -311,15 +311,12 @@ func TestConfigSetNotWritableDirectory(t *testing.T) {
 		t.Fatalf("expected exit 1 for not-writable dir, got %d; stderr: %s", result.ExitCode, result.Stderr)
 	}
 
-	var payload struct {
-		Error string `json:"error"`
-		Code  int    `json:"code"`
+	p := parseStderrError(t, result.Stderr)
+	if p.Code != 1 {
+		t.Errorf("expected error code 1, got %d", p.Code)
 	}
-	if err := json.Unmarshal([]byte(result.Stderr), &payload); err != nil {
-		t.Fatalf("stderr is not valid JSON: %v\nstderr: %s", err, result.Stderr)
-	}
-	if payload.Code != 1 {
-		t.Errorf("expected error code 1, got %d", payload.Code)
+	if p.ErrorType != "client_error" {
+		t.Errorf("expected error_type %q, got %q", "client_error", p.ErrorType)
 	}
 }
 
@@ -363,18 +360,15 @@ func TestAuthNoAPIKeyExits2(t *testing.T) {
 		t.Fatalf("expected exit 2 with no API key, got %d; stderr: %s", result.ExitCode, result.Stderr)
 	}
 
-	var payload struct {
-		Error string `json:"error"`
-		Code  int    `json:"code"`
+	p := parseStderrError(t, result.Stderr)
+	if p.Code != 2 {
+		t.Errorf("expected error code 2, got %d", p.Code)
 	}
-	if err := json.Unmarshal([]byte(result.Stderr), &payload); err != nil {
-		t.Fatalf("stderr is not valid JSON: %v\nstderr: %s", err, result.Stderr)
+	if p.ErrorType != "auth_error" {
+		t.Errorf("expected error_type %q, got %q", "auth_error", p.ErrorType)
 	}
-	if payload.Code != 2 {
-		t.Errorf("expected error code 2, got %d", payload.Code)
-	}
-	if !strings.Contains(payload.Error, "API key not configured") {
-		t.Errorf("expected error about missing API key, got: %s", payload.Error)
+	if !strings.Contains(p.Error, "API key not configured") {
+		t.Errorf("expected error about missing API key, got: %s", p.Error)
 	}
 }
 

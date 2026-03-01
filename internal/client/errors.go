@@ -14,6 +14,7 @@ const (
 
 // Error type strings for machine classification.
 const (
+	ErrorTypeClient     = "client_error"
 	ErrorTypeAuth       = "auth_error"
 	ErrorTypeRateLimit  = "rate_limited"
 	ErrorTypeCredit     = "credit_exhausted"
