@@ -86,6 +86,7 @@ func TestHTTPClientSendsAuthHeaders(t *testing.T) {
 func TestHTTPClientExtractsCreditHeaders(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Credits-Request", "10")
+		w.Header().Set("X-Credits-Limit", "1000")
 		w.Header().Set("X-Credits-Remaining", "990")
 		w.WriteHeader(200)
 		w.Write([]byte(`{"items":[]}`))
@@ -110,6 +111,14 @@ func TestHTTPClientExtractsCreditHeaders(t *testing.T) {
 	}
 	if int(creditsUsed.(float64)) != 10 {
 		t.Errorf("expected credits_used=10, got %v", creditsUsed)
+	}
+
+	creditsLimit, ok := parsed.Meta["credits_limit"]
+	if !ok {
+		t.Fatal("expected credits_limit in meta")
+	}
+	if int(creditsLimit.(float64)) != 1000 {
+		t.Errorf("expected credits_limit=1000, got %v", creditsLimit)
 	}
 
 	creditsRemaining, ok := parsed.Meta["credits_remaining"]
@@ -148,6 +157,13 @@ func TestHTTPClientNoCreditHeaders(t *testing.T) {
 	}
 	if cr != nil {
 		t.Errorf("expected credits_remaining to be null for unlimited plan, got %v", cr)
+	}
+	cl, ok := parsed.Meta["credits_limit"]
+	if !ok {
+		t.Fatal("expected credits_limit to be present in meta for unlimited plan")
+	}
+	if cl != nil {
+		t.Errorf("expected credits_limit to be null for unlimited plan, got %v", cl)
 	}
 	if _, ok := parsed.Meta["credits_used"]; ok {
 		t.Error("expected credits_used to be absent in meta when no credit headers present")
