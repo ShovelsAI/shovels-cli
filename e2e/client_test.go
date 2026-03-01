@@ -191,14 +191,12 @@ func TestHTTPClientEmptyItemsResponse(t *testing.T) {
 	}
 
 	parsed := parseEnvelope(t, result.Stdout)
-	var data struct {
-		Items []any `json:"items"`
-	}
+	var data []any
 	if err := json.Unmarshal(parsed.Data, &data); err != nil {
-		t.Fatalf("failed to parse data: %v", err)
+		t.Fatalf("expected data to be an array, got: %s", string(parsed.Data))
 	}
-	if len(data.Items) != 0 {
-		t.Errorf("expected empty items array, got %d items", len(data.Items))
+	if len(data) != 0 {
+		t.Errorf("expected empty array, got %d items", len(data))
 	}
 
 	countVal, ok := parsed.Meta["count"]
@@ -335,14 +333,12 @@ func TestHTTPClient429RetriesThenSucceeds(t *testing.T) {
 
 	// Verify successful response is returned, no partial output from failed attempt.
 	parsed := parseEnvelope(t, result.Stdout)
-	var data struct {
-		Items []string `json:"items"`
-	}
+	var data []string
 	if err := json.Unmarshal(parsed.Data, &data); err != nil {
-		t.Fatalf("failed to parse data: %v", err)
+		t.Fatalf("expected data to be an array, got: %s", string(parsed.Data))
 	}
-	if len(data.Items) != 1 || data.Items[0] != "ok" {
-		t.Errorf("expected successful response data, got %v", data.Items)
+	if len(data) != 1 || data[0] != "ok" {
+		t.Errorf("expected [\"ok\"], got %v", data)
 	}
 }
 
