@@ -17,12 +17,30 @@ import (
 // totalItems controls the total number of items across all pages. Each page
 // returns up to the requested size. If totalItems is -1, the handler always
 // reports more data (infinite stream).
+//
+// The handler validates cursor propagation: each response includes a
+// next_cursor like "cursor_50", and subsequent requests must carry that exact
+// value as the cursor query parameter. A missing or incorrect cursor after the
+// first request causes a 400 error response.
 func makePaginatedHandler(totalItems int, creditsUsed, creditsRemaining int) http.Handler {
+	var expectedCursor atomic.Value // stores the string the next request must send
 	var served atomic.Int32
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		size, _ := strconv.Atoi(r.URL.Query().Get("size"))
 		if size == 0 {
 			size = 50
+		}
+
+		// Validate cursor: the first request has no cursor; subsequent
+		// requests must carry the cursor returned by the previous response.
+		incomingCursor := r.URL.Query().Get("cursor")
+		if want, ok := expectedCursor.Load().(string); ok && want != "" {
+			if incomingCursor != want {
+				w.WriteHeader(400)
+				fmt.Fprintf(w, `{"error":"expected cursor %q, got %q"}`, want, incomingCursor)
+				return
+			}
 		}
 
 		start := int(served.Load())
@@ -46,6 +64,9 @@ func makePaginatedHandler(totalItems int, creditsUsed, creditsRemaining int) htt
 		if count > 0 && moreExist {
 			c := fmt.Sprintf("cursor_%d", start+count)
 			nextCursor = &c
+			expectedCursor.Store(c)
+		} else {
+			expectedCursor.Store("")
 		}
 
 		w.Header().Set("X-Credits-Request", strconv.Itoa(creditsUsed))
