@@ -63,10 +63,12 @@ var testHTTPCmd = &cobra.Command{
 
 		meta := map[string]any{}
 
-		// Derive count from the items array in the response body.
+		// For list responses, extract the items array as data and set count.
+		// Non-list responses keep the full body as data.
 		if m, ok := bodyData.(map[string]any); ok {
 			if items, exists := m["items"]; exists {
 				if arr, ok := items.([]any); ok {
+					bodyData = arr
 					meta["count"] = len(arr)
 				}
 			}
