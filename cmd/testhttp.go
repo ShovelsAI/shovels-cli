@@ -62,6 +62,15 @@ var testHTTPCmd = &cobra.Command{
 		}
 
 		meta := map[string]any{}
+
+		// Derive count from the items array in the response body.
+		if m, ok := bodyData.(map[string]any); ok {
+			if items, exists := m["items"]; exists {
+				if arr, ok := items.([]any); ok {
+					meta["count"] = len(arr)
+				}
+			}
+		}
 		if resp.Credits.CreditsUsed != nil {
 			meta["credits_used"] = *resp.Credits.CreditsUsed
 		}

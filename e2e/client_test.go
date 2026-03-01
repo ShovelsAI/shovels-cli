@@ -200,6 +200,14 @@ func TestHTTPClientEmptyItemsResponse(t *testing.T) {
 	if len(data.Items) != 0 {
 		t.Errorf("expected empty items array, got %d items", len(data.Items))
 	}
+
+	countVal, ok := parsed.Meta["count"]
+	if !ok {
+		t.Fatal("expected count in meta for empty items response")
+	}
+	if int(countVal.(float64)) != 0 {
+		t.Errorf("expected count=0 in meta, got %v", countVal)
+	}
 }
 
 // --- Error conditions ---
