@@ -328,6 +328,11 @@ func TestHTTPClient429RetriesThenSucceeds(t *testing.T) {
 		t.Fatalf("expected exit 0 after retry, got %d; stderr: %s", result.ExitCode, result.Stderr)
 	}
 
+	// Verify the server received exactly 2 requests: 1 initial + 1 retry.
+	if got := calls.Load(); got != 2 {
+		t.Errorf("expected 2 requests (1 initial + 1 retry), got %d", got)
+	}
+
 	// Verify successful response is returned, no partial output from failed attempt.
 	parsed := parseEnvelope(t, result.Stdout)
 	var data struct {

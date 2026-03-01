@@ -45,11 +45,13 @@ type Client struct {
 	baseURL    string
 	noRetry    bool
 	version    string
+	timeout    time.Duration
 	maxRetries int
 
-	// sleepFn is the function used for retry delays. Defaults to time.Sleep
-	// but can be overridden in tests.
-	sleepFn func(time.Duration)
+	// retrySleepFn waits for the given delay or returns early if the context
+	// is cancelled. Defaults to contextSleep but can be overridden in tests
+	// to skip actual delays.
+	retrySleepFn func(context.Context, time.Duration) error
 }
 
 // New creates a Client from the given options. The returned client is safe
@@ -66,20 +68,25 @@ func New(opts Options) *Client {
 	}
 
 	return &Client{
-		httpClient: &http.Client{Timeout: timeout},
-		apiKey:     opts.APIKey,
-		baseURL:    strings.TrimRight(opts.BaseURL, "/"),
-		noRetry:    opts.NoRetry,
-		version:    version,
-		maxRetries: 3,
-		sleepFn:    time.Sleep,
+		httpClient:   &http.Client{},
+		apiKey:       opts.APIKey,
+		baseURL:      strings.TrimRight(opts.BaseURL, "/"),
+		noRetry:      opts.NoRetry,
+		version:      version,
+		timeout:      timeout,
+		maxRetries:   3,
+		retrySleepFn: contextSleep,
 	}
 }
 
 // Get performs an authenticated GET request to the given API path (relative to
-// baseURL) with the provided query parameters. It returns the parsed response
-// or an *APIError on failure.
+// baseURL) with the provided query parameters. It applies the configured
+// timeout as a context deadline covering the full request lifecycle including
+// retries. Returns the parsed response or an *APIError on failure.
 func (c *Client) Get(ctx context.Context, path string, query map[string]string) (*Response, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+
 	url := c.baseURL + path
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -143,11 +150,8 @@ func (c *Client) doWithRetry(ctx context.Context, req *http.Request) (*Response,
 		lastErr = apiErr
 		if attempt < attempts-1 {
 			delay := retryDelay(attempt, resp.Header)
-			select {
-			case <-ctx.Done():
-				return nil, networkError(ctx.Err())
-			default:
-				c.sleepFn(delay)
+			if err := c.retrySleep(ctx, delay); err != nil {
+				return nil, networkError(err)
 			}
 		}
 	}
@@ -160,6 +164,25 @@ func (c *Client) doWithRetry(ctx context.Context, req *http.Request) (*Response,
 		Message:   fmt.Sprintf("Rate limited after %d retries", c.maxRetries),
 		ExitCode:  ExitRateLimit,
 		ErrorType: ErrorTypeRateLimit,
+	}
+}
+
+// retrySleep waits for the given delay or until the context is cancelled,
+// whichever comes first. Returns the context error if cancelled mid-wait.
+func (c *Client) retrySleep(ctx context.Context, delay time.Duration) error {
+	return c.retrySleepFn(ctx, delay)
+}
+
+// contextSleep waits for the given delay or until the context is cancelled.
+func contextSleep(ctx context.Context, delay time.Duration) error {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
 	}
 }
 

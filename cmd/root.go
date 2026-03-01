@@ -3,6 +3,7 @@ package cmd
 import (
 	"os"
 
+	"github.com/shovels-ai/shovels-cli/internal/client"
 	"github.com/shovels-ai/shovels-cli/internal/config"
 	"github.com/shovels-ai/shovels-cli/internal/output"
 	"github.com/spf13/cobra"
@@ -56,14 +57,14 @@ Authentication: set SHOVELS_API_KEY env var, pass --api-key flag, or run: shovel
 
 		cfg, err := config.Resolve(o)
 		if err != nil {
-			output.PrintError(os.Stderr, err.Error(), 1)
+			output.PrintErrorTyped(os.Stderr, err.Error(), 1, client.ErrorTypeClient)
 			return &exitError{code: 1}
 		}
 		resolvedConfig = cfg
 
 		if requiresAuth(cmd) && cfg.APIKey == "" {
 			msg := "API key not configured. Set SHOVELS_API_KEY or run: shovels config set api-key <key>"
-			output.PrintError(os.Stderr, msg, 2)
+			output.PrintErrorTyped(os.Stderr, msg, 2, client.ErrorTypeAuth)
 			return &exitError{code: 2}
 		}
 
@@ -96,7 +97,7 @@ func init() {
 	// Emit JSON to stderr on flag-parsing errors instead of cobra's plain text.
 	rootCmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
 		flagErrPrinted = true
-		output.PrintError(os.Stderr, err.Error(), 1)
+		output.PrintErrorTyped(os.Stderr, err.Error(), 1, client.ErrorTypeClient)
 		return err
 	})
 }
@@ -109,7 +110,7 @@ func Execute() int {
 			return e.code
 		}
 		if !flagErrPrinted {
-			output.PrintError(os.Stderr, err.Error(), 1)
+			output.PrintErrorTyped(os.Stderr, err.Error(), 1, client.ErrorTypeClient)
 		}
 		return 1
 	}

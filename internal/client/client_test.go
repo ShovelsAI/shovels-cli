@@ -32,8 +32,8 @@ func TestRetrySucceedsOnSecondAttempt(t *testing.T) {
 		BaseURL: srv.URL,
 		Timeout: 5 * time.Second,
 	})
-	// Override sleepFn to skip actual delays in tests.
-	c.sleepFn = func(d time.Duration) {}
+	// Override retrySleepFn to skip actual delays in tests.
+	c.retrySleepFn = func(_ context.Context, _ time.Duration) error { return nil }
 
 	resp, err := c.Get(context.Background(), "/test", nil)
 	if err != nil {
@@ -71,8 +71,9 @@ func TestRetryAfterHeaderUsedAsDelay(t *testing.T) {
 		BaseURL: srv.URL,
 		Timeout: 10 * time.Second,
 	})
-	c.sleepFn = func(d time.Duration) {
+	c.retrySleepFn = func(_ context.Context, d time.Duration) error {
 		sleepDuration = d
+		return nil
 	}
 
 	_, err := c.Get(context.Background(), "/test", nil)
@@ -100,7 +101,7 @@ func TestRetryExhaustsMaxAttempts(t *testing.T) {
 		BaseURL: srv.URL,
 		Timeout: 5 * time.Second,
 	})
-	c.sleepFn = func(d time.Duration) {}
+	c.retrySleepFn = func(_ context.Context, _ time.Duration) error { return nil }
 
 	_, err := c.Get(context.Background(), "/test", nil)
 	if err == nil {
@@ -139,7 +140,7 @@ func TestNoRetrySkipsRetries(t *testing.T) {
 		Timeout: 5 * time.Second,
 		NoRetry: true,
 	})
-	c.sleepFn = func(d time.Duration) {}
+	c.retrySleepFn = func(_ context.Context, _ time.Duration) error { return nil }
 
 	_, err := c.Get(context.Background(), "/test", nil)
 	if err == nil {

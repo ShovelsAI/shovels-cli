@@ -3,6 +3,7 @@ package cmd
 import (
 	"os"
 
+	"github.com/shovels-ai/shovels-cli/internal/client"
 	"github.com/shovels-ai/shovels-cli/internal/config"
 	"github.com/shovels-ai/shovels-cli/internal/output"
 	"github.com/spf13/cobra"
@@ -56,12 +57,12 @@ Example:
 		yamlKey, ok := keyMapping[key]
 		if !ok {
 			msg := "unknown config key: " + key + ". Supported keys: api-key, base-url"
-			output.PrintError(os.Stderr, msg, 1)
+			output.PrintErrorTyped(os.Stderr, msg, 1, client.ErrorTypeClient)
 			return &exitError{code: 1}
 		}
 
 		if err := config.SaveToFile(yamlKey, value); err != nil {
-			output.PrintError(os.Stderr, err.Error(), 1)
+			output.PrintErrorTyped(os.Stderr, err.Error(), 1, client.ErrorTypeClient)
 			return &exitError{code: 1}
 		}
 
