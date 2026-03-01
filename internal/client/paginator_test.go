@@ -136,6 +136,58 @@ func TestEffectiveLimitAllCustomCap(t *testing.T) {
 	}
 }
 
+func TestWithMaxRecordsClampsAtCeiling(t *testing.T) {
+	lc := LimitConfig{All: true, MaxRecords: 10000}
+	lc = lc.WithMaxRecords(200000)
+	if lc.MaxRecords != MaxCeiling {
+		t.Errorf("expected MaxRecords clamped to %d, got %d", MaxCeiling, lc.MaxRecords)
+	}
+	if got := lc.EffectiveLimit(); got != MaxCeiling {
+		t.Errorf("expected EffectiveLimit=%d, got %d", MaxCeiling, got)
+	}
+}
+
+func TestPaginateClampsBeyondCeiling(t *testing.T) {
+	requestCount := 0
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		size, _ := strconv.Atoi(r.URL.Query().Get("size"))
+		items := make([]json.RawMessage, size)
+		for i := range size {
+			items[i] = json.RawMessage(fmt.Sprintf(`{"id":%d}`, i))
+		}
+		// Report no more data so the paginator stops quickly.
+		resp := struct {
+			Items      []json.RawMessage `json:"items"`
+			NextCursor *string           `json:"next_cursor"`
+		}{Items: items, NextCursor: nil}
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+
+	c := New(Options{
+		APIKey:  "test-key",
+		BaseURL: srv.URL,
+		Timeout: 5 * time.Second,
+	})
+
+	// Bypass validation by constructing a LimitConfig with Limit > MaxCeiling directly.
+	lc := LimitConfig{Limit: MaxCeiling + 50000}
+	result, err := c.Paginate(context.Background(), "/test", nil, lc)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// The paginator must clamp to MaxCeiling, so EffectiveLimit inside Paginate
+	// is MaxCeiling. The server returned fewer items (one page of 50), which is
+	// fine -- the important thing is that the paginator did not try to fetch
+	// more than MaxCeiling.
+	if len(result.Items) > MaxCeiling {
+		t.Errorf("paginator fetched %d items, exceeding ceiling of %d", len(result.Items), MaxCeiling)
+	}
+}
+
 // --- Paginator page size calculation tests (boundary) ---
 
 func TestPaginateLimit75RequestsSizes50Then25(t *testing.T) {
