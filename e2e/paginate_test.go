@@ -13,24 +13,27 @@ import (
 	"testing"
 )
 
-// makePaginatedHandler returns an HTTP handler that serves paginated responses.
-// totalItems controls the total number of items across all pages. Each page
-// returns up to the requested size. If totalItems is -1, the handler always
-// reports more data (infinite stream).
+// makePaginatedHandler returns an HTTP handler that serves paginated responses
+// and a slice recording the size query parameter from each request. totalItems
+// controls the total number of items across all pages. Each page returns up to
+// the requested size. If totalItems is -1, the handler always reports more data
+// (infinite stream).
 //
 // The handler validates cursor propagation: each response includes a
 // next_cursor like "cursor_50", and subsequent requests must carry that exact
 // value as the cursor query parameter. A missing or incorrect cursor after the
 // first request causes a 400 error response.
-func makePaginatedHandler(totalItems int, creditsUsed, creditsRemaining int) http.Handler {
+func makePaginatedHandler(totalItems int, creditsUsed, creditsRemaining int) (http.Handler, *[]int) {
 	var expectedCursor atomic.Value // stores the string the next request must send
 	var served atomic.Int32
+	requestedSizes := &[]int{}
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		size, _ := strconv.Atoi(r.URL.Query().Get("size"))
 		if size == 0 {
 			size = 50
 		}
+		*requestedSizes = append(*requestedSizes, size)
 
 		// Validate cursor: the first request has no cursor; subsequent
 		// requests must carry the cursor returned by the previous response.
@@ -78,12 +81,15 @@ func makePaginatedHandler(totalItems int, creditsUsed, creditsRemaining int) htt
 		}{Items: items, NextCursor: nextCursor}
 		json.NewEncoder(w).Encode(resp)
 	})
+
+	return handler, requestedSizes
 }
 
 // --- Happy paths ---
 
 func TestPaginateDefaultLimit50(t *testing.T) {
-	srv := httptest.NewServer(makePaginatedHandler(200, 50, 9950))
+	handler, sizes := makePaginatedHandler(200, 50, 9950)
+	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
 	env := withIsolatedConfig(t)
@@ -127,13 +133,22 @@ func TestPaginateDefaultLimit50(t *testing.T) {
 	if cr != 9950 {
 		t.Errorf("expected credits_remaining=9950, got %d", cr)
 	}
+
+	if len(*sizes) != 1 {
+		t.Errorf("expected 1 API request, got %d", len(*sizes))
+	}
+	if len(*sizes) > 0 && (*sizes)[0] != 50 {
+		t.Errorf("expected request size=50, got %d", (*sizes)[0])
+	}
 }
 
 func TestPaginateLimit200MultiPage(t *testing.T) {
 	var requestCount atomic.Int32
+	var requestedSizes []int
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		n := int(requestCount.Add(1))
 		size, _ := strconv.Atoi(r.URL.Query().Get("size"))
+		requestedSizes = append(requestedSizes, size)
 
 		items := make([]json.RawMessage, size)
 		for i := range size {
@@ -184,15 +199,25 @@ func TestPaginateLimit200MultiPage(t *testing.T) {
 		t.Error("expected has_more=true")
 	}
 
-	// 200 items / 50 per page = 4 requests
+	// 200 items / 50 per page = 4 requests, each with size=50.
 	if got := requestCount.Load(); got != 4 {
 		t.Errorf("expected 4 API requests, got %d", got)
+	}
+	expectedSizes := []int{50, 50, 50, 50}
+	if len(requestedSizes) != len(expectedSizes) {
+		t.Fatalf("expected %d size entries, got %d: %v", len(expectedSizes), len(requestedSizes), requestedSizes)
+	}
+	for i, want := range expectedSizes {
+		if requestedSizes[i] != want {
+			t.Errorf("request %d: expected size=%d, got %d", i+1, want, requestedSizes[i])
+		}
 	}
 }
 
 func TestPaginateLimitAll(t *testing.T) {
 	totalItems := 120
-	srv := httptest.NewServer(makePaginatedHandler(totalItems, 10, 9880))
+	handler, _ := makePaginatedHandler(totalItems, 10, 9880)
+	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
 	env := withIsolatedConfig(t)
@@ -226,7 +251,8 @@ func TestPaginateLimitAll(t *testing.T) {
 // --- Edge cases ---
 
 func TestPaginateLimit200ButOnly75Exist(t *testing.T) {
-	srv := httptest.NewServer(makePaginatedHandler(75, 10, 990))
+	handler, sizes := makePaginatedHandler(75, 10, 990)
+	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
 	env := withIsolatedConfig(t)
@@ -257,6 +283,19 @@ func TestPaginateLimit200ButOnly75Exist(t *testing.T) {
 	hasMore := parsed.Meta["has_more"].(bool)
 	if hasMore {
 		t.Error("expected has_more=false when fewer results than limit")
+	}
+
+	// 75 items across 2 pages. The paginator requests size=50 for both because
+	// it cannot know the total count ahead of time. The second page returns only
+	// 25 items, signaling exhaustion via a nil cursor.
+	expectedSizes := []int{50, 50}
+	if len(*sizes) != len(expectedSizes) {
+		t.Fatalf("expected %d API requests, got %d: %v", len(expectedSizes), len(*sizes), *sizes)
+	}
+	for i, want := range expectedSizes {
+		if (*sizes)[i] != want {
+			t.Errorf("request %d: expected size=%d, got %d", i+1, want, (*sizes)[i])
+		}
 	}
 }
 
@@ -533,7 +572,8 @@ func TestNonPaginatedEnvelopeHasNoCountOrHasMore(t *testing.T) {
 func TestPaginateLimitAllDefaultCap10K(t *testing.T) {
 	// Server reports 15,000 items available. With --limit all (default cap 10K),
 	// the paginator must stop at 10,000 and report has_more=true.
-	srv := httptest.NewServer(makePaginatedHandler(15000, 50, 5000))
+	handler, _ := makePaginatedHandler(15000, 50, 5000)
+	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
 	env := withIsolatedConfig(t)
@@ -573,7 +613,8 @@ func TestPaginateLimitAllMaxRecordsOverride(t *testing.T) {
 	// Server has 200 items. --max-records 100 overrides the default 10K cap,
 	// capping collection at 100. This proves --max-records controls the actual
 	// ceiling: only 100 items returned despite 200 available.
-	srv := httptest.NewServer(makePaginatedHandler(200, 10, 9800))
+	handler, _ := makePaginatedHandler(200, 10, 9800)
+	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
 	env := withIsolatedConfig(t)
@@ -615,7 +656,8 @@ func TestPaginateLimitAllMaxRecords50000ExceedsDefaultCap(t *testing.T) {
 	// paginator would stop at 10,000. Using --max-records 50000 raises the cap,
 	// so all 10,100 items are fetched. This proves the flag lifts the ceiling
 	// beyond the 10K default.
-	srv := httptest.NewServer(makePaginatedHandler(10100, 50, 5000))
+	handler, _ := makePaginatedHandler(10100, 50, 5000)
+	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
 	env := withIsolatedConfig(t)
@@ -654,7 +696,8 @@ func TestPaginateLimitAllMaxRecords50000ExceedsDefaultCap(t *testing.T) {
 
 func TestPaginateCountEqualsActualDataLength(t *testing.T) {
 	// Server returns exactly 30 items, less than the default limit of 50.
-	srv := httptest.NewServer(makePaginatedHandler(30, 5, 995))
+	handler, _ := makePaginatedHandler(30, 5, 995)
+	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
 	env := withIsolatedConfig(t)
