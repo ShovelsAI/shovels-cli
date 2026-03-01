@@ -16,6 +16,7 @@ import (
 // CreditMeta holds credit usage information extracted from API response headers.
 type CreditMeta struct {
 	CreditsUsed      *int `json:"credits_used,omitempty"`
+	CreditsLimit     *int `json:"credits_limit,omitempty"`
 	CreditsRemaining *int `json:"credits_remaining,omitempty"`
 }
 
@@ -185,6 +186,11 @@ func extractCredits(header http.Header) CreditMeta {
 	if v := header.Get("X-Credits-Request"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
 			meta.CreditsUsed = &n
+		}
+	}
+	if v := header.Get("X-Credits-Limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			meta.CreditsLimit = &n
 		}
 	}
 	if v := header.Get("X-Credits-Remaining"); v != "" {

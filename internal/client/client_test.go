@@ -180,6 +180,7 @@ func TestAuthHeaders(t *testing.T) {
 func TestCreditHeaderExtraction(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Credits-Request", "42")
+		w.Header().Set("X-Credits-Limit", "1000")
 		w.Header().Set("X-Credits-Remaining", "958")
 		w.WriteHeader(200)
 		w.Write([]byte(`{}`))
@@ -199,6 +200,9 @@ func TestCreditHeaderExtraction(t *testing.T) {
 
 	if resp.Credits.CreditsUsed == nil || *resp.Credits.CreditsUsed != 42 {
 		t.Errorf("expected credits_used=42, got %v", resp.Credits.CreditsUsed)
+	}
+	if resp.Credits.CreditsLimit == nil || *resp.Credits.CreditsLimit != 1000 {
+		t.Errorf("expected credits_limit=1000, got %v", resp.Credits.CreditsLimit)
 	}
 	if resp.Credits.CreditsRemaining == nil || *resp.Credits.CreditsRemaining != 958 {
 		t.Errorf("expected credits_remaining=958, got %v", resp.Credits.CreditsRemaining)
@@ -225,6 +229,9 @@ func TestNoCreditHeaders(t *testing.T) {
 
 	if resp.Credits.CreditsUsed != nil {
 		t.Errorf("expected nil credits_used for unlimited plan, got %d", *resp.Credits.CreditsUsed)
+	}
+	if resp.Credits.CreditsLimit != nil {
+		t.Errorf("expected nil credits_limit for unlimited plan, got %d", *resp.Credits.CreditsLimit)
 	}
 	if resp.Credits.CreditsRemaining != nil {
 		t.Errorf("expected nil credits_remaining for unlimited plan, got %d", *resp.Credits.CreditsRemaining)

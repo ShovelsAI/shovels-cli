@@ -65,8 +65,13 @@ var testHTTPCmd = &cobra.Command{
 		if resp.Credits.CreditsUsed != nil {
 			meta["credits_used"] = *resp.Credits.CreditsUsed
 		}
-		// credits_remaining is always present: int value when known,
-		// nil (JSON null) for unlimited plans with no credit headers.
+		// credits_limit and credits_remaining are always present: int value
+		// when known, nil (JSON null) for unlimited plans with no credit headers.
+		if resp.Credits.CreditsLimit != nil {
+			meta["credits_limit"] = *resp.Credits.CreditsLimit
+		} else {
+			meta["credits_limit"] = nil
+		}
 		if resp.Credits.CreditsRemaining != nil {
 			meta["credits_remaining"] = *resp.Credits.CreditsRemaining
 		} else {
