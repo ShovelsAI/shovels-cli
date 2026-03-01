@@ -589,6 +589,48 @@ func TestPaginateLimitAllMaxRecordsOverride(t *testing.T) {
 	}
 }
 
+func TestPaginateLimitAllMaxRecords50000ExceedsDefaultCap(t *testing.T) {
+	// Server has 10,100 items. With --limit all alone (default cap 10K), the
+	// paginator would stop at 10,000. Using --max-records 50000 raises the cap,
+	// so all 10,100 items are fetched. This proves the flag lifts the ceiling
+	// beyond the 10K default.
+	srv := httptest.NewServer(makePaginatedHandler(10100, 50, 5000))
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--api-key", "sk-test",
+		"--base-url", srv.URL,
+		"--limit", "all",
+		"--max-records", "50000",
+		"_test-paginate", "/search",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	parsed := parseEnvelope(t, result.Stdout)
+
+	var data []json.RawMessage
+	if err := json.Unmarshal(parsed.Data, &data); err != nil {
+		t.Fatalf("expected data array: %v", err)
+	}
+	if len(data) != 10100 {
+		t.Errorf("expected 10100 items (beyond default 10K cap), got %d", len(data))
+	}
+
+	count := int(parsed.Meta["count"].(float64))
+	if count != 10100 {
+		t.Errorf("expected count=10100, got %d", count)
+	}
+
+	hasMore := parsed.Meta["has_more"].(bool)
+	if hasMore {
+		t.Error("expected has_more=false when all items fetched within raised cap")
+	}
+}
+
 func TestPaginateCountEqualsActualDataLength(t *testing.T) {
 	// Server returns exactly 30 items, less than the default limit of 50.
 	srv := httptest.NewServer(makePaginatedHandler(30, 5, 995))
