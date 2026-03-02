@@ -17,6 +17,17 @@ func withIsolatedConfig(t *testing.T) []string {
 	tmpDir := t.TempDir()
 	return []string{
 		"XDG_CONFIG_HOME=" + tmpDir,
+		"SHOVELS_API_KEY=sk-test",
+	}
+}
+
+// withIsolatedConfigNoAuth is like withIsolatedConfig but clears the API key
+// so commands that require auth will fail.
+func withIsolatedConfigNoAuth(t *testing.T) []string {
+	t.Helper()
+	tmpDir := t.TempDir()
+	return []string{
+		"XDG_CONFIG_HOME=" + tmpDir,
 		"SHOVELS_API_KEY=",
 	}
 }
@@ -27,7 +38,7 @@ func withIsolatedConfigDir(t *testing.T) ([]string, string) {
 	tmpDir := t.TempDir()
 	return []string{
 		"XDG_CONFIG_HOME=" + tmpDir,
-		"SHOVELS_API_KEY=",
+		"SHOVELS_API_KEY=sk-test",
 	}, tmpDir
 }
 
@@ -82,7 +93,7 @@ func TestConfigSetPreservesOtherKeys(t *testing.T) {
 }
 
 func TestConfigShowDefaults(t *testing.T) {
-	env := withIsolatedConfig(t)
+	env := withIsolatedConfigNoAuth(t)
 
 	result := runCLIWithEnv(t, env, "config", "show")
 	if result.ExitCode != 0 {
@@ -116,7 +127,11 @@ func TestConfigShowDefaults(t *testing.T) {
 }
 
 func TestConfigShowMasksAPIKey(t *testing.T) {
-	env, tmpDir := withIsolatedConfigDir(t)
+	tmpDir := t.TempDir()
+	env := []string{
+		"XDG_CONFIG_HOME=" + tmpDir,
+		"SHOVELS_API_KEY=",
+	}
 
 	// Set an API key first.
 	configDir := filepath.Join(tmpDir, "shovels")
@@ -176,33 +191,6 @@ func TestConfigShowReflectsEnvVar(t *testing.T) {
 	// "sk-envvar-test1234" masked: "sk-e***1234"
 	if envelope.Data.APIKey != "sk-e***1234" {
 		t.Errorf("expected masked key %q, got %q", "sk-e***1234", envelope.Data.APIKey)
-	}
-}
-
-func TestConfigShowFlagOverridesEnv(t *testing.T) {
-	tmpDir := t.TempDir()
-	env := []string{
-		"XDG_CONFIG_HOME=" + tmpDir,
-		"SHOVELS_API_KEY=sk-envvar-test1234",
-	}
-
-	result := runCLIWithEnv(t, env, "--api-key", "sk-flag-override-1234", "config", "show")
-	if result.ExitCode != 0 {
-		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
-	}
-
-	var envelope struct {
-		Data struct {
-			APIKey string `json:"api_key"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal([]byte(result.Stdout), &envelope); err != nil {
-		t.Fatalf("stdout is not valid JSON: %v", err)
-	}
-
-	// "sk-flag-override-1234" masked: "sk-f***1234"
-	if envelope.Data.APIKey != "sk-f***1234" {
-		t.Errorf("expected masked key %q, got %q", "sk-f***1234", envelope.Data.APIKey)
 	}
 }
 
@@ -321,7 +309,7 @@ func TestConfigSetNotWritableDirectory(t *testing.T) {
 }
 
 func TestConfigSetThenShowRoundTrip(t *testing.T) {
-	env := withIsolatedConfig(t)
+	env := withIsolatedConfigNoAuth(t)
 
 	// Set an API key.
 	setResult := runCLIWithEnv(t, env, "config", "set", "api-key", "sk-roundtrip-test-1234")
@@ -353,7 +341,7 @@ func TestConfigSetThenShowRoundTrip(t *testing.T) {
 // --- Auth gating tests using the _test-auth fixture command ---
 
 func TestAuthNoAPIKeyExits2(t *testing.T) {
-	env := withIsolatedConfig(t)
+	env := withIsolatedConfigNoAuth(t)
 
 	result := runCLIWithEnv(t, env, "_test-auth")
 	if result.ExitCode != 2 {
@@ -373,7 +361,11 @@ func TestAuthNoAPIKeyExits2(t *testing.T) {
 }
 
 func TestAuthConfigFileKeyResolves(t *testing.T) {
-	env, tmpDir := withIsolatedConfigDir(t)
+	tmpDir := t.TempDir()
+	env := []string{
+		"XDG_CONFIG_HOME=" + tmpDir,
+		"SHOVELS_API_KEY=",
+	}
 
 	// Write a config file with an API key.
 	configDir := filepath.Join(tmpDir, "shovels")
@@ -437,27 +429,3 @@ func TestAuthEnvVarOverridesConfigFile(t *testing.T) {
 	}
 }
 
-func TestAuthFlagOverridesEnvVar(t *testing.T) {
-	tmpDir := t.TempDir()
-	env := []string{
-		"XDG_CONFIG_HOME=" + tmpDir,
-		"SHOVELS_API_KEY=sk-from-env-5678",
-	}
-
-	result := runCLIWithEnv(t, env, "--api-key", "sk-from-flag-9999", "_test-auth")
-	if result.ExitCode != 0 {
-		t.Fatalf("expected exit 0 with flag key, got %d; stderr: %s", result.ExitCode, result.Stderr)
-	}
-
-	var envelope struct {
-		Data struct {
-			APIKey string `json:"api_key"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal([]byte(result.Stdout), &envelope); err != nil {
-		t.Fatalf("stdout is not valid JSON: %v\nstdout: %s", err, result.Stdout)
-	}
-	if envelope.Data.APIKey != "sk-from-flag-9999" {
-		t.Errorf("expected flag key %q, got %q", "sk-from-flag-9999", envelope.Data.APIKey)
-	}
-}

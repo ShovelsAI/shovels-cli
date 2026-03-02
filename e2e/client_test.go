@@ -55,9 +55,12 @@ func TestHTTPClientSendsAuthHeaders(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	env := withIsolatedConfig(t)
+	tmpDir := t.TempDir()
+	env := []string{
+		"XDG_CONFIG_HOME=" + tmpDir,
+		"SHOVELS_API_KEY=sk-test-header-key",
+	}
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test-header-key",
 		"--base-url", srv.URL,
 		"_test-http", "/check-headers",
 	)
@@ -95,7 +98,6 @@ func TestHTTPClientExtractsCreditHeaders(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"_test-http", "/test",
 	)
@@ -141,7 +143,6 @@ func TestHTTPClientNoCreditHeaders(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"_test-http", "/test",
 	)
@@ -181,7 +182,6 @@ func TestHTTPClientEmptyItemsResponse(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"_test-http", "/test",
 	)
@@ -217,9 +217,12 @@ func TestHTTPClient401ExitsCode2(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	env := withIsolatedConfig(t)
+	tmpDir := t.TempDir()
+	env := []string{
+		"XDG_CONFIG_HOME=" + tmpDir,
+		"SHOVELS_API_KEY=sk-bad",
+	}
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-bad",
 		"--base-url", srv.URL,
 		"_test-http", "/test",
 	)
@@ -246,7 +249,6 @@ func TestHTTPClient402ExitsCode4(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"_test-http", "/test",
 	)
@@ -276,7 +278,6 @@ func TestHTTPClient422ExitsCode1(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"_test-http", "/test",
 	)
@@ -317,7 +318,6 @@ func TestHTTPClient429RetriesThenSucceeds(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"_test-http", "/test",
 	)
@@ -351,7 +351,6 @@ func TestHTTPClient429NoRetryExitsCode3(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"--no-retry",
 		"_test-http", "/test",
@@ -379,7 +378,6 @@ func TestHTTPClient5xxExitsCode5(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"_test-http", "/test",
 	)
@@ -404,7 +402,6 @@ func TestHTTPClientNetworkErrorExitsCode5(t *testing.T) {
 	// Point at a URL that will refuse connections.
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", "http://127.0.0.1:1",
 		"--no-retry",
 		"--timeout", "2s",
@@ -439,7 +436,6 @@ func TestHTTPClient429RetriesExhaustExitsCode3(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"_test-http", "/test",
 	)
@@ -478,7 +474,6 @@ func TestHTTPClientTimeoutExitsCode5(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"--timeout", "1s",
 		"--no-retry",

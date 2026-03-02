@@ -116,8 +116,6 @@ func SaveToFile(key, value string) error {
 // Overrides holds flag values that were explicitly set by the user.
 // Only values where Set is true participate in the precedence chain.
 type Overrides struct {
-	APIKey     string
-	APIKeySet  bool
 	BaseURL    string
 	BaseURLSet bool
 }
@@ -141,13 +139,10 @@ func Resolve(o Overrides) (Config, error) {
 		cfg.BaseURL = fileCfg.BaseURL
 	}
 
-	// API key: flag > env > file
-	switch {
-	case o.APIKeySet:
-		cfg.APIKey = o.APIKey
-	case os.Getenv("SHOVELS_API_KEY") != "":
-		cfg.APIKey = os.Getenv("SHOVELS_API_KEY")
-	default:
+	// API key: env > file
+	if envKey := os.Getenv("SHOVELS_API_KEY"); envKey != "" {
+		cfg.APIKey = envKey
+	} else {
 		cfg.APIKey = fileCfg.APIKey
 	}
 

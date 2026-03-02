@@ -83,7 +83,6 @@ func TestAddressesSearchBasic(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"addresses", "search",
 		"--query", "123 Main St",
@@ -140,7 +139,6 @@ func TestAddressesSearchShortFlag(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"addresses", "search",
 		"-q", "San Francisco",
@@ -189,7 +187,6 @@ func TestAddressesSearchNoResults(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"addresses", "search",
 		"--query", "nonexistent address xyz",
@@ -226,7 +223,6 @@ func TestAddressesSearchMissingQuery(t *testing.T) {
 	env := withIsolatedConfig(t)
 
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"addresses", "search",
 	)
 
@@ -247,7 +243,7 @@ func TestAddressesSearchMissingQuery(t *testing.T) {
 }
 
 func TestAddressesSearchRequiresAuth(t *testing.T) {
-	env := withIsolatedConfig(t)
+	env := withIsolatedConfigNoAuth(t)
 
 	result := runCLIWithEnv(t, env,
 		"addresses", "search",

@@ -187,7 +187,7 @@ func TestResolveDefaultValues(t *testing.T) {
 	}
 }
 
-func TestResolveFlagOverridesEnvAndFile(t *testing.T) {
+func TestResolveEnvOverridesFileAPIKey(t *testing.T) {
 	withTempConfigDir(t)
 	t.Setenv("SHOVELS_API_KEY", "sk-env")
 
@@ -196,15 +196,12 @@ func TestResolveFlagOverridesEnvAndFile(t *testing.T) {
 		t.Fatalf("SaveToFile failed: %v", err)
 	}
 
-	cfg, err := Resolve(Overrides{
-		APIKey:    "sk-flag",
-		APIKeySet: true,
-	})
+	cfg, err := Resolve(Overrides{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if cfg.APIKey != "sk-flag" {
-		t.Errorf("expected APIKey %q, got %q", "sk-flag", cfg.APIKey)
+	if cfg.APIKey != "sk-env" {
+		t.Errorf("expected APIKey %q, got %q", "sk-env", cfg.APIKey)
 	}
 }
 
@@ -275,20 +272,20 @@ func TestResolveBaseURLFileOverridesDefault(t *testing.T) {
 	}
 }
 
-func TestResolveFlagSetWinsOverEnvEvenWhenEmpty(t *testing.T) {
+func TestResolveEmptyEnvFallsToFile(t *testing.T) {
 	withTempConfigDir(t)
-	t.Setenv("SHOVELS_API_KEY", "sk-env")
+	t.Setenv("SHOVELS_API_KEY", "")
 
-	cfg, err := Resolve(Overrides{
-		APIKey:    "",
-		APIKeySet: true,
-	})
+	if err := SaveToFile("api_key", "sk-file"); err != nil {
+		t.Fatalf("SaveToFile failed: %v", err)
+	}
+
+	cfg, err := Resolve(Overrides{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// Explicit --api-key="" should override the env var.
-	if cfg.APIKey != "" {
-		t.Errorf("expected empty APIKey when flag explicitly set to empty, got %q", cfg.APIKey)
+	if cfg.APIKey != "sk-file" {
+		t.Errorf("expected APIKey %q from file when env empty, got %q", "sk-file", cfg.APIKey)
 	}
 }
 

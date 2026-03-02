@@ -41,7 +41,7 @@ internal/
 
 ## Auth Precedence
 
-`--api-key` flag > `SHOVELS_API_KEY` env var > `~/.config/shovels/config.yaml`
+`SHOVELS_API_KEY` env var > `~/.config/shovels/config.yaml`
 
 ## Testing
 

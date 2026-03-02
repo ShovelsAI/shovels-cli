@@ -95,7 +95,6 @@ func TestContractorsSearchBasic(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"contractors", "search",
 		"--geo-id", "ZIP_90210",
@@ -160,7 +159,6 @@ func TestContractorsSearchClassificationFilter(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"contractors", "search",
 		"--geo-id", "ZIP_90210",
@@ -203,7 +201,6 @@ func TestContractorsSearchNoTallies(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"contractors", "search",
 		"--geo-id", "ZIP_90210",
@@ -243,7 +240,6 @@ func TestContractorsSearchNoResults(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"contractors", "search",
 		"--geo-id", "ZIP_99999",
@@ -283,7 +279,6 @@ func TestContractorsSearchNoTalliesOmittedByDefault(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"contractors", "search",
 		"--geo-id", "ZIP_90210",
@@ -311,7 +306,6 @@ func TestContractorsSearchMissingRequiredFlags(t *testing.T) {
 	env := withIsolatedConfig(t)
 
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"contractors", "search",
 	)
 
@@ -341,7 +335,6 @@ func TestContractorsSearchMissingOneRequiredFlag(t *testing.T) {
 	env := withIsolatedConfig(t)
 
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"contractors", "search",
 		"--permit-from", "2024-01-01",
 		"--permit-to", "2024-12-31",
@@ -361,7 +354,7 @@ func TestContractorsSearchMissingOneRequiredFlag(t *testing.T) {
 }
 
 func TestContractorsSearchRequiresAuth(t *testing.T) {
-	env := withIsolatedConfig(t)
+	env := withIsolatedConfigNoAuth(t)
 
 	result := runCLIWithEnv(t, env,
 		"contractors", "search",
@@ -386,7 +379,6 @@ func TestContractorsSearchInvalidDateFormat(t *testing.T) {
 	env := withIsolatedConfig(t)
 
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"contractors", "search",
 		"--geo-id", "ZIP_90210",
 		"--permit-from", "2024/01/01",
@@ -416,7 +408,6 @@ func TestContractorsSearchInvalidDateFormatTo(t *testing.T) {
 	env := withIsolatedConfig(t)
 
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"contractors", "search",
 		"--geo-id", "ZIP_90210",
 		"--permit-from", "2024-01-01",
@@ -460,7 +451,6 @@ func TestContractorsSearchPagination(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"--limit", "100",
 		"contractors", "search",
@@ -540,7 +530,6 @@ func TestContractorsGetSingleID(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"contractors", "get", "C123",
 	)
@@ -596,7 +585,6 @@ func TestContractorsGetMultipleIDs(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"contractors", "get", "C123", "C456",
 	)
@@ -651,7 +639,6 @@ func TestContractorsGetSomeMissing(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"contractors", "get", "C123", "C999", "C888",
 	)
@@ -699,7 +686,6 @@ func TestContractorsGetSomeMissing(t *testing.T) {
 func TestContractorsGetNoIDs(t *testing.T) {
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"contractors", "get",
 	)
 
@@ -723,7 +709,6 @@ func TestContractorsGetTooManyIDs(t *testing.T) {
 	env := withIsolatedConfig(t)
 
 	args := []string{
-		"--api-key", "sk-test",
 		"contractors", "get",
 	}
 	for i := range 51 {
@@ -757,7 +742,6 @@ func TestContractorsGetSingleIDIsObject(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"contractors", "get", "CSOLO",
 	)
@@ -788,7 +772,6 @@ func TestContractorsGetMultipleIDsIsArray(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"contractors", "get", "CA", "CB",
 	)
@@ -820,7 +803,6 @@ func TestContractorsGetExactly50IDs(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	args := []string{
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"contractors", "get",
 	}
@@ -922,7 +904,6 @@ func TestContractorsPermitsBasic(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"contractors", "permits", "ABC123",
 	)
@@ -971,7 +952,6 @@ func TestContractorsPermitsNoResults(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"contractors", "permits", "UNKNOWN_C",
 	)
@@ -1011,7 +991,6 @@ func TestContractorsPermitsNoResults(t *testing.T) {
 func TestContractorsPermitsNoID(t *testing.T) {
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"contractors", "permits",
 	)
 
@@ -1033,7 +1012,6 @@ func TestContractorsPermitsNoID(t *testing.T) {
 func TestContractorsPermitsExtraArgsRejected(t *testing.T) {
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"contractors", "permits", "ABC123", "EXTRA",
 	)
 
@@ -1074,7 +1052,6 @@ func TestContractorsPermitsPagination(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"--limit", "100",
 		"contractors", "permits", "ABC123",
@@ -1166,7 +1143,6 @@ func TestContractorsEmployeesBasic(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"contractors", "employees", "ABC123",
 	)
@@ -1211,7 +1187,6 @@ func TestContractorsEmployeesBasic(t *testing.T) {
 func TestContractorsEmployeesNoID(t *testing.T) {
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"contractors", "employees",
 	)
 
@@ -1231,7 +1206,6 @@ func TestContractorsEmployeesNoID(t *testing.T) {
 func TestContractorsEmployeesExtraArgsRejected(t *testing.T) {
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"contractors", "employees", "ABC123", "EXTRA",
 	)
 
@@ -1291,7 +1265,6 @@ func TestContractorsMetricsBasic(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"contractors", "metrics", "ABC123",
 		"--metric-from", "2024-01-01",
@@ -1369,7 +1342,6 @@ func TestContractorsMetricsBasic(t *testing.T) {
 func TestContractorsMetricsMissingAllFlags(t *testing.T) {
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"contractors", "metrics", "ABC123",
 	)
 
@@ -1401,7 +1373,6 @@ func TestContractorsMetricsMissingAllFlags(t *testing.T) {
 func TestContractorsMetricsMissingSomeFlags(t *testing.T) {
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"contractors", "metrics", "ABC123",
 		"--metric-from", "2024-01-01",
 		"--metric-to", "2024-12-31",
@@ -1430,7 +1401,6 @@ func TestContractorsMetricsMissingSomeFlags(t *testing.T) {
 func TestContractorsMetricsNoID(t *testing.T) {
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"contractors", "metrics",
 		"--metric-from", "2024-01-01",
 		"--metric-to", "2024-12-31",
@@ -1460,7 +1430,6 @@ func TestContractorsMetricsExactlyOneIDAccepted(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"contractors", "metrics", "SINGLE_ID",
 		"--metric-from", "2024-01-01",
@@ -1487,7 +1456,6 @@ func TestContractorsMetricsExactlyOneIDAccepted(t *testing.T) {
 func TestContractorsMetricsExtraArgsRejected(t *testing.T) {
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"contractors", "metrics", "ABC123", "EXTRA",
 		"--metric-from", "2024-01-01",
 		"--metric-to", "2024-12-31",

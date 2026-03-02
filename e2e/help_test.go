@@ -37,7 +37,6 @@ func TestRootHelpShowsDescriptionCommandsAndGlobalFlags(t *testing.T) {
 
 	// Global flags must be present.
 	globalFlags := []string{
-		"--api-key",
 		"--limit",
 		"--max-records",
 		"--base-url",
