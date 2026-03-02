@@ -18,13 +18,14 @@ const maxContractorGetIDs = 50
 
 var contractorsCmd = &cobra.Command{
 	Use:   "contractors",
-	Short: "Search and retrieve contractors",
-	Long: `Query the Shovels contractor database. Subcommands:
+	Short: "Search contractors and retrieve their permits, employees, and metrics",
+	Long: `Query the Shovels contractor database.
 
-  search     Find contractors by location, date range, tags, and performance metrics
-  get        Retrieve one or more contractors by ID
-  permits    List permits filed by a specific contractor
-  employees  List employees of a specific contractor
+Available subcommands:
+  search     Search contractors by geographic area, date range, permit tags, and performance metrics
+  get        Retrieve one or more contractors by their exact contractor ID
+  permits    List building permits filed by a specific contractor
+  employees  List employees associated with a specific contractor
   metrics    Get monthly performance metrics for a specific contractor
 
 Every response is a JSON envelope: {"data": ..., "meta": {...}}`,
@@ -32,23 +33,25 @@ Every response is a JSON envelope: {"data": ..., "meta": {...}}`,
 
 var contractorsSearchCmd = &cobra.Command{
 	Use:   "search",
-	Short: "Search contractors by location, date, and filters",
-	Long: `Search the Shovels contractor database with required location and date filters
-plus optional permit, property, and contractor filters.
+	Short: "Search contractors by location, date range, permit tags, and performance metrics",
+	Long: `Search the Shovels contractor database. Requires a geographic area and date
+range. Supports permit tag filters, property type filters, contractor
+classification filters, and minimum-value thresholds.
 
 Required flags:
-  --geo-id    Geographic filter (e.g. ZIP_90210, CITY_LOS_ANGELES_CA)
-  --from      Start date in YYYY-MM-DD format
-  --to        End date in YYYY-MM-DD format
+  --geo-id GEO_ID   Geographic area: ZIP_90210, CITY_LOS_ANGELES_CA, COUNTY_LOS_ANGELES_CA, or STATE_CA (required)
+  --from DATE        Start date in YYYY-MM-DD format (required)
+  --to DATE          End date in YYYY-MM-DD format (required)
 
-Example:
-  shovels contractors search --geo-id ZIP_90210 --from 2024-01-01 --to 2024-12-31
+Examples:
+  Search contractors in a zip code:
+    shovels contractors search --geo-id ZIP_90210 --from 2024-01-01 --to 2024-12-31
 
-Filter by classification:
-  shovels contractors search --geo-id ZIP_90210 --from 2024-01-01 --to 2024-12-31 --contractor-classification general_building
+  Filter by contractor classification:
+    shovels contractors search --geo-id ZIP_90210 --from 2024-01-01 --to 2024-12-31 --contractor-classification general_building
 
-Skip tallies for faster response:
-  shovels contractors search --geo-id ZIP_90210 --from 2024-01-01 --to 2024-12-31 --no-tallies`,
+  Skip tallies for faster response:
+    shovels contractors search --geo-id ZIP_90210 --from 2024-01-01 --to 2024-12-31 --no-tallies`,
 	Annotations: map[string]string{
 		AnnotationRequiresAuth: "true",
 	},
@@ -66,21 +69,22 @@ func runContractorsSearch(cmd *cobra.Command, args []string) error {
 
 var contractorsGetCmd = &cobra.Command{
 	Use:   "get ID [ID...]",
-	Short: "Retrieve one or more contractors by ID",
-	Long: `Fetch specific contractors by their IDs. Pass one or more contractor IDs as
-positional arguments (maximum 50 per request).
+	Short: "Retrieve one or more contractors by their exact contractor ID",
+	Long: `Fetch specific contractors by ID. Accepts 1 to 50 contractor IDs as
+positional arguments.
 
 Single ID returns the contractor object directly in data.
-Multiple IDs return an array in data, with meta.missing listing any unfound IDs.
+Multiple IDs return an array in data, with meta.missing listing unfound IDs.
 
-Example (single contractor):
-  shovels contractors get C123
+Examples:
+  Single contractor:
+    shovels contractors get C123
 
-Example (multiple contractors):
-  shovels contractors get C123 C456 C789
+  Multiple contractors in one request:
+    shovels contractors get C123 C456 C789
 
 Single ID response: {"data": {<contractor>}, "meta": {"credits_used": N, ...}}
-Batch response:     {"data": [{...}, ...], "meta": {"count": N, ...}}`,
+Batch response:     {"data": [{...}, ...], "meta": {"count": N, "missing": [...], ...}}`,
 	Annotations: map[string]string{
 		AnnotationRequiresAuth: "true",
 	},
@@ -148,14 +152,20 @@ func runContractorsGet(cmd *cobra.Command, args []string) error {
 
 var contractorsPermitsCmd = &cobra.Command{
 	Use:   "permits ID",
-	Short: "List permits filed by a specific contractor",
+	Short: "List building permits filed by a specific contractor",
 	Long: `Retrieve building permits associated with a contractor. Accepts exactly one
 contractor ID as a positional argument. Results are paginated; use --limit to
-control how many permits are returned.
+control how many records are returned.
 
-Example:
-  shovels contractors permits ABC123
-  shovels contractors permits ABC123 --limit 100
+Examples:
+  List permits for a contractor:
+    shovels contractors permits ABC123
+
+  Fetch up to 100 permits:
+    shovels contractors permits ABC123 --limit 100
+
+  Fetch all permits (up to --max-records cap):
+    shovels contractors permits ABC123 --limit all
 
 Response: {"data": [...], "meta": {"count": N, "has_more": bool, "credits_used": N, ...}}`,
 	Args: cobra.ExactArgs(1),
@@ -194,14 +204,17 @@ func runContractorsPermits(cmd *cobra.Command, args []string) error {
 
 var contractorsEmployeesCmd = &cobra.Command{
 	Use:   "employees ID",
-	Short: "List employees of a specific contractor",
+	Short: "List employees associated with a specific contractor",
 	Long: `Retrieve employees associated with a contractor. Accepts exactly one
 contractor ID as a positional argument. Results are paginated; use --limit to
-control how many employees are returned.
+control how many records are returned.
 
-Example:
-  shovels contractors employees ABC123
-  shovels contractors employees ABC123 --limit all
+Examples:
+  List employees for a contractor:
+    shovels contractors employees ABC123
+
+  Fetch all employees (up to --max-records cap):
+    shovels contractors employees ABC123 --limit all
 
 Response: {"data": [...], "meta": {"count": N, "has_more": bool, "credits_used": N, ...}}`,
 	Args: cobra.ExactArgs(1),
@@ -240,18 +253,20 @@ func runContractorsEmployees(cmd *cobra.Command, args []string) error {
 
 var contractorsMetricsCmd = &cobra.Command{
 	Use:   "metrics ID",
-	Short: "Get monthly performance metrics for a contractor",
+	Short: "Get monthly performance metrics for a specific contractor",
 	Long: `Retrieve monthly performance metrics for a specific contractor. Accepts exactly
 one contractor ID as a positional argument. All four flags are required.
 
 Required flags:
-  --metric-from     Start date in YYYY-MM-DD format (inclusive)
-  --metric-to       End date in YYYY-MM-DD format (inclusive)
-  --property-type   Property type filter (e.g. residential, commercial)
-  --tag             Permit tag filter (e.g. solar, roofing)
+  --metric-from YYYY-MM-DD     Metrics start date, inclusive (required)
+  --metric-to YYYY-MM-DD       Metrics end date, inclusive (required)
+  --property-type TYPE          Property type: residential, commercial, industrial (required)
+  --tag TAG                     Permit tag: solar, roofing, electrical, etc. (required)
 
 Example:
-  shovels contractors metrics ABC123 --metric-from 2024-01-01 --metric-to 2024-12-31 --property-type residential --tag solar
+  shovels contractors metrics ABC123 \
+    --metric-from 2024-01-01 --metric-to 2024-12-31 \
+    --property-type residential --tag solar
 
 Response: {"data": [...], "meta": {"credits_used": N, "credits_remaining": N}}
 Metrics are not paginated. The response contains monthly aggregate data.`,
@@ -336,7 +351,7 @@ func init() {
 	registerSearchFlags(contractorsSearchCmd)
 
 	// Contractors-specific flag
-	contractorsSearchCmd.Flags().Bool("no-tallies", false, "Omit tag and status tallies from response for faster results (sends include_tallies=false)")
+	contractorsSearchCmd.Flags().Bool("no-tallies", false, "Omit tag and status tallies for faster response (sends include_tallies=false)")
 
 	groups := searchFlagGroups()
 	groups = append(groups, flagGroup{
@@ -346,10 +361,10 @@ func init() {
 	setGroupedUsage(contractorsSearchCmd, groups)
 
 	// Metrics flags
-	contractorsMetricsCmd.Flags().String("metric-from", "", "Start date for metrics (YYYY-MM-DD format, required)")
-	contractorsMetricsCmd.Flags().String("metric-to", "", "End date for metrics (YYYY-MM-DD format, required)")
-	contractorsMetricsCmd.Flags().String("property-type", "", "Property type filter (e.g. residential, commercial, required)")
-	contractorsMetricsCmd.Flags().String("tag", "", "Permit tag filter (e.g. solar, roofing, required)")
+	contractorsMetricsCmd.Flags().String("metric-from", "", "Metrics start date in YYYY-MM-DD format (required)")
+	contractorsMetricsCmd.Flags().String("metric-to", "", "Metrics end date in YYYY-MM-DD format (required)")
+	contractorsMetricsCmd.Flags().String("property-type", "", "Property type: residential, commercial, industrial (required)")
+	contractorsMetricsCmd.Flags().String("tag", "", "Permit tag: solar, roofing, electrical, plumbing, etc. (required)")
 
 	contractorsCmd.AddCommand(contractorsSearchCmd)
 	contractorsCmd.AddCommand(contractorsGetCmd)

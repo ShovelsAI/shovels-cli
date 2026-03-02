@@ -11,20 +11,23 @@ import (
 
 var configCmd = &cobra.Command{
 	Use:   "config",
-	Short: "Manage CLI configuration (API key, base URL, defaults)",
-	Long: `Read and write persistent CLI configuration stored in ~/.config/shovels/config.yaml.
+	Short: "Read and write persistent CLI settings (API key, base URL)",
+	Long: `Manage persistent CLI configuration stored in ~/.config/shovels/config.yaml.
 
-Subcommands:
-  set    Write a configuration key (e.g. api-key, base-url)
-  show   Display current resolved configuration as JSON`,
+Available subcommands:
+  set    Save a configuration key (api-key, base-url) to the config file
+  show   Display the resolved configuration as JSON (API key is masked)`,
 }
 
 var configShowCmd = &cobra.Command{
 	Use:   "show",
-	Short: "Display resolved configuration as JSON to stdout",
-	Long: `Prints the current resolved configuration as a JSON object.
-The API key is masked for security (first 4 + last 4 characters shown).
-Config values reflect the full precedence chain: flag > env > file > default.`,
+	Short: "Display the resolved configuration as JSON (API key masked)",
+	Long: `Print the resolved configuration as a JSON object to stdout. The API key
+is masked for security (first 4 and last 4 characters shown). Values
+reflect the full precedence chain: --api-key flag > SHOVELS_API_KEY env > config file > default.
+
+Example:
+  shovels config show`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg := ResolvedConfig()
 		data := map[string]any{
@@ -38,16 +41,20 @@ Config values reflect the full precedence chain: flag > env > file > default.`,
 }
 
 var configSetCmd = &cobra.Command{
-	Use:   "set <key> <value>",
-	Short: "Set a configuration value persistently",
-	Long: `Write a configuration key to ~/.config/shovels/config.yaml.
+	Use:   "set KEY VALUE",
+	Short: "Save a configuration key to ~/.config/shovels/config.yaml",
+	Long: `Write a configuration key-value pair to ~/.config/shovels/config.yaml.
 
 Supported keys:
-  api-key     Your Shovels API key
+  api-key     Your Shovels API key (e.g. sk-abc123)
   base-url    API base URL (default: https://api.shovels.ai/v2)
 
-Example:
-  shovels config set api-key sk-your-api-key-here`,
+Examples:
+  Save an API key:
+    shovels config set api-key sk-your-api-key-here
+
+  Override the base URL:
+    shovels config set base-url https://staging.shovels.ai/v2`,
 	Args: cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		key := args[0]

@@ -12,27 +12,33 @@ import (
 
 var addressesCmd = &cobra.Command{
 	Use:   "addresses",
-	Short: "Search addresses in the Shovels database",
-	Long: `Query the Shovels address database. Subcommands:
+	Short: "Search addresses by street, city, state, or zip code",
+	Long: `Query the Shovels address database.
 
-  search   Find addresses by query string
+Available subcommands:
+  search   Search addresses by street name, city, state, or zip code
 
 Every response is a JSON envelope: {"data": [...], "meta": {...}}`,
 }
 
 var addressesSearchCmd = &cobra.Command{
 	Use:   "search",
-	Short: "Search addresses by query string",
-	Long: `Search the Shovels address database with a text query. The query matches
-against address fields (street, city, state, zip).
+	Short: "Search addresses by street name, city, state, or zip code",
+	Long: `Search the Shovels address database. The query matches against street name,
+city, state, and zip code fields.
 
 Required flags:
-  --query, -q   Search string (e.g. "123 Main St", "San Francisco")
+  --query, -q TEXT   Address search string, e.g. "123 Main St" or "90210" (required)
 
-Example:
-  shovels addresses search --query "123 Main St"
-  shovels addresses search -q "San Francisco"
-  shovels addresses search --query "90210" --limit 10
+Examples:
+  Search by street address:
+    shovels addresses search --query "123 Main St"
+
+  Search by city name:
+    shovels addresses search -q "San Francisco"
+
+  Search by zip code with result limit:
+    shovels addresses search --query "90210" --limit 10
 
 Response: {"data": [...], "meta": {"count": N, "has_more": bool, "credits_used": N, ...}}`,
 	Annotations: map[string]string{
@@ -78,7 +84,7 @@ func runAddressesSearch(cmd *cobra.Command, args []string) error {
 }
 
 func init() {
-	addressesSearchCmd.Flags().StringP("query", "q", "", "Search string for address lookup (required)")
+	addressesSearchCmd.Flags().StringP("query", "q", "", "Address search string, e.g. \"123 Main St\" or \"90210\" (required)")
 
 	addressesCmd.AddCommand(addressesSearchCmd)
 	rootCmd.AddCommand(addressesCmd)

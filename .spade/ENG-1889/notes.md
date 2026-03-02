@@ -55,6 +55,12 @@ Key decisions from expert convergence (3 rounds):
 ## § Architectural Decisions
 <!-- Populated during /strike execution -->
 
+- [Step 5 debt] E2E fixture command setup is now duplicated across three `cmd/test*.go` files; a small shared helper would reduce divergence as more fixture commands are added.
+- [Step 6 debt] Flag definitions and help-group membership are duplicated in separate hard-coded lists in [cmd/permits.go](/Users/luka/workspace/shovels-cli/worktrees/ENG-1889/cmd/permits.go), which can drift as filters evolve; a shared flag-metadata registry would reduce divergence risk.
+- [Step 7 debt] Client construction, timeout parsing, and API error translation are duplicated between `permits search` and `permits get`; extracting a shared command helper would reduce divergence risk as command count grows.
+- [Step 9 debt] `runContractorsGet` duplicates client creation/API error translation/request-building patterns already present in permits get; a shared helper would reduce divergence risk across resource `get` commands.
+- [Step 10 debt] [cmd/contractors.go:168](/Users/luka/workspace/shovels-cli/worktrees/ENG-1889/cmd/contractors.go:168), [cmd/contractors.go:214](/Users/luka/workspace/shovels-cli/worktrees/ENG-1889/cmd/contractors.go:214), and [cmd/contractors.go:265](/Users/luka/workspace/shovels-cli/worktrees/ENG-1889/cmd/contractors.go:265) duplicate client setup and API error translation logic; a shared helper would reduce divergence risk and prep-refactor debt.
+- [Step 11 debt] Client setup and API error translation logic are duplicated again in new command handlers; a prep refactor to a shared command helper would reduce divergence risk as commands grow.
 ## § Patterns Discovered
 <!-- Populated during /strike execution -->
 
@@ -67,5 +73,12 @@ Key decisions from expert convergence (3 rounds):
 - Step 1: E2E test infrastructure -> eb7da6e (3 commits)
 - Step 2: Project scaffold + root command + version -> 6df9c61 (2 commits)
 - Step 3: Config layer -> be3911b (6 commits)
+- Step 5: Output envelope + pagination -> 57768bd (7 commits)
+- Step 6: `shovels permits search` -> 2e43972 (3 commits)
+- Step 7: `shovels permits get` -> 0903824 (2 commits)
+- Step 8: `shovels contractors search` -> a82e8b0 (2 commits)
+- Step 9: `shovels contractors get` -> 9141a75
+- Step 10: `shovels contractors permits|employees|metrics` -> ce11d15 (2 commits)
+- Step 11: `shovels addresses search` + `shovels usage` -> f97bc85
 ## § Amendments
 <!-- For post-strike work discovered during execution -->
