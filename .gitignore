@@ -1,0 +1,15 @@
+# Build artifacts
+shovels
+dist/
+
+# Environment / secrets
+.envrc
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
