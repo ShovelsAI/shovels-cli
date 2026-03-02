@@ -186,8 +186,14 @@ func runContractorsPermits(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	var q url.Values
+	if cmd.Flags().Changed("include-count") {
+		q = url.Values{}
+		setBoolFlag(cmd, "include-count", "include_count", q)
+	}
+
 	endpoint := fmt.Sprintf("/contractors/%s/permits", args[0])
-	result, err := cl.Paginate(context.Background(), endpoint, nil, lc)
+	result, err := cl.Paginate(context.Background(), endpoint, q, lc)
 	if err != nil {
 		apiErr, ok := err.(*client.APIError)
 		if ok {
@@ -198,7 +204,7 @@ func runContractorsPermits(cmd *cobra.Command, args []string) error {
 		return &exitError{code: 1}
 	}
 
-	output.PrintPaginated(cmd.OutOrStdout(), result.Items, result.HasMore, result.Credits)
+	output.PrintPaginated(cmd.OutOrStdout(), result.Items, result.HasMore, result.Credits, result.TotalCount)
 	return nil
 }
 
@@ -247,7 +253,7 @@ func runContractorsEmployees(cmd *cobra.Command, args []string) error {
 		return &exitError{code: 1}
 	}
 
-	output.PrintPaginated(cmd.OutOrStdout(), result.Items, result.HasMore, result.Credits)
+	output.PrintPaginated(cmd.OutOrStdout(), result.Items, result.HasMore, result.Credits, nil)
 	return nil
 }
 
@@ -354,11 +360,17 @@ func init() {
 	contractorsSearchCmd.Flags().Bool("no-tallies", false, "Omit tag and status tallies for faster response (sends include_tallies=false)")
 
 	groups := searchFlagGroups()
-	groups = append(groups, flagGroup{
-		Title: "Response Options",
-		Names: []string{"no-tallies"},
-	})
+	// Append no-tallies to the existing Response Options group.
+	for i := range groups {
+		if groups[i].Title == "Response Options" {
+			groups[i].Names = append(groups[i].Names, "no-tallies")
+			break
+		}
+	}
 	setGroupedUsage(contractorsSearchCmd, groups)
+
+	// Contractor permits flag
+	contractorsPermitsCmd.Flags().Bool("include-count", false, "Request total result count (capped at 10,000). Returned as total_count in meta on first page")
 
 	// Metrics flags
 	contractorsMetricsCmd.Flags().String("metric-from", "", "Metrics start date in YYYY-MM-DD format (required)")

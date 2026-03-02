@@ -82,18 +82,28 @@ func (lc LimitConfig) EffectiveLimit() int {
 	return lc.Limit
 }
 
+// TotalCount holds the server-side result count returned when include_count=true.
+// Value is capped at 10,000 by the API; Relation is "eq" for exact counts or
+// "gte" when the actual count exceeds the cap.
+type TotalCount struct {
+	Value    int    `json:"value"`
+	Relation string `json:"relation"`
+}
+
 // pageResponse is the expected shape of a paginated API response.
 type pageResponse struct {
 	Items      []json.RawMessage `json:"items"`
 	NextCursor *string           `json:"next_cursor"`
+	TotalCount *TotalCount       `json:"total_count"`
 }
 
 // PaginatedResult holds the assembled output from paginating through an API
 // endpoint. All items are collected in memory before returning.
 type PaginatedResult struct {
-	Items   []json.RawMessage
-	HasMore bool
-	Credits CreditMeta
+	Items      []json.RawMessage
+	HasMore    bool
+	Credits    CreditMeta
+	TotalCount *TotalCount
 }
 
 // Paginate fetches records from a paginated API endpoint, following cursors
@@ -113,6 +123,8 @@ func (c *Client) Paginate(ctx context.Context, path string, query url.Values, lc
 	}
 
 	var lastCredits CreditMeta
+	var totalCount *TotalCount
+	firstPage := true
 
 	for {
 		remaining := effective - len(collected)
@@ -138,23 +150,32 @@ func (c *Client) Paginate(ctx context.Context, path string, query url.Values, lc
 			}
 		}
 
+		// Capture total_count from the first page only; subsequent pages
+		// do not include it even when include_count was requested.
+		if firstPage {
+			totalCount = page.TotalCount
+			firstPage = false
+		}
+
 		collected = append(collected, page.Items...)
 
 		// No more pages available from the API.
 		if page.NextCursor == nil || *page.NextCursor == "" {
 			return &PaginatedResult{
-				Items:   collected,
-				HasMore: false,
-				Credits: lastCredits,
+				Items:      collected,
+				HasMore:    false,
+				Credits:    lastCredits,
+				TotalCount: totalCount,
 			}, nil
 		}
 
 		// Reached the requested limit with more pages available.
 		if len(collected) >= effective {
 			return &PaginatedResult{
-				Items:   collected[:effective],
-				HasMore: true,
-				Credits: lastCredits,
+				Items:      collected[:effective],
+				HasMore:    true,
+				Credits:    lastCredits,
+				TotalCount: totalCount,
 			}, nil
 		}
 
@@ -164,8 +185,9 @@ func (c *Client) Paginate(ctx context.Context, path string, query url.Values, lc
 	// This branch handles the case where effective was already 0 or
 	// we broke out of the loop after collecting enough items.
 	return &PaginatedResult{
-		Items:   collected,
-		HasMore: len(collected) >= effective && effective > 0,
-		Credits: lastCredits,
+		Items:      collected,
+		HasMore:    len(collected) >= effective && effective > 0,
+		Credits:    lastCredits,
+		TotalCount: totalCount,
 	}, nil
 }

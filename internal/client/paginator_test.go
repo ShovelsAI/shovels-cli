@@ -437,3 +437,86 @@ func TestPaginateLimit1(t *testing.T) {
 		t.Errorf("expected 1 item, got %d", len(result.Items))
 	}
 }
+
+func TestPaginateTotalCountCapturedFromFirstPage(t *testing.T) {
+	requestCount := 0
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		size, _ := strconv.Atoi(r.URL.Query().Get("size"))
+		items := make([]json.RawMessage, size)
+		for i := range size {
+			items[i] = json.RawMessage(fmt.Sprintf(`{"id":%d}`, i))
+		}
+
+		type tcShape struct {
+			Value    int    `json:"value"`
+			Relation string `json:"relation"`
+		}
+		type resp struct {
+			Items      []json.RawMessage `json:"items"`
+			NextCursor *string           `json:"next_cursor"`
+			TotalCount *tcShape          `json:"total_count"`
+		}
+
+		r2 := resp{Items: items}
+		if requestCount == 1 {
+			r2.TotalCount = &tcShape{Value: 1234, Relation: "eq"}
+			cursor := "page2"
+			r2.NextCursor = &cursor
+		}
+		json.NewEncoder(w).Encode(r2)
+	}))
+	defer srv.Close()
+
+	c := New(Options{
+		APIKey:  "test-key",
+		BaseURL: srv.URL,
+		Timeout: 5 * time.Second,
+	})
+
+	lc := LimitConfig{Limit: 75}
+	result, err := c.Paginate(context.Background(), "/test", nil, lc)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result.TotalCount == nil {
+		t.Fatal("expected TotalCount to be non-nil")
+	}
+	if result.TotalCount.Value != 1234 {
+		t.Errorf("expected TotalCount.Value=1234, got %d", result.TotalCount.Value)
+	}
+	if result.TotalCount.Relation != "eq" {
+		t.Errorf("expected TotalCount.Relation=eq, got %q", result.TotalCount.Relation)
+	}
+}
+
+func TestPaginateTotalCountNilWhenNotPresent(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := struct {
+			Items      []json.RawMessage `json:"items"`
+			NextCursor *string           `json:"next_cursor"`
+		}{
+			Items: []json.RawMessage{json.RawMessage(`{"id":1}`)},
+		}
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+
+	c := New(Options{
+		APIKey:  "test-key",
+		BaseURL: srv.URL,
+		Timeout: 5 * time.Second,
+	})
+
+	lc := LimitConfig{Limit: 10}
+	result, err := c.Paginate(context.Background(), "/test", nil, lc)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result.TotalCount != nil {
+		t.Errorf("expected TotalCount to be nil, got %+v", result.TotalCount)
+	}
+}

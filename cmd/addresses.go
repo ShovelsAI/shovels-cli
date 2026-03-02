@@ -79,7 +79,7 @@ func runAddressesSearch(cmd *cobra.Command, args []string) error {
 		return &exitError{code: 1}
 	}
 
-	output.PrintPaginated(cmd.OutOrStdout(), result.Items, result.HasMore, result.Credits)
+	output.PrintPaginated(cmd.OutOrStdout(), result.Items, result.HasMore, result.Credits, nil)
 	return nil
 }
 

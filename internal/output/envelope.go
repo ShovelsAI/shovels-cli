@@ -10,7 +10,9 @@ import (
 // PrintPaginated writes a JSON envelope for paginated responses. The data
 // field contains the items array, and meta includes count, has_more, and
 // credit information from the last API response in the pagination sequence.
-func PrintPaginated(w io.Writer, items []json.RawMessage, hasMore bool, credits client.CreditMeta) {
+// When totalCount is non-nil, meta includes a total_count object with value
+// and relation fields.
+func PrintPaginated(w io.Writer, items []json.RawMessage, hasMore bool, credits client.CreditMeta, totalCount *client.TotalCount) {
 	meta := map[string]any{
 		"count":    len(items),
 		"has_more": hasMore,
@@ -20,6 +22,9 @@ func PrintPaginated(w io.Writer, items []json.RawMessage, hasMore bool, credits 
 	}
 	if credits.CreditsRemaining != nil {
 		meta["credits_remaining"] = *credits.CreditsRemaining
+	}
+	if totalCount != nil {
+		meta["total_count"] = totalCount
 	}
 
 	env := Envelope{
