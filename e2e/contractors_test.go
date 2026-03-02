@@ -497,3 +497,359 @@ func TestContractorsSearchPagination(t *testing.T) {
 		t.Errorf("expected 2 API requests, got %d", got)
 	}
 }
+
+// =======================================================================
+// contractors get
+// =======================================================================
+
+// makeContractorGetHandler returns an HTTP handler that serves batch
+// contractor responses. knownIDs defines which IDs exist; unknown IDs
+// are omitted from the response.
+func makeContractorGetHandler(knownIDs map[string]bool, creditsUsed, creditsRemaining int) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ids := r.URL.Query()["id"]
+
+		var items []json.RawMessage
+		for _, id := range ids {
+			if knownIDs[id] {
+				items = append(items, json.RawMessage(fmt.Sprintf(
+					`{"id":%q,"name":"Contractor %s","classification":"general_building"}`, id, id,
+				)))
+			}
+		}
+		if items == nil {
+			items = []json.RawMessage{}
+		}
+
+		w.Header().Set("X-Credits-Request", strconv.Itoa(creditsUsed))
+		w.Header().Set("X-Credits-Remaining", strconv.Itoa(creditsRemaining))
+
+		resp := struct {
+			Items []json.RawMessage `json:"items"`
+		}{Items: items}
+		json.NewEncoder(w).Encode(resp)
+	})
+}
+
+// --- contractors get: Happy paths ---
+
+func TestContractorsGetSingleID(t *testing.T) {
+	known := map[string]bool{"C123": true}
+	srv := httptest.NewServer(makeContractorGetHandler(known, 1, 9999))
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--api-key", "sk-test",
+		"--base-url", srv.URL,
+		"contractors", "get", "C123",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	parsed := parseEnvelope(t, result.Stdout)
+
+	// Single ID: data must be an object, not an array.
+	var dataObj map[string]any
+	if err := json.Unmarshal(parsed.Data, &dataObj); err != nil {
+		t.Fatalf("expected data to be object for single ID, got: %s", string(parsed.Data))
+	}
+	if dataObj["id"] != "C123" {
+		t.Errorf("expected id=C123, got %v", dataObj["id"])
+	}
+	if dataObj["name"] != "Contractor C123" {
+		t.Errorf("expected name=%q, got %v", "Contractor C123", dataObj["name"])
+	}
+
+	// No count in meta for single-object responses.
+	if _, ok := parsed.Meta["count"]; ok {
+		t.Error("single-object response should not have count in meta")
+	}
+
+	// No has_more for batch (non-paginated) responses.
+	if _, ok := parsed.Meta["has_more"]; ok {
+		t.Error("batch response should not have has_more in meta")
+	}
+
+	// meta.missing should be absent when ID is found.
+	if _, ok := parsed.Meta["missing"]; ok {
+		t.Error("expected missing to be absent when ID is found")
+	}
+
+	cu := int(parsed.Meta["credits_used"].(float64))
+	if cu != 1 {
+		t.Errorf("expected credits_used=1, got %d", cu)
+	}
+
+	cr := int(parsed.Meta["credits_remaining"].(float64))
+	if cr != 9999 {
+		t.Errorf("expected credits_remaining=9999, got %d", cr)
+	}
+}
+
+func TestContractorsGetMultipleIDs(t *testing.T) {
+	known := map[string]bool{"C123": true, "C456": true}
+	srv := httptest.NewServer(makeContractorGetHandler(known, 2, 9998))
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--api-key", "sk-test",
+		"--base-url", srv.URL,
+		"contractors", "get", "C123", "C456",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	parsed := parseEnvelope(t, result.Stdout)
+
+	// Multiple IDs: data must be an array.
+	var data []json.RawMessage
+	if err := json.Unmarshal(parsed.Data, &data); err != nil {
+		t.Fatalf("expected data array for multiple IDs: %v", err)
+	}
+	if len(data) != 2 {
+		t.Errorf("expected 2 items, got %d", len(data))
+	}
+
+	count := int(parsed.Meta["count"].(float64))
+	if count != 2 {
+		t.Errorf("expected count=2, got %d", count)
+	}
+
+	// meta.missing should be absent when all IDs found.
+	if _, ok := parsed.Meta["missing"]; ok {
+		t.Error("expected missing to be absent when all IDs found")
+	}
+
+	// No has_more for batch (non-paginated) responses.
+	if _, ok := parsed.Meta["has_more"]; ok {
+		t.Error("batch response should not have has_more in meta")
+	}
+
+	cu := int(parsed.Meta["credits_used"].(float64))
+	if cu != 2 {
+		t.Errorf("expected credits_used=2, got %d", cu)
+	}
+
+	cr := int(parsed.Meta["credits_remaining"].(float64))
+	if cr != 9998 {
+		t.Errorf("expected credits_remaining=9998, got %d", cr)
+	}
+}
+
+// --- contractors get: Edge cases ---
+
+func TestContractorsGetSomeMissing(t *testing.T) {
+	known := map[string]bool{"C123": true}
+	srv := httptest.NewServer(makeContractorGetHandler(known, 1, 9999))
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--api-key", "sk-test",
+		"--base-url", srv.URL,
+		"contractors", "get", "C123", "C999", "C888",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	parsed := parseEnvelope(t, result.Stdout)
+
+	var data []json.RawMessage
+	if err := json.Unmarshal(parsed.Data, &data); err != nil {
+		t.Fatalf("expected data array: %v", err)
+	}
+	if len(data) != 1 {
+		t.Errorf("expected 1 item in data (only C123 found), got %d", len(data))
+	}
+
+	count := int(parsed.Meta["count"].(float64))
+	if count != 1 {
+		t.Errorf("expected count=1, got %d", count)
+	}
+
+	missingVal, ok := parsed.Meta["missing"]
+	if !ok {
+		t.Fatal("expected missing in meta when some IDs not found")
+	}
+	missingArr, ok := missingVal.([]any)
+	if !ok {
+		t.Fatalf("expected missing to be array, got %T", missingVal)
+	}
+	if len(missingArr) != 2 {
+		t.Fatalf("expected 2 missing IDs, got %d", len(missingArr))
+	}
+	if missingArr[0].(string) != "C999" {
+		t.Errorf("expected first missing ID C999, got %q", missingArr[0])
+	}
+	if missingArr[1].(string) != "C888" {
+		t.Errorf("expected second missing ID C888, got %q", missingArr[1])
+	}
+}
+
+// --- contractors get: Error conditions ---
+
+func TestContractorsGetNoIDs(t *testing.T) {
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--api-key", "sk-test",
+		"contractors", "get",
+	)
+
+	if result.ExitCode != 1 {
+		t.Fatalf("expected exit 1, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	p := parseStderrError(t, result.Stderr)
+	if p.Code != 1 {
+		t.Errorf("expected error code 1, got %d", p.Code)
+	}
+	if p.ErrorType != "validation_error" {
+		t.Errorf("expected error_type %q, got %q", "validation_error", p.ErrorType)
+	}
+	if p.Error != "at least one contractor ID required" {
+		t.Errorf("expected error %q, got %q", "at least one contractor ID required", p.Error)
+	}
+}
+
+func TestContractorsGetTooManyIDs(t *testing.T) {
+	env := withIsolatedConfig(t)
+
+	args := []string{
+		"--api-key", "sk-test",
+		"contractors", "get",
+	}
+	for i := range 51 {
+		args = append(args, fmt.Sprintf("C%05d", i))
+	}
+
+	result := runCLIWithEnv(t, env, args...)
+
+	if result.ExitCode != 1 {
+		t.Fatalf("expected exit 1, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	p := parseStderrError(t, result.Stderr)
+	if p.Code != 1 {
+		t.Errorf("expected error code 1, got %d", p.Code)
+	}
+	if p.ErrorType != "validation_error" {
+		t.Errorf("expected error_type %q, got %q", "validation_error", p.ErrorType)
+	}
+	if p.Error != "maximum 50 IDs per request" {
+		t.Errorf("expected error %q, got %q", "maximum 50 IDs per request", p.Error)
+	}
+}
+
+// --- contractors get: Boundary conditions ---
+
+func TestContractorsGetSingleIDIsObject(t *testing.T) {
+	known := map[string]bool{"CSOLO": true}
+	srv := httptest.NewServer(makeContractorGetHandler(known, 1, 9999))
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--api-key", "sk-test",
+		"--base-url", srv.URL,
+		"contractors", "get", "CSOLO",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	parsed := parseEnvelope(t, result.Stdout)
+
+	// Verify data is an object by attempting to unmarshal as a map.
+	var dataObj map[string]any
+	if err := json.Unmarshal(parsed.Data, &dataObj); err != nil {
+		t.Fatalf("single ID: expected data to be object, got: %s", string(parsed.Data))
+	}
+
+	// Verify it is NOT an array by attempting to unmarshal as array.
+	var dataArr []any
+	if err := json.Unmarshal(parsed.Data, &dataArr); err == nil {
+		t.Fatal("single ID: data should NOT be an array")
+	}
+}
+
+func TestContractorsGetMultipleIDsIsArray(t *testing.T) {
+	known := map[string]bool{"CA": true, "CB": true}
+	srv := httptest.NewServer(makeContractorGetHandler(known, 2, 9998))
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--api-key", "sk-test",
+		"--base-url", srv.URL,
+		"contractors", "get", "CA", "CB",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	parsed := parseEnvelope(t, result.Stdout)
+
+	// Verify data is an array.
+	var dataArr []json.RawMessage
+	if err := json.Unmarshal(parsed.Data, &dataArr); err != nil {
+		t.Fatalf("multiple IDs: expected data to be array, got: %s", string(parsed.Data))
+	}
+	if len(dataArr) != 2 {
+		t.Errorf("expected 2 items in array, got %d", len(dataArr))
+	}
+}
+
+func TestContractorsGetExactly50IDs(t *testing.T) {
+	known := make(map[string]bool, 50)
+	for i := range 50 {
+		known[fmt.Sprintf("C%05d", i)] = true
+	}
+
+	srv := httptest.NewServer(makeContractorGetHandler(known, 50, 9950))
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	args := []string{
+		"--api-key", "sk-test",
+		"--base-url", srv.URL,
+		"contractors", "get",
+	}
+	for i := range 50 {
+		args = append(args, fmt.Sprintf("C%05d", i))
+	}
+
+	result := runCLIWithEnv(t, env, args...)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	parsed := parseEnvelope(t, result.Stdout)
+
+	var data []json.RawMessage
+	if err := json.Unmarshal(parsed.Data, &data); err != nil {
+		t.Fatalf("expected data array: %v", err)
+	}
+	if len(data) != 50 {
+		t.Errorf("expected 50 items, got %d", len(data))
+	}
+
+	count := int(parsed.Meta["count"].(float64))
+	if count != 50 {
+		t.Errorf("expected count=50, got %d", count)
+	}
+
+	if _, ok := parsed.Meta["missing"]; ok {
+		t.Error("expected missing to be absent when all 50 IDs found")
+	}
+}
