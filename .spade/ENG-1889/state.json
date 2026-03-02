@@ -11,7 +11,7 @@
   "execution": {
     "guard_mode": "codex",
     "user_instructions": "",
-    "current_step": 12,
+    "current_step": 14,
     "total_steps": 13
   },
   "steps": {
@@ -82,14 +82,15 @@
       "head_tree": "39e86a936161c3b1beb26864f047ba81fa5dd6bb"
     },
     "12": {
-      "status": "in_progress",
+      "status": "approved",
       "range_base": "f97bc85",
-      "head_sha": null
+      "head_sha": "a7beaeb"
     },
     "13": {
-      "status": "pending",
-      "range_base": null,
-      "head_sha": null
+      "status": "approved",
+      "range_base": "a7beaeb",
+      "head_sha": "39829b2",
+      "head_tree": "2b2cdba07835573a337ffb27a758344af17c6a6a"
     }
   }
 }

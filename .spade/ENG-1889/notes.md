@@ -61,6 +61,7 @@ Key decisions from expert convergence (3 rounds):
 - [Step 9 debt] `runContractorsGet` duplicates client creation/API error translation/request-building patterns already present in permits get; a shared helper would reduce divergence risk across resource `get` commands.
 - [Step 10 debt] [cmd/contractors.go:168](/Users/luka/workspace/shovels-cli/worktrees/ENG-1889/cmd/contractors.go:168), [cmd/contractors.go:214](/Users/luka/workspace/shovels-cli/worktrees/ENG-1889/cmd/contractors.go:214), and [cmd/contractors.go:265](/Users/luka/workspace/shovels-cli/worktrees/ENG-1889/cmd/contractors.go:265) duplicate client setup and API error translation logic; a shared helper would reduce divergence risk and prep-refactor debt.
 - [Step 11 debt] Client setup and API error translation logic are duplicated again in new command handlers; a prep refactor to a shared command helper would reduce divergence risk as commands grow.
+- [Step 13 debt] CI and release workflows duplicate checkout/setup-go/test setup; a reusable workflow would reduce drift risk between validation paths.
 ## § Patterns Discovered
 <!-- Populated during /strike execution -->
 
@@ -80,5 +81,7 @@ Key decisions from expert convergence (3 rounds):
 - Step 9: `shovels contractors get` -> 9141a75
 - Step 10: `shovels contractors permits|employees|metrics` -> ce11d15 (2 commits)
 - Step 11: `shovels addresses search` + `shovels usage` -> f97bc85
+- Step 12: LLM-optimized `--help` text -> a7beaeb (2 commits)
+- Step 13: GoReleaser + GitHub Actions + README -> 39829b2 (2 commits)
 ## § Amendments
 <!-- For post-strike work discovered during execution -->
