@@ -35,21 +35,34 @@ func TestRootHelpShowsDescriptionCommandsAndGlobalFlags(t *testing.T) {
 		}
 	}
 
-	// Global flags must be present with defaults.
-	globalFlags := []struct {
-		flag     string
-		fragment string
-	}{
-		{"--api-key", "--api-key"},
-		{"--limit", "--limit"},
-		{"--max-records", "--max-records"},
-		{"--base-url", "--base-url"},
-		{"--no-retry", "--no-retry"},
-		{"--timeout", "--timeout"},
+	// Global flags must be present.
+	globalFlags := []string{
+		"--api-key",
+		"--limit",
+		"--max-records",
+		"--base-url",
+		"--no-retry",
+		"--timeout",
 	}
-	for _, gf := range globalFlags {
-		if !strings.Contains(out, gf.fragment) {
-			t.Errorf("root --help should contain global flag %q", gf.flag)
+	for _, flag := range globalFlags {
+		if !strings.Contains(out, flag) {
+			t.Errorf("root --help should contain global flag %q", flag)
+		}
+	}
+
+	// Default values must be visible in the help text.
+	defaults := []struct {
+		label string
+		value string
+	}{
+		{"--limit default", "50"},
+		{"--timeout default", "30s"},
+		{"--base-url default", "https://api.shovels.ai/v2"},
+		{"--max-records default", "10000"},
+	}
+	for _, d := range defaults {
+		if !strings.Contains(out, d.value) {
+			t.Errorf("root --help should show %s value %q", d.label, d.value)
 		}
 	}
 }
@@ -99,19 +112,51 @@ func TestPermitsSearchHelpShowsGroupedFlagsAndExamples(t *testing.T) {
 		t.Error("permits search --help should contain date format hint YYYY-MM-DD")
 	}
 
-	// Optional flags should be present with type hints.
+	// All optional flags from shared search flags + permits-specific flags.
 	optionalFlags := []string{
+		// Permit filters
 		"--tags",
 		"--query",
 		"--status",
+		"--min-approval-duration",
+		"--min-construction-duration",
+		"--min-inspection-pr",
+		"--min-job-value",
+		"--min-fees",
+		// Property filters
 		"--property-type",
+		"--property-min-market-value",
+		"--property-min-building-area",
+		"--property-min-lot-size",
+		"--property-min-story-count",
+		"--property-min-unit-count",
+		// Contractor filters
 		"--contractor-classification",
+		"--contractor-name",
+		"--contractor-website",
+		"--contractor-min-total-job-value",
+		"--contractor-min-total-permits-count",
+		"--contractor-min-inspection-pr",
+		"--contractor-license",
+		// Permits-specific
 		"--has-contractor",
 	}
 	for _, flag := range optionalFlags {
 		if !strings.Contains(out, flag) {
 			t.Errorf("permits search --help should contain optional flag %q", flag)
 		}
+	}
+
+	// Type hints should be present for typed flags.
+	typeHints := []string{"string", "int", "strings"}
+	foundTypeHints := 0
+	for _, hint := range typeHints {
+		if strings.Contains(out, hint) {
+			foundTypeHints++
+		}
+	}
+	if foundTypeHints == 0 {
+		t.Error("permits search --help should display type hints for flags")
 	}
 
 	// Global flags section should appear (inherited).
@@ -149,10 +194,16 @@ func TestHelpOutputIsPlainText(t *testing.T) {
 		{"permits", "get", "--help"},
 		{"contractors", "--help"},
 		{"contractors", "search", "--help"},
+		{"contractors", "get", "--help"},
+		{"contractors", "permits", "--help"},
+		{"contractors", "employees", "--help"},
+		{"contractors", "metrics", "--help"},
 		{"addresses", "--help"},
 		{"addresses", "search", "--help"},
 		{"usage", "--help"},
 		{"config", "--help"},
+		{"config", "set", "--help"},
+		{"config", "show", "--help"},
 		{"version", "--help"},
 	}
 
