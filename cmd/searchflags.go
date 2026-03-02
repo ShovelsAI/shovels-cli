@@ -26,36 +26,36 @@ func registerSearchFlags(cmd *cobra.Command) {
 	f := cmd.Flags()
 
 	// Required filters
-	f.String("geo-id", "", "Geographic filter ID (e.g. ZIP_90210, CITY_LOS_ANGELES_CA, COUNTY_LOS_ANGELES_CA, STATE_CA)")
-	f.String("from", "", "Start date for permit filing (YYYY-MM-DD format, required)")
-	f.String("to", "", "End date for permit filing (YYYY-MM-DD format, required)")
+	f.String("geo-id", "", "Geographic area ID: ZIP_90210, CITY_LOS_ANGELES_CA, COUNTY_LOS_ANGELES_CA, STATE_CA (required)")
+	f.String("from", "", "Start date in YYYY-MM-DD format (required)")
+	f.String("to", "", "End date in YYYY-MM-DD format (required)")
 
 	// Permit filters
-	f.StringSlice("tags", nil, "Permit tags to filter by (AND logic). Prefix with - to exclude (e.g. --tags=-roofing)")
-	f.String("query", "", "Substring search in permit description (case-insensitive, max 50 chars)")
-	f.StringSlice("status", nil, "Permit status filter: final, in_review, inactive, active")
-	f.Int("min-approval-duration", 0, "Minimum approval duration in days")
-	f.Int("min-construction-duration", 0, "Minimum construction duration in days")
-	f.Int("min-inspection-pr", 0, "Minimum inspection pass rate (0-100)")
-	f.Int("min-job-value", 0, "Minimum job value in dollars")
-	f.Int("min-fees", 0, "Minimum permit fees in dollars")
+	f.StringSlice("tags", nil, "Permit tags, AND logic, prefix with - to exclude (e.g. solar, -roofing)")
+	f.String("query", "", "Substring search in permit description, case-insensitive, max 50 chars")
+	f.StringSlice("status", nil, "Permit status: final, in_review, inactive, active")
+	f.Int("min-approval-duration", 0, "Minimum approval duration in days (integer)")
+	f.Int("min-construction-duration", 0, "Minimum construction duration in days (integer)")
+	f.Int("min-inspection-pr", 0, "Minimum inspection pass rate, 0-100 (integer)")
+	f.Int("min-job-value", 0, "Minimum job value in dollars (integer)")
+	f.Int("min-fees", 0, "Minimum permit fees in dollars (integer)")
 
 	// Property filters
-	f.String("property-type", "", "Property type filter (e.g. residential, commercial, industrial)")
-	f.Int("property-min-market-value", 0, "Minimum assessed market value in dollars")
-	f.Int("property-min-building-area", 0, "Minimum building area in square feet")
-	f.Int("property-min-lot-size", 0, "Minimum lot size in square feet")
-	f.Int("property-min-story-count", 0, "Minimum number of stories")
-	f.Int("property-min-unit-count", 0, "Minimum number of units")
+	f.String("property-type", "", "Property type: residential, commercial, industrial")
+	f.Int("property-min-market-value", 0, "Minimum assessed market value in dollars (integer)")
+	f.Int("property-min-building-area", 0, "Minimum building area in square feet (integer)")
+	f.Int("property-min-lot-size", 0, "Minimum lot size in square feet (integer)")
+	f.Int("property-min-story-count", 0, "Minimum number of stories (integer)")
+	f.Int("property-min-unit-count", 0, "Minimum number of units (integer)")
 
 	// Contractor filters
-	f.StringSlice("contractor-classification", nil, "Contractor classification filter (AND logic, prefix with - to exclude)")
-	f.String("contractor-name", "", "Filter by contractor name or partial name")
-	f.String("contractor-website", "", "Filter by contractor website (exclude http/https prefix)")
-	f.Int("contractor-min-total-job-value", 0, "Minimum lifetime contractor job value in dollars")
-	f.Int("contractor-min-total-permits-count", 0, "Minimum lifetime permits count")
-	f.Int("contractor-min-inspection-pr", 0, "Minimum lifetime inspection pass rate (0-100)")
-	f.String("contractor-license", "", "Filter by contractor license number")
+	f.StringSlice("contractor-classification", nil, "Contractor classification, AND logic, prefix with - to exclude (e.g. general_building)")
+	f.String("contractor-name", "", "Filter by contractor name or partial name (string)")
+	f.String("contractor-website", "", "Filter by contractor website domain, omit http/https (string)")
+	f.Int("contractor-min-total-job-value", 0, "Minimum lifetime contractor job value in dollars (integer)")
+	f.Int("contractor-min-total-permits-count", 0, "Minimum lifetime permits count (integer)")
+	f.Int("contractor-min-inspection-pr", 0, "Minimum lifetime inspection pass rate, 0-100 (integer)")
+	f.String("contractor-license", "", "Filter by contractor license number (string)")
 }
 
 // searchFlagGroups returns the standard flag groups shared by permits search

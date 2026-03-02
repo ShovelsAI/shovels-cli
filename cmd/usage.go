@@ -11,18 +11,16 @@ import (
 
 var usageCmd = &cobra.Command{
 	Use:   "usage",
-	Short: "Show API credit usage for the current account",
-	Long: `Retrieve credit usage information for the authenticated account. Returns
-credits used, credit limit, and other account usage details.
-
-This command is not paginated. The response contains a single data object
-with no count or has_more fields in meta.
+	Short: "Show API credit usage and limits for the authenticated account",
+	Long: `Retrieve credit usage for the authenticated account. Returns total credits
+consumed, credit limit, and other account details. Useful for monitoring
+quota before running large queries.
 
 Example:
   shovels usage
 
 Response: {"data": {"credits_used": N, "credit_limit": N, ...}, "meta": {"credits_used": N, ...}}
-For unlimited plans, credit_limit is null.`,
+For unlimited plans, credit_limit is null. Not paginated.`,
 	Annotations: map[string]string{
 		AnnotationRequiresAuth: "true",
 	},

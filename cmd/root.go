@@ -35,13 +35,30 @@ func (e *exitError) Error() string { return "" }
 
 var rootCmd = &cobra.Command{
 	Use:   "shovels",
-	Short: "Agent-first CLI for the Shovels REST API",
-	Long: `shovels is an agent-first CLI for the Shovels building permit and contractor API.
+	Short: "Query the Shovels building permit and contractor database from the command line",
+	Long: `shovels is a CLI for the Shovels REST API. It searches building permits,
+contractors, and addresses across the United States.
 
 Every command outputs valid JSON to stdout. Errors go to stderr as JSON.
 Pipe output to jq, parse it programmatically, or feed it to another AI agent.
 
-Authentication: set SHOVELS_API_KEY env var, pass --api-key flag, or run: shovels config set api-key <key>`,
+Available resources:
+  permits       Search and retrieve building permits by location, date, type, and contractor
+  contractors   Search contractors, retrieve details, list their permits/employees/metrics
+  addresses     Search addresses by street, city, state, or zip code
+  usage         Check API credit consumption for the authenticated account
+  config        Read and write persistent settings (API key, base URL)
+  version       Print CLI version, git commit, and build date
+
+Authentication (checked in this order):
+  1. --api-key flag
+  2. SHOVELS_API_KEY environment variable
+  3. ~/.config/shovels/config.yaml
+
+Quick start:
+  shovels config set api-key YOUR_API_KEY
+  shovels permits search --geo-id ZIP_90210 --from 2024-01-01 --to 2024-12-31
+  shovels contractors search --geo-id ZIP_90210 --from 2024-01-01 --to 2024-12-31 --tags solar`,
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -87,12 +104,12 @@ func requiresAuth(cmd *cobra.Command) bool {
 
 func init() {
 	flags := rootCmd.PersistentFlags()
-	flags.String("api-key", "", "Shovels API key (overrides SHOVELS_API_KEY env var and config file)")
-	flags.String("limit", "50", `Maximum number of records to return. Use a number (1-100000) or "all" for up to --max-records`)
-	flags.Int("max-records", 10000, "Upper bound when --limit=all (default 10000, max 100000)")
-	flags.String("base-url", "https://api.shovels.ai/v2", "Shovels API base URL")
-	flags.Bool("no-retry", false, "Disable automatic retry on rate-limit (429) responses")
-	flags.String("timeout", "30s", "Per-request timeout as a Go duration (e.g. 10s, 1m)")
+	flags.String("api-key", "", "API key for authentication (overrides SHOVELS_API_KEY env var and config file)")
+	flags.String("limit", "50", `Maximum records to return: integer 1-100000 or "all" (default "50")`)
+	flags.Int("max-records", 10000, "Upper bound when --limit=all, range 1-100000 (default 10000)")
+	flags.String("base-url", "https://api.shovels.ai/v2", "API base URL (default https://api.shovels.ai/v2)")
+	flags.Bool("no-retry", false, "Disable automatic retry on HTTP 429 rate-limit responses")
+	flags.String("timeout", "30s", "Per-request timeout as a Go duration, e.g. 10s, 1m, 2m30s (default 30s)")
 
 	// Emit JSON to stderr on flag-parsing errors instead of cobra's plain text.
 	rootCmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
