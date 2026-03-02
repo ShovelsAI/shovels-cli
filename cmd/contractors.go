@@ -39,19 +39,24 @@ range. Supports permit tag filters, property type filters, contractor
 classification filters, and minimum-value thresholds.
 
 Required flags:
-  --geo-id GEO_ID   Geographic area: ZIP_90210, CITY_LOS_ANGELES_CA, COUNTY_LOS_ANGELES_CA, or STATE_CA (required)
-  --permit-from DATE        Start date in YYYY-MM-DD format (required)
-  --permit-to DATE          End date in YYYY-MM-DD format (required)
+  --geo-id       Geographic area: zip code (92024), state (CA), or Shovels ID from addresses search
+  --permit-from  Start date in YYYY-MM-DD format
+  --permit-to    End date in YYYY-MM-DD format
+
+Geographic IDs:
+  Zip codes and states work directly (92024, CA). For cities, counties, or
+  addresses, resolve the ID first:
+    shovels addresses search -q "Austin, TX" | jq '.data[0].geo_id'
 
 Examples:
   Search contractors in a zip code:
-    shovels contractors search --geo-id ZIP_90210 --permit-from 2024-01-01 --permit-to 2024-12-31
+    shovels contractors search --geo-id 78701 --permit-from 2024-01-01 --permit-to 2024-12-31
 
   Filter by contractor classification:
-    shovels contractors search --geo-id ZIP_90210 --permit-from 2024-01-01 --permit-to 2024-12-31 --contractor-classification general_building
+    shovels contractors search --geo-id 92024 --permit-from 2024-01-01 --permit-to 2024-12-31 --contractor-classification general_building
 
   Skip tallies for faster response:
-    shovels contractors search --geo-id ZIP_90210 --permit-from 2024-01-01 --permit-to 2024-12-31 --no-tallies`,
+    shovels contractors search --geo-id CA --permit-from 2024-01-01 --permit-to 2024-12-31 --no-tallies`,
 	Annotations: map[string]string{
 		AnnotationRequiresAuth: "true",
 	},

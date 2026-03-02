@@ -46,10 +46,10 @@ shovels version
 export SHOVELS_API_KEY=your-api-key
 
 # 2. Search permits
-shovels permits search --geo-id ZIP_90210 --permit-from 2024-01-01 --permit-to 2024-12-31
+shovels permits search --geo-id 90210 --permit-from 2024-01-01 --permit-to 2024-12-31
 
 # 3. Search contractors
-shovels contractors search --geo-id ZIP_90210 --permit-from 2024-01-01 --permit-to 2024-12-31 --tags solar
+shovels contractors search --geo-id 90210 --permit-from 2024-01-01 --permit-to 2024-12-31 --tags solar
 
 # 4. Check credit usage
 shovels usage
@@ -96,19 +96,19 @@ Search and retrieve building permits.
 
 ```bash
 # Search by location and date range
-shovels permits search --geo-id ZIP_90210 --permit-from 2024-01-01 --permit-to 2024-12-31
+shovels permits search --geo-id 90210 --permit-from 2024-01-01 --permit-to 2024-12-31
 
 # Filter by work type (AND logic for multiple tags)
-shovels permits search --geo-id ZIP_90210 --permit-from 2024-01-01 --permit-to 2024-12-31 --tags solar --tags roofing
+shovels permits search --geo-id 90210 --permit-from 2024-01-01 --permit-to 2024-12-31 --tags solar --tags roofing
 
 # Exclude a tag (prefix with -)
-shovels permits search --geo-id ZIP_90210 --permit-from 2024-01-01 --permit-to 2024-12-31 --tags solar --tags=-roofing
+shovels permits search --geo-id 90210 --permit-from 2024-01-01 --permit-to 2024-12-31 --tags solar --tags=-roofing
 
 # Filter by property type and minimum job value
-shovels permits search --geo-id STATE_CA --permit-from 2024-01-01 --permit-to 2024-12-31 --property-type residential --min-job-value 50000
+shovels permits search --geo-id CA --permit-from 2024-01-01 --permit-to 2024-12-31 --property-type residential --min-job-value 50000
 
 # Request total result count in meta
-shovels permits search --geo-id ZIP_90210 --permit-from 2024-01-01 --permit-to 2024-12-31 --include-count
+shovels permits search --geo-id 90210 --permit-from 2024-01-01 --permit-to 2024-12-31 --include-count
 
 # Retrieve permits by ID (1–50 IDs)
 shovels permits get P123
@@ -119,7 +119,7 @@ shovels permits get P123 P456 P789
 
 **Optional flags:** `--include-count` returns `total_count` in meta (capped at 10,000)
 
-Geographic ID formats: `ZIP_90210`, `CITY_LOS_ANGELES_CA`, `COUNTY_LOS_ANGELES_CA`, `STATE_CA`
+Geographic IDs: zip codes (`90210`), states (`CA`), or Shovels IDs resolved via `shovels addresses search -q "..."`
 
 ### contractors
 
@@ -127,10 +127,10 @@ Search contractors and retrieve their permits, employees, and metrics.
 
 ```bash
 # Search by location
-shovels contractors search --geo-id ZIP_90210 --permit-from 2024-01-01 --permit-to 2024-12-31
+shovels contractors search --geo-id 90210 --permit-from 2024-01-01 --permit-to 2024-12-31
 
 # Filter by classification
-shovels contractors search --geo-id ZIP_90210 --permit-from 2024-01-01 --permit-to 2024-12-31 --contractor-classification general_building
+shovels contractors search --geo-id 90210 --permit-from 2024-01-01 --permit-to 2024-12-31 --contractor-classification general_building
 
 # Retrieve by ID
 shovels contractors get C123

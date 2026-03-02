@@ -26,7 +26,11 @@ func registerSearchFlags(cmd *cobra.Command) {
 	f := cmd.Flags()
 
 	// Required filters
-	f.String("geo-id", "", "Geographic area ID: ZIP_90210, CITY_LOS_ANGELES_CA, COUNTY_LOS_ANGELES_CA, STATE_CA (required)")
+	f.String("geo-id", "", `Geographic area ID (required). Formats:
+  Zip code:  5-digit code directly (92024, 78701, 33139)
+  State:     2-letter code directly (CA, TX, FL)
+  Address/city/county: opaque Shovels ID, resolve first:
+    shovels addresses search -q "Austin, TX" | jq '.data[0].geo_id'`)
 	f.String("permit-from", "", "Permit start date in YYYY-MM-DD format (required)")
 	f.String("permit-to", "", "Permit end date in YYYY-MM-DD format (required)")
 
