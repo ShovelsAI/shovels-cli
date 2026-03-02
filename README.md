@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/ShovelsAI/shovels-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/ShovelsAI/shovels-cli/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/ShovelsAI/shovels-cli)](https://github.com/ShovelsAI/shovels-cli/releases/latest)
-[![Go Report Card](https://goreportcard.com/badge/github.com/shovels-ai/shovels-cli)](https://goreportcard.com/report/github.com/shovels-ai/shovels-cli)
+[![Go Report Card](https://goreportcard.com/badge/github.com/ShovelsAI/shovels-cli)](https://goreportcard.com/report/github.com/ShovelsAI/shovels-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Agent-first CLI for the [Shovels](https://www.shovels.ai/) building permit and contractor API. A single binary that any AI agent (or human) can shell out to. JSON only. Zero interactivity.
