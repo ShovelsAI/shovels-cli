@@ -55,13 +55,13 @@ export SHOVELS_API_KEY=YOUR_API_KEY
 ### 2. Search permits
 
 ```bash
-shovels permits search --geo-id ZIP_90210 --from 2024-01-01 --to 2024-12-31
+shovels permits search --geo-id ZIP_90210 --permit-from 2024-01-01 --permit-to 2024-12-31
 ```
 
 ### 3. Search contractors
 
 ```bash
-shovels contractors search --geo-id ZIP_90210 --from 2024-01-01 --to 2024-12-31 --tags solar
+shovels contractors search --geo-id ZIP_90210 --permit-from 2024-01-01 --permit-to 2024-12-31 --tags solar
 ```
 
 ### 4. Check credit usage
@@ -118,23 +118,23 @@ Search and retrieve building permits.
 
 ```bash
 # Search permits by location, date range, and tags
-shovels permits search --geo-id ZIP_90210 --from 2024-01-01 --to 2024-12-31 --tags solar
+shovels permits search --geo-id ZIP_90210 --permit-from 2024-01-01 --permit-to 2024-12-31 --tags solar
 
 # Multiple tags (AND logic)
-shovels permits search --geo-id ZIP_90210 --from 2024-01-01 --to 2024-12-31 --tags solar --tags roofing
+shovels permits search --geo-id ZIP_90210 --permit-from 2024-01-01 --permit-to 2024-12-31 --tags solar --tags roofing
 
 # Exclude a tag (prefix with -)
-shovels permits search --geo-id ZIP_90210 --from 2024-01-01 --to 2024-12-31 --tags solar --tags=-roofing
+shovels permits search --geo-id ZIP_90210 --permit-from 2024-01-01 --permit-to 2024-12-31 --tags solar --tags=-roofing
 
 # Filter by property type and minimum value
-shovels permits search --geo-id STATE_CA --from 2024-01-01 --to 2024-12-31 --property-type residential --min-job-value 50000
+shovels permits search --geo-id STATE_CA --permit-from 2024-01-01 --permit-to 2024-12-31 --property-type residential --min-job-value 50000
 
 # Retrieve permits by ID
 shovels permits get P123
 shovels permits get P123 P456 P789
 ```
 
-**Search required flags:** `--geo-id`, `--from`, `--to`
+**Search required flags:** `--geo-id`, `--permit-from`, `--permit-to`
 
 Geographic ID formats: `ZIP_90210`, `CITY_LOS_ANGELES_CA`, `COUNTY_LOS_ANGELES_CA`, `STATE_CA`
 
@@ -144,10 +144,10 @@ Search contractors and retrieve their permits, employees, and metrics.
 
 ```bash
 # Search contractors
-shovels contractors search --geo-id ZIP_90210 --from 2024-01-01 --to 2024-12-31
+shovels contractors search --geo-id ZIP_90210 --permit-from 2024-01-01 --permit-to 2024-12-31
 
 # Filter by classification
-shovels contractors search --geo-id ZIP_90210 --from 2024-01-01 --to 2024-12-31 --contractor-classification general_building
+shovels contractors search --geo-id ZIP_90210 --permit-from 2024-01-01 --permit-to 2024-12-31 --contractor-classification general_building
 
 # Retrieve contractors by ID
 shovels contractors get C123
@@ -166,7 +166,7 @@ shovels contractors metrics ABC123 \
   --property-type residential --tag solar
 ```
 
-**Search required flags:** `--geo-id`, `--from`, `--to`
+**Search required flags:** `--geo-id`, `--permit-from`, `--permit-to`
 
 **Metrics required flags:** `--metric-from`, `--metric-to`, `--property-type`, `--tag`
 

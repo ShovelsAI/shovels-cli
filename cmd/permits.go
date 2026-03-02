@@ -35,21 +35,21 @@ filters, and minimum-value thresholds.
 
 Required flags:
   --geo-id GEO_ID   Geographic area: ZIP_90210, CITY_LOS_ANGELES_CA, COUNTY_LOS_ANGELES_CA, or STATE_CA (required)
-  --from DATE        Start date in YYYY-MM-DD format (required)
-  --to DATE          End date in YYYY-MM-DD format (required)
+  --permit-from DATE        Start date in YYYY-MM-DD format (required)
+  --permit-to DATE          End date in YYYY-MM-DD format (required)
 
 Examples:
   Search solar permits in a zip code:
-    shovels permits search --geo-id ZIP_90210 --from 2024-01-01 --to 2024-12-31 --tags solar --limit 10
+    shovels permits search --geo-id ZIP_90210 --permit-from 2024-01-01 --permit-to 2024-12-31 --tags solar --limit 10
 
   Multiple tags (AND logic):
-    shovels permits search --geo-id ZIP_90210 --from 2024-01-01 --to 2024-12-31 --tags solar --tags roofing
+    shovels permits search --geo-id ZIP_90210 --permit-from 2024-01-01 --permit-to 2024-12-31 --tags solar --tags roofing
 
   Exclude a tag with dash prefix:
-    shovels permits search --geo-id ZIP_90210 --from 2024-01-01 --to 2024-12-31 --tags solar --tags=-roofing
+    shovels permits search --geo-id ZIP_90210 --permit-from 2024-01-01 --permit-to 2024-12-31 --tags solar --tags=-roofing
 
   Filter by property type and minimum job value:
-    shovels permits search --geo-id STATE_CA --from 2024-01-01 --to 2024-12-31 --property-type residential --min-job-value 50000`,
+    shovels permits search --geo-id STATE_CA --permit-from 2024-01-01 --permit-to 2024-12-31 --property-type residential --min-job-value 50000`,
 	Annotations: map[string]string{
 		AnnotationRequiresAuth: "true",
 	},
