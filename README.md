@@ -95,7 +95,9 @@ shovels
 ├── config
 │   ├── set         Save a configuration value
 │   └── show        Display resolved configuration (API key masked)
-└── version         Print CLI version, git commit, and build date
+├── version         Print CLI version, git commit, and build date
+├── completion      Generate shell autocompletion scripts (bash, zsh, fish, powershell)
+└── help            Help about any command
 ```
 
 ### permits
