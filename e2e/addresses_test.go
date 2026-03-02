@@ -237,8 +237,8 @@ func TestAddressesSearchMissingQuery(t *testing.T) {
 	if p.ErrorType != "validation_error" {
 		t.Errorf("expected error_type %q, got %q", "validation_error", p.ErrorType)
 	}
-	if !strings.Contains(p.Error, "query is required") {
-		t.Errorf("expected error to contain %q, got: %s", "query is required", p.Error)
+	if !strings.Contains(p.Error, "required flag missing: --query (-q)") {
+		t.Errorf("expected error to contain %q, got: %s", "required flag missing: --query (-q)", p.Error)
 	}
 }
 
