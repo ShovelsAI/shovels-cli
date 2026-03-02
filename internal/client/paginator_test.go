@@ -357,6 +357,42 @@ func TestPaginateCountEqualsActualItems(t *testing.T) {
 	}
 }
 
+func TestPaginateSinglePageTruncatesToLimit(t *testing.T) {
+	// Simulates endpoints like /cities/search that ignore the size param
+	// and return all matches in one response with next_cursor=null.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		items := make([]json.RawMessage, 10)
+		for i := range 10 {
+			items[i] = json.RawMessage(fmt.Sprintf(`{"id":%d}`, i))
+		}
+		resp := struct {
+			Items      []json.RawMessage `json:"items"`
+			NextCursor *string           `json:"next_cursor"`
+		}{Items: items, NextCursor: nil}
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+
+	c := New(Options{
+		APIKey:  "test-key",
+		BaseURL: srv.URL,
+		Timeout: 5 * time.Second,
+	})
+
+	lc := LimitConfig{Limit: 5}
+	result, err := c.Paginate(context.Background(), "/test", nil, lc)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result.Items) != 5 {
+		t.Errorf("expected 5 items after truncation, got %d", len(result.Items))
+	}
+	if !result.HasMore {
+		t.Error("expected HasMore=true when server returned more items than the limit")
+	}
+}
+
 func TestPaginateMidPaginationError(t *testing.T) {
 	requestCount := 0
 
