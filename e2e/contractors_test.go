@@ -853,3 +853,602 @@ func TestContractorsGetExactly50IDs(t *testing.T) {
 		t.Error("expected missing to be absent when all 50 IDs found")
 	}
 }
+
+// =======================================================================
+// contractors permits
+// =======================================================================
+
+// makeContractorPermitsHandler returns an HTTP handler that serves paginated
+// permit responses for a specific contractor. The handler validates that the
+// URL path contains the contractor ID.
+func makeContractorPermitsHandler(totalItems int, creditsUsed, creditsRemaining int) (http.Handler, *[]map[string][]string) {
+	var served atomic.Int32
+	capturedQueries := &[]map[string][]string{}
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		params := map[string][]string{}
+		for k, v := range r.URL.Query() {
+			params[k] = v
+		}
+		*capturedQueries = append(*capturedQueries, params)
+
+		size, _ := strconv.Atoi(r.URL.Query().Get("size"))
+		if size == 0 {
+			size = 50
+		}
+
+		start := int(served.Load())
+		remaining := totalItems - start
+		count := min(size, remaining)
+		if count < 0 {
+			count = 0
+		}
+		served.Add(int32(count))
+
+		items := make([]json.RawMessage, count)
+		for i := range count {
+			items[i] = json.RawMessage(fmt.Sprintf(
+				`{"id":"P_%05d","description":"Permit %d","status":"final"}`,
+				start+i, start+i,
+			))
+		}
+
+		var nextCursor *string
+		moreExist := (start + count) < totalItems
+		if count > 0 && moreExist {
+			c := fmt.Sprintf("cursor_%d", start+count)
+			nextCursor = &c
+		}
+
+		w.Header().Set("X-Credits-Request", strconv.Itoa(creditsUsed))
+		w.Header().Set("X-Credits-Remaining", strconv.Itoa(creditsRemaining))
+
+		resp := struct {
+			Items      []json.RawMessage `json:"items"`
+			NextCursor *string           `json:"next_cursor"`
+		}{Items: items, NextCursor: nextCursor}
+		json.NewEncoder(w).Encode(resp)
+	})
+
+	return handler, capturedQueries
+}
+
+// --- contractors permits: Happy paths ---
+
+func TestContractorsPermitsBasic(t *testing.T) {
+	handler, _ := makeContractorPermitsHandler(5, 5, 9995)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--api-key", "sk-test",
+		"--base-url", srv.URL,
+		"contractors", "permits", "ABC123",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	parsed := parseEnvelope(t, result.Stdout)
+
+	var data []json.RawMessage
+	if err := json.Unmarshal(parsed.Data, &data); err != nil {
+		t.Fatalf("expected data array: %v", err)
+	}
+	if len(data) != 5 {
+		t.Errorf("expected 5 items, got %d", len(data))
+	}
+
+	count := int(parsed.Meta["count"].(float64))
+	if count != 5 {
+		t.Errorf("expected count=5, got %d", count)
+	}
+
+	hasMore := parsed.Meta["has_more"].(bool)
+	if hasMore {
+		t.Error("expected has_more=false with only 5 items")
+	}
+
+	cu := int(parsed.Meta["credits_used"].(float64))
+	if cu != 5 {
+		t.Errorf("expected credits_used=5, got %d", cu)
+	}
+
+	cr := int(parsed.Meta["credits_remaining"].(float64))
+	if cr != 9995 {
+		t.Errorf("expected credits_remaining=9995, got %d", cr)
+	}
+}
+
+// --- contractors permits: Edge cases ---
+
+func TestContractorsPermitsNoResults(t *testing.T) {
+	handler, _ := makeContractorPermitsHandler(0, 0, 10000)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--api-key", "sk-test",
+		"--base-url", srv.URL,
+		"contractors", "permits", "UNKNOWN_C",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	parsed := parseEnvelope(t, result.Stdout)
+
+	var data []json.RawMessage
+	if err := json.Unmarshal(parsed.Data, &data); err != nil {
+		t.Fatalf("expected data array: %v", err)
+	}
+	if len(data) != 0 {
+		t.Errorf("expected 0 items, got %d", len(data))
+	}
+
+	count := int(parsed.Meta["count"].(float64))
+	if count != 0 {
+		t.Errorf("expected count=0, got %d", count)
+	}
+
+	hasMore := parsed.Meta["has_more"].(bool)
+	if hasMore {
+		t.Error("expected has_more=false for empty results")
+	}
+
+	// meta.missing should be absent for paginated endpoints.
+	if _, ok := parsed.Meta["missing"]; ok {
+		t.Error("expected missing to be absent for paginated response")
+	}
+}
+
+// --- contractors permits: Error conditions ---
+
+func TestContractorsPermitsNoID(t *testing.T) {
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--api-key", "sk-test",
+		"contractors", "permits",
+	)
+
+	if result.ExitCode != 1 {
+		t.Fatalf("expected exit 1, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	p := parseStderrError(t, result.Stderr)
+	if p.Code != 1 {
+		t.Errorf("expected error code 1, got %d", p.Code)
+	}
+	if p.ErrorType != "validation_error" {
+		t.Errorf("expected error_type %q, got %q", "validation_error", p.ErrorType)
+	}
+	if !strings.Contains(p.Error, "contractor ID required") {
+		t.Errorf("expected error about contractor ID, got: %s", p.Error)
+	}
+}
+
+// --- contractors permits: Boundary conditions ---
+
+func TestContractorsPermitsPagination(t *testing.T) {
+	var requestCount atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := int(requestCount.Add(1))
+		size, _ := strconv.Atoi(r.URL.Query().Get("size"))
+
+		items := make([]json.RawMessage, size)
+		for i := range size {
+			items[i] = json.RawMessage(fmt.Sprintf(`{"id":"P_%05d"}`, (n-1)*size+i))
+		}
+
+		cursor := fmt.Sprintf("page%d", n+1)
+		w.Header().Set("X-Credits-Request", "50")
+		w.Header().Set("X-Credits-Remaining", "9800")
+		resp := struct {
+			Items      []json.RawMessage `json:"items"`
+			NextCursor *string           `json:"next_cursor"`
+		}{Items: items, NextCursor: &cursor}
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--api-key", "sk-test",
+		"--base-url", srv.URL,
+		"--limit", "100",
+		"contractors", "permits", "ABC123",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	parsed := parseEnvelope(t, result.Stdout)
+	var data []json.RawMessage
+	if err := json.Unmarshal(parsed.Data, &data); err != nil {
+		t.Fatalf("expected data array: %v", err)
+	}
+	if len(data) != 100 {
+		t.Errorf("expected 100 items, got %d", len(data))
+	}
+
+	count := int(parsed.Meta["count"].(float64))
+	if count != 100 {
+		t.Errorf("expected count=100, got %d", count)
+	}
+
+	hasMore := parsed.Meta["has_more"].(bool)
+	if !hasMore {
+		t.Error("expected has_more=true")
+	}
+
+	if got := requestCount.Load(); got != 2 {
+		t.Errorf("expected 2 API requests, got %d", got)
+	}
+}
+
+// =======================================================================
+// contractors employees
+// =======================================================================
+
+// makeContractorEmployeesHandler returns an HTTP handler that serves paginated
+// employee responses for a specific contractor.
+func makeContractorEmployeesHandler(totalItems int, creditsUsed, creditsRemaining int) http.Handler {
+	var served atomic.Int32
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		size, _ := strconv.Atoi(r.URL.Query().Get("size"))
+		if size == 0 {
+			size = 50
+		}
+
+		start := int(served.Load())
+		remaining := totalItems - start
+		count := min(size, remaining)
+		if count < 0 {
+			count = 0
+		}
+		served.Add(int32(count))
+
+		items := make([]json.RawMessage, count)
+		for i := range count {
+			items[i] = json.RawMessage(fmt.Sprintf(
+				`{"name":"Employee %d","title":"Engineer"}`,
+				start+i,
+			))
+		}
+
+		var nextCursor *string
+		moreExist := (start + count) < totalItems
+		if count > 0 && moreExist {
+			c := fmt.Sprintf("cursor_%d", start+count)
+			nextCursor = &c
+		}
+
+		w.Header().Set("X-Credits-Request", strconv.Itoa(creditsUsed))
+		w.Header().Set("X-Credits-Remaining", strconv.Itoa(creditsRemaining))
+
+		resp := struct {
+			Items      []json.RawMessage `json:"items"`
+			NextCursor *string           `json:"next_cursor"`
+		}{Items: items, NextCursor: nextCursor}
+		json.NewEncoder(w).Encode(resp)
+	})
+}
+
+// --- contractors employees: Happy paths ---
+
+func TestContractorsEmployeesBasic(t *testing.T) {
+	handler := makeContractorEmployeesHandler(3, 3, 9997)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--api-key", "sk-test",
+		"--base-url", srv.URL,
+		"contractors", "employees", "ABC123",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	parsed := parseEnvelope(t, result.Stdout)
+
+	var data []json.RawMessage
+	if err := json.Unmarshal(parsed.Data, &data); err != nil {
+		t.Fatalf("expected data array: %v", err)
+	}
+	if len(data) != 3 {
+		t.Errorf("expected 3 items, got %d", len(data))
+	}
+
+	count := int(parsed.Meta["count"].(float64))
+	if count != 3 {
+		t.Errorf("expected count=3, got %d", count)
+	}
+
+	hasMore := parsed.Meta["has_more"].(bool)
+	if hasMore {
+		t.Error("expected has_more=false with only 3 items")
+	}
+
+	cu := int(parsed.Meta["credits_used"].(float64))
+	if cu != 3 {
+		t.Errorf("expected credits_used=3, got %d", cu)
+	}
+
+	cr := int(parsed.Meta["credits_remaining"].(float64))
+	if cr != 9997 {
+		t.Errorf("expected credits_remaining=9997, got %d", cr)
+	}
+}
+
+// --- contractors employees: Error conditions ---
+
+func TestContractorsEmployeesNoID(t *testing.T) {
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--api-key", "sk-test",
+		"contractors", "employees",
+	)
+
+	if result.ExitCode != 1 {
+		t.Fatalf("expected exit 1, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	p := parseStderrError(t, result.Stderr)
+	if p.Code != 1 {
+		t.Errorf("expected error code 1, got %d", p.Code)
+	}
+	if p.ErrorType != "validation_error" {
+		t.Errorf("expected error_type %q, got %q", "validation_error", p.ErrorType)
+	}
+	if !strings.Contains(p.Error, "contractor ID required") {
+		t.Errorf("expected error about contractor ID, got: %s", p.Error)
+	}
+}
+
+// =======================================================================
+// contractors metrics
+// =======================================================================
+
+// makeContractorMetricsHandler returns an HTTP handler that validates required
+// query parameters and serves monthly metrics for a contractor.
+func makeContractorMetricsHandler(creditsUsed, creditsRemaining int) (http.Handler, *[]map[string][]string) {
+	capturedQueries := &[]map[string][]string{}
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		params := map[string][]string{}
+		for k, v := range r.URL.Query() {
+			params[k] = v
+		}
+		*capturedQueries = append(*capturedQueries, params)
+
+		w.Header().Set("X-Credits-Request", strconv.Itoa(creditsUsed))
+		w.Header().Set("X-Credits-Remaining", strconv.Itoa(creditsRemaining))
+
+		items := []json.RawMessage{
+			json.RawMessage(`{"month":"2024-01","permit_count":10,"avg_job_value":50000}`),
+			json.RawMessage(`{"month":"2024-02","permit_count":8,"avg_job_value":45000}`),
+			json.RawMessage(`{"month":"2024-03","permit_count":12,"avg_job_value":55000}`),
+		}
+
+		resp := struct {
+			Items []json.RawMessage `json:"items"`
+		}{Items: items}
+		json.NewEncoder(w).Encode(resp)
+	})
+
+	return handler, capturedQueries
+}
+
+// --- contractors metrics: Happy paths ---
+
+func TestContractorsMetricsBasic(t *testing.T) {
+	handler, queries := makeContractorMetricsHandler(10, 9990)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--api-key", "sk-test",
+		"--base-url", srv.URL,
+		"contractors", "metrics", "ABC123",
+		"--metric-from", "2024-01-01",
+		"--metric-to", "2024-12-31",
+		"--property-type", "residential",
+		"--tag", "solar",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	parsed := parseEnvelope(t, result.Stdout)
+
+	// Data should be an array of monthly metrics.
+	var data []json.RawMessage
+	if err := json.Unmarshal(parsed.Data, &data); err != nil {
+		t.Fatalf("expected data array: %v", err)
+	}
+	if len(data) != 3 {
+		t.Errorf("expected 3 monthly metrics, got %d", len(data))
+	}
+
+	// Verify first metric has expected shape.
+	var firstMetric map[string]any
+	if err := json.Unmarshal(data[0], &firstMetric); err != nil {
+		t.Fatalf("failed to parse first metric: %v", err)
+	}
+	if firstMetric["month"] != "2024-01" {
+		t.Errorf("expected month=2024-01, got %v", firstMetric["month"])
+	}
+	if int(firstMetric["permit_count"].(float64)) != 10 {
+		t.Errorf("expected permit_count=10, got %v", firstMetric["permit_count"])
+	}
+
+	// Non-paginated: no count or has_more in meta.
+	if _, exists := parsed.Meta["count"]; exists {
+		t.Error("metrics response must not contain count in meta")
+	}
+	if _, exists := parsed.Meta["has_more"]; exists {
+		t.Error("metrics response must not contain has_more in meta")
+	}
+
+	cu := int(parsed.Meta["credits_used"].(float64))
+	if cu != 10 {
+		t.Errorf("expected credits_used=10, got %d", cu)
+	}
+
+	cr := int(parsed.Meta["credits_remaining"].(float64))
+	if cr != 9990 {
+		t.Errorf("expected credits_remaining=9990, got %d", cr)
+	}
+
+	// Verify query params sent to API.
+	if len(*queries) != 1 {
+		t.Fatalf("expected 1 API request, got %d", len(*queries))
+	}
+	q := (*queries)[0]
+	if q["metric_from"][0] != "2024-01-01" {
+		t.Errorf("expected metric_from=2024-01-01, got %q", q["metric_from"])
+	}
+	if q["metric_to"][0] != "2024-12-31" {
+		t.Errorf("expected metric_to=2024-12-31, got %q", q["metric_to"])
+	}
+	if q["property_type"][0] != "residential" {
+		t.Errorf("expected property_type=residential, got %q", q["property_type"])
+	}
+	if q["tag"][0] != "solar" {
+		t.Errorf("expected tag=solar, got %q", q["tag"])
+	}
+}
+
+// --- contractors metrics: Error conditions ---
+
+func TestContractorsMetricsMissingAllFlags(t *testing.T) {
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--api-key", "sk-test",
+		"contractors", "metrics", "ABC123",
+	)
+
+	if result.ExitCode != 1 {
+		t.Fatalf("expected exit 1, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	p := parseStderrError(t, result.Stderr)
+	if p.Code != 1 {
+		t.Errorf("expected error code 1, got %d", p.Code)
+	}
+	if p.ErrorType != "validation_error" {
+		t.Errorf("expected error_type %q, got %q", "validation_error", p.ErrorType)
+	}
+	if !strings.Contains(p.Error, "--metric-from") {
+		t.Errorf("expected error to mention --metric-from, got: %s", p.Error)
+	}
+	if !strings.Contains(p.Error, "--metric-to") {
+		t.Errorf("expected error to mention --metric-to, got: %s", p.Error)
+	}
+	if !strings.Contains(p.Error, "--property-type") {
+		t.Errorf("expected error to mention --property-type, got: %s", p.Error)
+	}
+	if !strings.Contains(p.Error, "--tag") {
+		t.Errorf("expected error to mention --tag, got: %s", p.Error)
+	}
+}
+
+func TestContractorsMetricsMissingSomeFlags(t *testing.T) {
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--api-key", "sk-test",
+		"contractors", "metrics", "ABC123",
+		"--metric-from", "2024-01-01",
+		"--metric-to", "2024-12-31",
+	)
+
+	if result.ExitCode != 1 {
+		t.Fatalf("expected exit 1, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	p := parseStderrError(t, result.Stderr)
+	if p.ErrorType != "validation_error" {
+		t.Errorf("expected error_type %q, got %q", "validation_error", p.ErrorType)
+	}
+	// Should mention the missing flags but not the provided ones.
+	if !strings.Contains(p.Error, "--property-type") {
+		t.Errorf("expected error to mention --property-type, got: %s", p.Error)
+	}
+	if !strings.Contains(p.Error, "--tag") {
+		t.Errorf("expected error to mention --tag, got: %s", p.Error)
+	}
+	if strings.Contains(p.Error, "--metric-from") {
+		t.Errorf("expected error NOT to mention --metric-from (it was provided), got: %s", p.Error)
+	}
+}
+
+func TestContractorsMetricsNoID(t *testing.T) {
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--api-key", "sk-test",
+		"contractors", "metrics",
+		"--metric-from", "2024-01-01",
+		"--metric-to", "2024-12-31",
+		"--property-type", "residential",
+		"--tag", "solar",
+	)
+
+	if result.ExitCode != 1 {
+		t.Fatalf("expected exit 1, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	p := parseStderrError(t, result.Stderr)
+	if p.Code != 1 {
+		t.Errorf("expected error code 1, got %d", p.Code)
+	}
+	if p.ErrorType != "validation_error" {
+		t.Errorf("expected error_type %q, got %q", "validation_error", p.ErrorType)
+	}
+	if !strings.Contains(p.Error, "contractor ID required") {
+		t.Errorf("expected error about contractor ID, got: %s", p.Error)
+	}
+}
+
+// --- contractors metrics: Boundary conditions ---
+
+func TestContractorsMetricsExactlyOneIDAccepted(t *testing.T) {
+	handler, _ := makeContractorMetricsHandler(5, 9995)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--api-key", "sk-test",
+		"--base-url", srv.URL,
+		"contractors", "metrics", "SINGLE_ID",
+		"--metric-from", "2024-01-01",
+		"--metric-to", "2024-12-31",
+		"--property-type", "residential",
+		"--tag", "solar",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	parsed := parseEnvelope(t, result.Stdout)
+
+	var data []json.RawMessage
+	if err := json.Unmarshal(parsed.Data, &data); err != nil {
+		t.Fatalf("expected data array: %v", err)
+	}
+	if len(data) != 3 {
+		t.Errorf("expected 3 monthly metrics, got %d", len(data))
+	}
+}
