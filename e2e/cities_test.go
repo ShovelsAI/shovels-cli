@@ -14,6 +14,8 @@ import (
 
 // makeCitySearchHandler returns an HTTP handler that validates the q query
 // parameter and serves city responses. Each city has geo_id, name, and state.
+// The handler ignores the size query parameter, matching the real /cities/search
+// endpoint which returns all matches in a single response regardless of size.
 func makeCitySearchHandler(totalItems int, creditsUsed, creditsRemaining int) (http.Handler, *[]map[string][]string) {
 	capturedQueries := &[]map[string][]string{}
 
@@ -30,19 +32,9 @@ func makeCitySearchHandler(totalItems int, creditsUsed, creditsRemaining int) (h
 			return
 		}
 
-		// Cities endpoint returns all results in a single page (no pagination).
-		size, _ := strconv.Atoi(r.URL.Query().Get("size"))
-		if size == 0 {
-			size = 50
-		}
-
-		count := totalItems
-		if count > size {
-			count = size
-		}
-
-		items := make([]json.RawMessage, count)
-		for i := range count {
+		// The real cities endpoint ignores size and returns all matches.
+		items := make([]json.RawMessage, totalItems)
+		for i := range totalItems {
 			items[i] = json.RawMessage(fmt.Sprintf(
 				`{"geo_id":"city_%05d","name":"CITY %d, STATE, ST","state":"ST"}`,
 				i, i,
@@ -129,6 +121,8 @@ func TestCitiesSearchBasic(t *testing.T) {
 }
 
 func TestCitiesSearchWithLimit(t *testing.T) {
+	// Server returns 10 items (ignoring size param, like the real endpoint).
+	// --limit 5 must truncate client-side to exactly 5.
 	handler, _ := makeCitySearchHandler(10, 5, 9995)
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
@@ -151,8 +145,18 @@ func TestCitiesSearchWithLimit(t *testing.T) {
 	if err := json.Unmarshal(parsed.Data, &data); err != nil {
 		t.Fatalf("expected data array: %v", err)
 	}
-	if len(data) > 5 {
-		t.Errorf("expected at most 5 items, got %d", len(data))
+	if len(data) != 5 {
+		t.Errorf("expected exactly 5 items after client-side truncation, got %d", len(data))
+	}
+
+	count := int(parsed.Meta["count"].(float64))
+	if count != 5 {
+		t.Errorf("expected count=5, got %d", count)
+	}
+
+	hasMore := parsed.Meta["has_more"].(bool)
+	if !hasMore {
+		t.Error("expected has_more=true when server returned more items than the limit")
 	}
 }
 
