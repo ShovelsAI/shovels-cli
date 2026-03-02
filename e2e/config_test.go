@@ -428,4 +428,3 @@ func TestAuthEnvVarOverridesConfigFile(t *testing.T) {
 		t.Errorf("expected env var key %q, got %q", "sk-from-env-5678", envelope.Data.APIKey)
 	}
 }
-
