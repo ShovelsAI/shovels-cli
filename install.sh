@@ -1,6 +1,6 @@
 #!/bin/sh
 # Shovels CLI installer
-# Usage: curl -LsSf https://raw.githubusercontent.com/ShovelsAI/shovels-cli/main/install.sh | sh
+# Usage: curl -LsSf https://shovels.ai/install.sh | sh
 #
 # Environment variables:
 #   SHOVELS_VERSION     Pin to a specific version (e.g. v0.1.0)
