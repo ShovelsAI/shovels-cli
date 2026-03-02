@@ -68,7 +68,7 @@ func runAddressesSearch(cmd *cobra.Command, args []string) error {
 		"q": {query},
 	}
 
-	result, err := cl.Paginate(context.Background(), "/addresses", q, lc)
+	result, err := cl.Paginate(context.Background(), "/addresses/search", q, lc)
 	if err != nil {
 		apiErr, ok := err.(*client.APIError)
 		if ok {
