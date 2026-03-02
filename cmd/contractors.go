@@ -158,6 +158,7 @@ Example:
   shovels contractors permits ABC123 --limit 100
 
 Response: {"data": [...], "meta": {"count": N, "has_more": bool, "credits_used": N, ...}}`,
+	Args: cobra.ExactArgs(1),
 	Annotations: map[string]string{
 		AnnotationRequiresAuth: "true",
 	},
@@ -165,11 +166,6 @@ Response: {"data": [...], "meta": {"count": N, "has_more": bool, "credits_used":
 }
 
 func runContractorsPermits(cmd *cobra.Command, args []string) error {
-	if len(args) == 0 {
-		output.PrintErrorTyped(os.Stderr, "contractor ID required", 1, client.ErrorTypeValidation)
-		return &exitError{code: 1}
-	}
-
 	lc, err := parseLimitConfig(cmd)
 	if err != nil {
 		return err
@@ -208,6 +204,7 @@ Example:
   shovels contractors employees ABC123 --limit all
 
 Response: {"data": [...], "meta": {"count": N, "has_more": bool, "credits_used": N, ...}}`,
+	Args: cobra.ExactArgs(1),
 	Annotations: map[string]string{
 		AnnotationRequiresAuth: "true",
 	},
@@ -215,11 +212,6 @@ Response: {"data": [...], "meta": {"count": N, "has_more": bool, "credits_used":
 }
 
 func runContractorsEmployees(cmd *cobra.Command, args []string) error {
-	if len(args) == 0 {
-		output.PrintErrorTyped(os.Stderr, "contractor ID required", 1, client.ErrorTypeValidation)
-		return &exitError{code: 1}
-	}
-
 	lc, err := parseLimitConfig(cmd)
 	if err != nil {
 		return err
@@ -263,6 +255,7 @@ Example:
 
 Response: {"data": [...], "meta": {"credits_used": N, "credits_remaining": N}}
 Metrics are not paginated. The response contains monthly aggregate data.`,
+	Args: cobra.ExactArgs(1),
 	Annotations: map[string]string{
 		AnnotationRequiresAuth: "true",
 	},
@@ -270,11 +263,6 @@ Metrics are not paginated. The response contains monthly aggregate data.`,
 }
 
 func runContractorsMetrics(cmd *cobra.Command, args []string) error {
-	if len(args) == 0 {
-		output.PrintErrorTyped(os.Stderr, "contractor ID required", 1, client.ErrorTypeValidation)
-		return &exitError{code: 1}
-	}
-
 	metricFrom, _ := cmd.Flags().GetString("metric-from")
 	metricTo, _ := cmd.Flags().GetString("metric-to")
 	propertyType, _ := cmd.Flags().GetString("property-type")
