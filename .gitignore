@@ -4,6 +4,16 @@ dist/
 
 # Environment / secrets
 .envrc
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Internal tooling
+.spade/
+worktrees/
 
 # IDE
 .vscode/

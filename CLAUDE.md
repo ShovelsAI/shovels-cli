@@ -71,7 +71,3 @@ goreleaser release --clean
 - Flag names match API query parameter names where possible (e.g., `--permit-tags` maps to `permit_tags`)
 - Use snake_case in JSON output keys (match API response format)
 - Wrap API responses: `{"data": [...], "meta": {"count": N, "has_more": bool, "credits_used": N, "credits_remaining": N}}`
-
-## Linear
-
-- Tracking issue: [ENG-1889](https://linear.app/shovels/issue/ENG-1889)

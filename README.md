@@ -224,7 +224,7 @@ Manage persistent CLI settings stored in `~/.config/shovels/config.yaml`.
 shovels config set api-key sk-your-key
 
 # Override base URL
-shovels config set base-url https://staging.shovels.ai/v2
+shovels config set base-url https://api.example.com/v2
 
 # Show resolved config (API key masked)
 shovels config show

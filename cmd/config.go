@@ -54,7 +54,7 @@ Examples:
     shovels config set api-key sk-your-api-key-here
 
   Override the base URL:
-    shovels config set base-url https://staging.shovels.ai/v2`,
+    shovels config set base-url https://api.example.com/v2`,
 	Args: cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		key := args[0]
