@@ -585,6 +585,282 @@ func TestPermitsSearchQuery50CharsAccepted(t *testing.T) {
 	}
 }
 
+// =======================================================================
+// permits get
+// =======================================================================
+
+// makePermitGetHandler returns an HTTP handler that serves batch permit
+// responses. knownIDs defines which IDs exist; unknown IDs are omitted
+// from the response (the caller detects them as missing).
+func makePermitGetHandler(knownIDs map[string]bool, creditsUsed, creditsRemaining int) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ids := r.URL.Query()["id"]
+
+		var items []json.RawMessage
+		for _, id := range ids {
+			if knownIDs[id] {
+				items = append(items, json.RawMessage(fmt.Sprintf(
+					`{"id":%q,"description":"Permit %s","status":"final"}`, id, id,
+				)))
+			}
+		}
+		if items == nil {
+			items = []json.RawMessage{}
+		}
+
+		w.Header().Set("X-Credits-Request", strconv.Itoa(creditsUsed))
+		w.Header().Set("X-Credits-Remaining", strconv.Itoa(creditsRemaining))
+
+		resp := struct {
+			Items []json.RawMessage `json:"items"`
+		}{Items: items}
+		json.NewEncoder(w).Encode(resp)
+	})
+}
+
+// --- permits get: Happy paths ---
+
+func TestPermitsGetMultipleIDs(t *testing.T) {
+	known := map[string]bool{"P123": true, "P456": true}
+	srv := httptest.NewServer(makePermitGetHandler(known, 2, 9998))
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--api-key", "sk-test",
+		"--base-url", srv.URL,
+		"permits", "get", "P123", "P456",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	parsed := parseEnvelope(t, result.Stdout)
+
+	var data []json.RawMessage
+	if err := json.Unmarshal(parsed.Data, &data); err != nil {
+		t.Fatalf("expected data array: %v", err)
+	}
+	if len(data) != 2 {
+		t.Errorf("expected 2 items, got %d", len(data))
+	}
+
+	count := int(parsed.Meta["count"].(float64))
+	if count != 2 {
+		t.Errorf("expected count=2, got %d", count)
+	}
+
+	// meta.missing should be absent when all IDs found.
+	if _, ok := parsed.Meta["missing"]; ok {
+		t.Error("expected missing to be absent when all IDs found")
+	}
+
+	// No has_more for batch (non-paginated) responses.
+	if _, ok := parsed.Meta["has_more"]; ok {
+		t.Error("batch response should not have has_more in meta")
+	}
+
+	cu := int(parsed.Meta["credits_used"].(float64))
+	if cu != 2 {
+		t.Errorf("expected credits_used=2, got %d", cu)
+	}
+
+	cr := int(parsed.Meta["credits_remaining"].(float64))
+	if cr != 9998 {
+		t.Errorf("expected credits_remaining=9998, got %d", cr)
+	}
+}
+
+// --- permits get: Edge cases ---
+
+func TestPermitsGetSingleID(t *testing.T) {
+	known := map[string]bool{"P123": true}
+	srv := httptest.NewServer(makePermitGetHandler(known, 1, 9999))
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--api-key", "sk-test",
+		"--base-url", srv.URL,
+		"permits", "get", "P123",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	parsed := parseEnvelope(t, result.Stdout)
+
+	var data []json.RawMessage
+	if err := json.Unmarshal(parsed.Data, &data); err != nil {
+		t.Fatalf("expected data array: %v", err)
+	}
+	if len(data) != 1 {
+		t.Errorf("expected 1 item, got %d", len(data))
+	}
+
+	count := int(parsed.Meta["count"].(float64))
+	if count != 1 {
+		t.Errorf("expected count=1, got %d", count)
+	}
+
+	if _, ok := parsed.Meta["missing"]; ok {
+		t.Error("expected missing to be absent when all IDs found")
+	}
+}
+
+func TestPermitsGetSomeMissing(t *testing.T) {
+	known := map[string]bool{"P123": true}
+	srv := httptest.NewServer(makePermitGetHandler(known, 1, 9999))
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--api-key", "sk-test",
+		"--base-url", srv.URL,
+		"permits", "get", "P123", "P999", "P888",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	parsed := parseEnvelope(t, result.Stdout)
+
+	var data []json.RawMessage
+	if err := json.Unmarshal(parsed.Data, &data); err != nil {
+		t.Fatalf("expected data array: %v", err)
+	}
+	if len(data) != 1 {
+		t.Errorf("expected 1 item in data (only P123 found), got %d", len(data))
+	}
+
+	count := int(parsed.Meta["count"].(float64))
+	if count != 1 {
+		t.Errorf("expected count=1, got %d", count)
+	}
+
+	missingVal, ok := parsed.Meta["missing"]
+	if !ok {
+		t.Fatal("expected missing in meta when some IDs not found")
+	}
+	missingArr, ok := missingVal.([]any)
+	if !ok {
+		t.Fatalf("expected missing to be array, got %T", missingVal)
+	}
+	if len(missingArr) != 2 {
+		t.Fatalf("expected 2 missing IDs, got %d", len(missingArr))
+	}
+	if missingArr[0].(string) != "P999" {
+		t.Errorf("expected first missing ID P999, got %q", missingArr[0])
+	}
+	if missingArr[1].(string) != "P888" {
+		t.Errorf("expected second missing ID P888, got %q", missingArr[1])
+	}
+}
+
+// --- permits get: Error conditions ---
+
+func TestPermitsGetNoIDs(t *testing.T) {
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--api-key", "sk-test",
+		"permits", "get",
+	)
+
+	if result.ExitCode != 1 {
+		t.Fatalf("expected exit 1, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	p := parseStderrError(t, result.Stderr)
+	if p.Code != 1 {
+		t.Errorf("expected error code 1, got %d", p.Code)
+	}
+	if p.ErrorType != "validation_error" {
+		t.Errorf("expected error_type %q, got %q", "validation_error", p.ErrorType)
+	}
+	if p.Error != "at least one permit ID required" {
+		t.Errorf("expected error %q, got %q", "at least one permit ID required", p.Error)
+	}
+}
+
+func TestPermitsGetTooManyIDs(t *testing.T) {
+	env := withIsolatedConfig(t)
+
+	args := []string{
+		"--api-key", "sk-test",
+		"permits", "get",
+	}
+	for i := range 51 {
+		args = append(args, fmt.Sprintf("P%05d", i))
+	}
+
+	result := runCLIWithEnv(t, env, args...)
+
+	if result.ExitCode != 1 {
+		t.Fatalf("expected exit 1, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	p := parseStderrError(t, result.Stderr)
+	if p.Code != 1 {
+		t.Errorf("expected error code 1, got %d", p.Code)
+	}
+	if p.ErrorType != "validation_error" {
+		t.Errorf("expected error_type %q, got %q", "validation_error", p.ErrorType)
+	}
+	if p.Error != "maximum 50 IDs per request" {
+		t.Errorf("expected error %q, got %q", "maximum 50 IDs per request", p.Error)
+	}
+}
+
+// --- permits get: Boundary conditions ---
+
+func TestPermitsGetExactly50IDs(t *testing.T) {
+	known := make(map[string]bool, 50)
+	for i := range 50 {
+		known[fmt.Sprintf("P%05d", i)] = true
+	}
+
+	srv := httptest.NewServer(makePermitGetHandler(known, 50, 9950))
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	args := []string{
+		"--api-key", "sk-test",
+		"--base-url", srv.URL,
+		"permits", "get",
+	}
+	for i := range 50 {
+		args = append(args, fmt.Sprintf("P%05d", i))
+	}
+
+	result := runCLIWithEnv(t, env, args...)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	parsed := parseEnvelope(t, result.Stdout)
+
+	var data []json.RawMessage
+	if err := json.Unmarshal(parsed.Data, &data); err != nil {
+		t.Fatalf("expected data array: %v", err)
+	}
+	if len(data) != 50 {
+		t.Errorf("expected 50 items, got %d", len(data))
+	}
+
+	count := int(parsed.Meta["count"].(float64))
+	if count != 50 {
+		t.Errorf("expected count=50, got %d", count)
+	}
+
+	if _, ok := parsed.Meta["missing"]; ok {
+		t.Error("expected missing to be absent when all 50 IDs found")
+	}
+}
+
 func TestPermitsSearchInvalidDateFormatTo(t *testing.T) {
 	env := withIsolatedConfig(t)
 
