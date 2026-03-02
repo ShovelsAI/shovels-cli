@@ -1023,15 +1023,32 @@ func TestContractorsPermitsNoID(t *testing.T) {
 	if p.Code != 1 {
 		t.Errorf("expected error code 1, got %d", p.Code)
 	}
-	if p.ErrorType != "validation_error" {
-		t.Errorf("expected error_type %q, got %q", "validation_error", p.ErrorType)
-	}
-	if !strings.Contains(p.Error, "contractor ID required") {
-		t.Errorf("expected error about contractor ID, got: %s", p.Error)
+	if !strings.Contains(p.Error, "accepts 1 arg(s)") {
+		t.Errorf("expected error about arg count, got: %s", p.Error)
 	}
 }
 
 // --- contractors permits: Boundary conditions ---
+
+func TestContractorsPermitsExtraArgsRejected(t *testing.T) {
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--api-key", "sk-test",
+		"contractors", "permits", "ABC123", "EXTRA",
+	)
+
+	if result.ExitCode != 1 {
+		t.Fatalf("expected exit 1, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	p := parseStderrError(t, result.Stderr)
+	if p.Code != 1 {
+		t.Errorf("expected error code 1, got %d", p.Code)
+	}
+	if !strings.Contains(p.Error, "accepts 1 arg(s)") {
+		t.Errorf("expected error about arg count, got: %s", p.Error)
+	}
+}
 
 func TestContractorsPermitsPagination(t *testing.T) {
 	var requestCount atomic.Int32
@@ -1206,11 +1223,28 @@ func TestContractorsEmployeesNoID(t *testing.T) {
 	if p.Code != 1 {
 		t.Errorf("expected error code 1, got %d", p.Code)
 	}
-	if p.ErrorType != "validation_error" {
-		t.Errorf("expected error_type %q, got %q", "validation_error", p.ErrorType)
+	if !strings.Contains(p.Error, "accepts 1 arg(s)") {
+		t.Errorf("expected error about arg count, got: %s", p.Error)
 	}
-	if !strings.Contains(p.Error, "contractor ID required") {
-		t.Errorf("expected error about contractor ID, got: %s", p.Error)
+}
+
+func TestContractorsEmployeesExtraArgsRejected(t *testing.T) {
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--api-key", "sk-test",
+		"contractors", "employees", "ABC123", "EXTRA",
+	)
+
+	if result.ExitCode != 1 {
+		t.Fatalf("expected exit 1, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	p := parseStderrError(t, result.Stderr)
+	if p.Code != 1 {
+		t.Errorf("expected error code 1, got %d", p.Code)
+	}
+	if !strings.Contains(p.Error, "accepts 1 arg(s)") {
+		t.Errorf("expected error about arg count, got: %s", p.Error)
 	}
 }
 
@@ -1412,11 +1446,8 @@ func TestContractorsMetricsNoID(t *testing.T) {
 	if p.Code != 1 {
 		t.Errorf("expected error code 1, got %d", p.Code)
 	}
-	if p.ErrorType != "validation_error" {
-		t.Errorf("expected error_type %q, got %q", "validation_error", p.ErrorType)
-	}
-	if !strings.Contains(p.Error, "contractor ID required") {
-		t.Errorf("expected error about contractor ID, got: %s", p.Error)
+	if !strings.Contains(p.Error, "accepts 1 arg(s)") {
+		t.Errorf("expected error about arg count, got: %s", p.Error)
 	}
 }
 
@@ -1450,5 +1481,29 @@ func TestContractorsMetricsExactlyOneIDAccepted(t *testing.T) {
 	}
 	if len(data) != 3 {
 		t.Errorf("expected 3 monthly metrics, got %d", len(data))
+	}
+}
+
+func TestContractorsMetricsExtraArgsRejected(t *testing.T) {
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--api-key", "sk-test",
+		"contractors", "metrics", "ABC123", "EXTRA",
+		"--metric-from", "2024-01-01",
+		"--metric-to", "2024-12-31",
+		"--property-type", "residential",
+		"--tag", "solar",
+	)
+
+	if result.ExitCode != 1 {
+		t.Fatalf("expected exit 1, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	p := parseStderrError(t, result.Stderr)
+	if p.Code != 1 {
+		t.Errorf("expected error code 1, got %d", p.Code)
+	}
+	if !strings.Contains(p.Error, "accepts 1 arg(s)") {
+		t.Errorf("expected error about arg count, got: %s", p.Error)
 	}
 }
