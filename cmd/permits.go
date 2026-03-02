@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
@@ -13,6 +14,9 @@ import (
 	"github.com/shovels-ai/shovels-cli/internal/output"
 	"github.com/spf13/cobra"
 )
+
+// maxPermitGetIDs is the maximum number of permit IDs accepted per request.
+const maxPermitGetIDs = 50
 
 // validPermitStatuses lists the values the API accepts for permit_status.
 var validPermitStatuses = []string{"final", "in_review", "inactive", "active"}
@@ -238,6 +242,108 @@ func setBoolFlag(cmd *cobra.Command, flag, param string, q url.Values) {
 	}
 }
 
+var permitsGetCmd = &cobra.Command{
+	Use:   "get ID [ID...]",
+	Short: "Retrieve one or more permits by ID",
+	Long: `Fetch specific permits by their IDs. Pass one or more permit IDs as
+positional arguments (maximum 50 per request).
+
+Example (single permit):
+  shovels permits get P123
+
+Example (multiple permits):
+  shovels permits get P123 P456 P789
+
+Response envelope: {"data": [...], "meta": {"count": N, ...}}
+When some IDs are not found, meta.missing lists the missing IDs.`,
+	Annotations: map[string]string{
+		AnnotationRequiresAuth: "true",
+	},
+	RunE: runPermitsGet,
+}
+
+func runPermitsGet(cmd *cobra.Command, args []string) error {
+	if len(args) == 0 {
+		output.PrintErrorTyped(os.Stderr, "at least one permit ID required", 1, client.ErrorTypeValidation)
+		return &exitError{code: 1}
+	}
+	if len(args) > maxPermitGetIDs {
+		output.PrintErrorTyped(os.Stderr, fmt.Sprintf("maximum %d IDs per request", maxPermitGetIDs), 1, client.ErrorTypeValidation)
+		return &exitError{code: 1}
+	}
+
+	cfg := ResolvedConfig()
+
+	timeoutStr, _ := cmd.Flags().GetString("timeout")
+	timeout, err := time.ParseDuration(timeoutStr)
+	if err != nil {
+		output.PrintErrorTyped(os.Stderr, "invalid timeout: "+timeoutStr, 1, client.ErrorTypeValidation)
+		return &exitError{code: 1}
+	}
+
+	noRetry, _ := cmd.Flags().GetBool("no-retry")
+
+	cl := client.New(client.Options{
+		APIKey:  cfg.APIKey,
+		BaseURL: cfg.BaseURL,
+		Timeout: timeout,
+		NoRetry: noRetry,
+		Version: buildVersion,
+	})
+
+	q := url.Values{}
+	for _, id := range args {
+		q.Add("id", id)
+	}
+
+	resp, err := cl.Get(context.Background(), "/permits", q)
+	if err != nil {
+		apiErr, ok := err.(*client.APIError)
+		if ok {
+			output.PrintErrorTyped(os.Stderr, apiErr.Message, apiErr.ExitCode, apiErr.ErrorType)
+			return &exitError{code: apiErr.ExitCode}
+		}
+		output.PrintErrorTyped(os.Stderr, err.Error(), 1, client.ErrorTypeClient)
+		return &exitError{code: 1}
+	}
+
+	var page struct {
+		Items []json.RawMessage `json:"items"`
+	}
+	if err := json.Unmarshal(resp.Body, &page); err != nil {
+		output.PrintErrorTyped(os.Stderr, "failed to parse API response", 1, client.ErrorTypeClient)
+		return &exitError{code: 1}
+	}
+
+	// Detect missing IDs by comparing requested IDs against returned IDs.
+	missing := findMissingIDs(args, page.Items)
+
+	output.PrintBatch(cmd.OutOrStdout(), page.Items, missing, resp.Credits)
+	return nil
+}
+
+// findMissingIDs returns the subset of requested IDs not present in the
+// returned items. Each item is expected to have an "id" field at the top level.
+func findMissingIDs(requested []string, items []json.RawMessage) []string {
+	found := make(map[string]bool, len(items))
+	for _, item := range items {
+		var obj struct {
+			ID string `json:"id"`
+		}
+		if json.Unmarshal(item, &obj) == nil && obj.ID != "" {
+			found[obj.ID] = true
+		}
+	}
+
+	var missing []string
+	for _, id := range requested {
+		if !found[id] {
+			missing = append(missing, id)
+		}
+	}
+	return missing
+}
+
 func init() {
 	f := permitsSearchCmd.Flags()
 
@@ -308,5 +414,6 @@ func init() {
 	})
 
 	permitsCmd.AddCommand(permitsSearchCmd)
+	permitsCmd.AddCommand(permitsGetCmd)
 	rootCmd.AddCommand(permitsCmd)
 }
