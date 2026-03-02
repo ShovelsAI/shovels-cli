@@ -49,23 +49,24 @@ changelog:
       - "^test:"
       - "^ci:"
 
-brews:
-  - repository:
-      owner: shovels-ai
-      name: homebrew-tap
-      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    directory: Formula
-    homepage: "https://github.com/shovels-ai/shovels-cli"
-    description: "Agent-first CLI for the Shovels building permit and contractor API"
-    license: "MIT"
-    install: |
-      bin.install "shovels"
-    test: |
-      system "#{bin}/shovels", "version"
+# Uncomment when shovels-ai/homebrew-tap repo and HOMEBREW_TAP_TOKEN secret are ready:
+# brews:
+#   - repository:
+#       owner: shovels-ai
+#       name: homebrew-tap
+#       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+#     directory: Formula
+#     homepage: "https://github.com/ShovelsAI/shovels-cli"
+#     description: "Agent-first CLI for the Shovels building permit and contractor API"
+#     license: "MIT"
+#     install: |
+#       bin.install "shovels"
+#     test: |
+#       system "#{bin}/shovels", "version"
 
 release:
   github:
-    owner: shovels-ai
+    owner: ShovelsAI
     name: shovels-cli
   draft: false
   prerelease: auto
