@@ -104,8 +104,8 @@ func TestPermitsSearchHelpShowsGroupedFlagsAndExamples(t *testing.T) {
 	}
 
 	// Example values should be present.
-	if !strings.Contains(out, "ZIP_90210") {
-		t.Error("permits search --help should contain example value ZIP_90210")
+	if !strings.Contains(out, "92024") {
+		t.Error("permits search --help should contain example zip code 92024")
 	}
 	if !strings.Contains(out, "YYYY-MM-DD") {
 		t.Error("permits search --help should contain date format hint YYYY-MM-DD")
@@ -283,8 +283,8 @@ func TestFlagDescriptionsIncludeValueHints(t *testing.T) {
 	}
 
 	// --geo-id should include example values.
-	if !strings.Contains(out, "ZIP_") {
-		t.Error("--geo-id flag should include example like ZIP_90210")
+	if !strings.Contains(out, "92024") {
+		t.Error("--geo-id flag should include example zip code like 92024")
 	}
 
 	// Required flags should have "(required)" in their description.
