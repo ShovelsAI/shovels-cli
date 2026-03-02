@@ -25,6 +25,14 @@ Get an API key at [shovels.ai](https://www.shovels.ai/) to get started.
 
 ## Install
 
+### Quick install (macOS / Linux)
+
+```bash
+curl -LsSf https://raw.githubusercontent.com/ShovelsAI/shovels-cli/main/install.sh | sh
+```
+
+Downloads the latest release, verifies the SHA256 checksum, installs to `~/.shovels/bin`, and adds it to your PATH.
+
 ### Homebrew (macOS / Linux)
 
 ```bash
