@@ -1,7 +1,6 @@
-# shovels
+# Shovels CLI
 
-[![CI](https://github.com/shovels-ai/shovels-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/shovels-ai/shovels-cli/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/shovels-ai/shovels-cli)](https://github.com/shovels-ai/shovels-cli/releases/latest)
+[![CI](https://github.com/ShovelsAI/shovels-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/ShovelsAI/shovels-cli/actions/workflows/ci.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/shovels-ai/shovels-cli)](https://goreportcard.com/report/github.com/shovels-ai/shovels-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
