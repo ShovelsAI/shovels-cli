@@ -274,6 +274,39 @@ func init() {
 	f.Int("contractor-min-inspection-pr", 0, "Minimum lifetime inspection pass rate (0-100)")
 	f.String("contractor-license", "", "Filter by contractor license number")
 
+	setGroupedUsage(permitsSearchCmd, []flagGroup{
+		{
+			Title: "Required Flags",
+			Names: []string{"geo-id", "from", "to"},
+		},
+		{
+			Title: "Permit Filters",
+			Names: []string{
+				"tags", "query", "status",
+				"min-approval-duration", "min-construction-duration",
+				"min-inspection-pr", "min-job-value", "min-fees",
+				"has-contractor",
+			},
+		},
+		{
+			Title: "Property Filters",
+			Names: []string{
+				"property-type", "property-min-market-value",
+				"property-min-building-area", "property-min-lot-size",
+				"property-min-story-count", "property-min-unit-count",
+			},
+		},
+		{
+			Title: "Contractor Filters",
+			Names: []string{
+				"contractor-classification", "contractor-name",
+				"contractor-website", "contractor-min-total-job-value",
+				"contractor-min-total-permits-count",
+				"contractor-min-inspection-pr", "contractor-license",
+			},
+		},
+	})
+
 	permitsCmd.AddCommand(permitsSearchCmd)
 	rootCmd.AddCommand(permitsCmd)
 }
