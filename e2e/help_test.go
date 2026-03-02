@@ -28,7 +28,7 @@ func TestRootHelpShowsDescriptionCommandsAndGlobalFlags(t *testing.T) {
 	}
 
 	// All resource commands must be listed.
-	commands := []string{"permits", "contractors", "addresses", "usage", "config", "version"}
+	commands := []string{"permits", "contractors", "addresses", "cities", "counties", "jurisdictions", "tags", "usage", "config", "version"}
 	for _, cmd := range commands {
 		if !strings.Contains(out, cmd) {
 			t.Errorf("root --help should list the %q command", cmd)
@@ -199,6 +199,14 @@ func TestHelpOutputIsPlainText(t *testing.T) {
 		{"contractors", "metrics", "--help"},
 		{"addresses", "--help"},
 		{"addresses", "search", "--help"},
+		{"cities", "--help"},
+		{"cities", "search", "--help"},
+		{"counties", "--help"},
+		{"counties", "search", "--help"},
+		{"jurisdictions", "--help"},
+		{"jurisdictions", "search", "--help"},
+		{"tags", "--help"},
+		{"tags", "list", "--help"},
 		{"usage", "--help"},
 		{"config", "--help"},
 		{"config", "set", "--help"},
@@ -384,5 +392,89 @@ func TestAddressesSearchHelpShowsRequiredFlag(t *testing.T) {
 	}
 	if !strings.Contains(out, "123 Main St") {
 		t.Error("addresses search --help should include example address")
+	}
+}
+
+// TestPermitsSearchHelpShowsGeoResolutionCommands verifies that
+// `shovels permits search --help` lists cities search, counties search,
+// and jurisdictions search as geo_id resolution commands.
+func TestPermitsSearchHelpShowsGeoResolutionCommands(t *testing.T) {
+	result := runCLI(t, "permits", "search", "--help")
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	out := result.Stdout
+
+	resolutionCommands := []string{
+		"cities search",
+		"counties search",
+		"jurisdictions search",
+		"addresses search",
+	}
+	for _, cmd := range resolutionCommands {
+		if !strings.Contains(out, cmd) {
+			t.Errorf("permits search --help should reference %q as a resolution command", cmd)
+		}
+	}
+}
+
+// TestContractorsSearchHelpShowsGeoResolutionCommands verifies that
+// `shovels contractors search --help` lists cities search, counties search,
+// and jurisdictions search as geo_id resolution commands.
+func TestContractorsSearchHelpShowsGeoResolutionCommands(t *testing.T) {
+	result := runCLI(t, "contractors", "search", "--help")
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	out := result.Stdout
+
+	resolutionCommands := []string{
+		"cities search",
+		"counties search",
+		"jurisdictions search",
+		"addresses search",
+	}
+	for _, cmd := range resolutionCommands {
+		if !strings.Contains(out, cmd) {
+			t.Errorf("contractors search --help should reference %q as a resolution command", cmd)
+		}
+	}
+}
+
+// TestGeoIDFlagShowsAllResolutionCommands verifies that the --geo-id
+// flag description in the flags section shows all three geo resolution
+// commands (cities, counties, jurisdictions) plus addresses.
+func TestGeoIDFlagShowsAllResolutionCommands(t *testing.T) {
+	result := runCLI(t, "permits", "search", "--help")
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	out := result.Stdout
+
+	// The --geo-id flag description should list resolution commands.
+	resolutionLines := []string{
+		"cities search",
+		"counties search",
+		"jurisdictions search",
+		"addresses search",
+	}
+	for _, line := range resolutionLines {
+		if !strings.Contains(out, line) {
+			t.Errorf("--geo-id flag description should reference %q", line)
+		}
+	}
+
+	// Must show correct geo_id formats (bare zip codes, state codes).
+	if !strings.Contains(out, "92024") {
+		t.Error("--geo-id should show bare zip code example like 92024")
+	}
+	if !strings.Contains(out, "CA") {
+		t.Error("--geo-id should show state code example like CA")
 	}
 }
