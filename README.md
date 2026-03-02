@@ -135,6 +135,8 @@ shovels permits get P123 P456 P789
 
 **Search required flags:** `--geo-id`, `--permit-from`, `--permit-to`
 
+**Search optional flags:** `--include-count` requests total result count (capped at 10,000), returned as `total_count` in meta
+
 Geographic ID formats: `ZIP_90210`, `CITY_LOS_ANGELES_CA`, `COUNTY_LOS_ANGELES_CA`, `STATE_CA`
 
 ### contractors
@@ -166,6 +168,8 @@ shovels contractors metrics ABC123 \
 ```
 
 **Search required flags:** `--geo-id`, `--permit-from`, `--permit-to`
+
+**Search optional flags:** `--include-count` requests total result count (capped at 10,000), returned as `total_count` in meta
 
 **Metrics required flags:** `--metric-from`, `--metric-to`, `--property-type`, `--tag`
 

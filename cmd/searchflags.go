@@ -56,6 +56,9 @@ func registerSearchFlags(cmd *cobra.Command) {
 	f.Int("contractor-min-total-permits-count", 0, "Minimum lifetime permits count (integer)")
 	f.Int("contractor-min-inspection-pr", 0, "Minimum lifetime inspection pass rate, 0-100 (integer)")
 	f.String("contractor-license", "", "Filter by contractor license number (string)")
+
+	// Response options
+	f.Bool("include-count", false, "Request total result count (capped at 10,000). Returned as total_count in meta on first page")
 }
 
 // searchFlagGroups returns the standard flag groups shared by permits search
@@ -90,6 +93,10 @@ func searchFlagGroups() []flagGroup {
 				"contractor-min-total-permits-count",
 				"contractor-min-inspection-pr", "contractor-license",
 			},
+		},
+		{
+			Title: "Response Options",
+			Names: []string{"include-count"},
 		},
 	}
 }
@@ -263,6 +270,7 @@ func runPaginatedSearch(cmd *cobra.Command, endpoint string, queryFn func(url.Va
 	}
 
 	q := buildSearchQuery(cmd)
+	setBoolFlag(cmd, "include-count", "include_count", q)
 	if queryFn != nil {
 		queryFn(q)
 	}
@@ -283,7 +291,7 @@ func runPaginatedSearch(cmd *cobra.Command, endpoint string, queryFn func(url.Va
 		return &exitError{code: 1}
 	}
 
-	output.PrintPaginated(cmd.OutOrStdout(), result.Items, result.HasMore, result.Credits)
+	output.PrintPaginated(cmd.OutOrStdout(), result.Items, result.HasMore, result.Credits, result.TotalCount)
 	return nil
 }
 

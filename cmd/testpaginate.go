@@ -70,7 +70,7 @@ var testPaginateCmd = &cobra.Command{
 			return &exitError{code: 1}
 		}
 
-		output.PrintPaginated(cmd.OutOrStdout(), result.Items, result.HasMore, result.Credits)
+		output.PrintPaginated(cmd.OutOrStdout(), result.Items, result.HasMore, result.Credits, result.TotalCount)
 		return nil
 	},
 }

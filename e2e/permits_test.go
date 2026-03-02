@@ -76,10 +76,22 @@ func makePermitSearchHandler(totalItems int, creditsUsed, creditsRemaining int) 
 		w.Header().Set("X-Credits-Request", strconv.Itoa(creditsUsed))
 		w.Header().Set("X-Credits-Remaining", strconv.Itoa(creditsRemaining))
 
-		resp := struct {
+		type totalCountShape struct {
+			Value    int    `json:"value"`
+			Relation string `json:"relation"`
+		}
+		type respShape struct {
 			Items      []json.RawMessage `json:"items"`
 			NextCursor *string           `json:"next_cursor"`
-		}{Items: items, NextCursor: nextCursor}
+			TotalCount *totalCountShape  `json:"total_count,omitempty"`
+		}
+		resp := respShape{Items: items, NextCursor: nextCursor}
+
+		// Include total_count on first page when include_count=true.
+		if r.URL.Query().Get("include_count") == "true" && r.URL.Query().Get("cursor") == "" {
+			resp.TotalCount = &totalCountShape{Value: totalItems, Relation: "eq"}
+		}
+
 		json.NewEncoder(w).Encode(resp)
 	})
 
@@ -863,5 +875,90 @@ func TestPermitsSearchInvalidDateFormatTo(t *testing.T) {
 	}
 	if !strings.Contains(p.Error, "--permit-to") {
 		t.Errorf("expected error to mention --permit-to, got: %s", p.Error)
+	}
+}
+
+// --- include-count ---
+
+func TestPermitsSearchIncludeCount(t *testing.T) {
+	handler, queries := makePermitSearchHandler(25, 5, 9995)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--base-url", srv.URL,
+		"permits", "search",
+		"--geo-id", "ZIP_90210",
+		"--permit-from", "2024-01-01",
+		"--permit-to", "2024-12-31",
+		"--include-count",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	// Verify include_count=true sent to API.
+	if len(*queries) < 1 {
+		t.Fatal("expected at least 1 API request")
+	}
+	q := (*queries)[0]
+	ic := q["include_count"]
+	if len(ic) != 1 || ic[0] != "true" {
+		t.Errorf("expected include_count=[true], got %v", ic)
+	}
+
+	parsed := parseEnvelope(t, result.Stdout)
+
+	// Verify total_count in meta.
+	tcVal, ok := parsed.Meta["total_count"]
+	if !ok {
+		t.Fatal("expected total_count in meta when --include-count is set")
+	}
+	tcMap, ok := tcVal.(map[string]any)
+	if !ok {
+		t.Fatalf("expected total_count to be object, got %T", tcVal)
+	}
+	if int(tcMap["value"].(float64)) != 25 {
+		t.Errorf("expected total_count.value=25, got %v", tcMap["value"])
+	}
+	if tcMap["relation"] != "eq" {
+		t.Errorf("expected total_count.relation=eq, got %v", tcMap["relation"])
+	}
+}
+
+func TestPermitsSearchNoIncludeCountByDefault(t *testing.T) {
+	handler, queries := makePermitSearchHandler(5, 5, 9995)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--base-url", srv.URL,
+		"permits", "search",
+		"--geo-id", "ZIP_90210",
+		"--permit-from", "2024-01-01",
+		"--permit-to", "2024-12-31",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	// Verify include_count is NOT sent when flag is omitted.
+	if len(*queries) < 1 {
+		t.Fatal("expected at least 1 API request")
+	}
+	q := (*queries)[0]
+	if _, exists := q["include_count"]; exists {
+		t.Error("include_count should not be sent when --include-count is omitted")
+	}
+
+	parsed := parseEnvelope(t, result.Stdout)
+
+	// Verify total_count is absent in meta.
+	if _, ok := parsed.Meta["total_count"]; ok {
+		t.Error("expected total_count to be absent when --include-count is not set")
 	}
 }

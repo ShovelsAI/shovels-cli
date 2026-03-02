@@ -21,7 +21,7 @@ func TestPrintPaginatedEnvelopeShape(t *testing.T) {
 		CreditsRemaining: intPtr(9950),
 	}
 
-	PrintPaginated(&buf, items, true, credits)
+	PrintPaginated(&buf, items, true, credits, nil)
 
 	var env struct {
 		Data []json.RawMessage `json:"data"`
@@ -73,7 +73,7 @@ func TestPrintPaginatedNoCredits(t *testing.T) {
 	items := []json.RawMessage{json.RawMessage(`{"id":1}`)}
 	credits := client.CreditMeta{}
 
-	PrintPaginated(&buf, items, false, credits)
+	PrintPaginated(&buf, items, false, credits, nil)
 
 	var env struct {
 		Data []json.RawMessage `json:"data"`
@@ -99,7 +99,7 @@ func TestPrintPaginatedCountEqualsActualItems(t *testing.T) {
 		json.RawMessage(`{"id":3}`),
 	}
 
-	PrintPaginated(&buf, items, false, client.CreditMeta{})
+	PrintPaginated(&buf, items, false, client.CreditMeta{}, nil)
 
 	var env struct {
 		Meta map[string]any `json:"meta"`
@@ -268,5 +268,81 @@ func TestPrintSingleNoCredits(t *testing.T) {
 	// Meta should be empty but not nil.
 	if len(env.Meta) != 0 {
 		t.Errorf("expected empty meta for no-credit single response, got %v", env.Meta)
+	}
+}
+
+func TestPrintPaginatedWithTotalCount(t *testing.T) {
+	var buf bytes.Buffer
+	items := []json.RawMessage{json.RawMessage(`{"id":1}`)}
+	credits := client.CreditMeta{
+		CreditsUsed:      intPtr(1),
+		CreditsRemaining: intPtr(9999),
+	}
+	tc := &client.TotalCount{Value: 1234, Relation: "eq"}
+
+	PrintPaginated(&buf, items, true, credits, tc)
+
+	var env struct {
+		Data []json.RawMessage `json:"data"`
+		Meta map[string]any    `json:"meta"`
+	}
+	if err := json.Unmarshal(buf.Bytes(), &env); err != nil {
+		t.Fatalf("invalid JSON: %v\nraw: %s", err, buf.String())
+	}
+
+	tcVal, ok := env.Meta["total_count"]
+	if !ok {
+		t.Fatal("expected total_count in meta")
+	}
+	tcMap, ok := tcVal.(map[string]any)
+	if !ok {
+		t.Fatalf("expected total_count to be object, got %T", tcVal)
+	}
+	if int(tcMap["value"].(float64)) != 1234 {
+		t.Errorf("expected total_count.value=1234, got %v", tcMap["value"])
+	}
+	if tcMap["relation"] != "eq" {
+		t.Errorf("expected total_count.relation=eq, got %v", tcMap["relation"])
+	}
+}
+
+func TestPrintPaginatedWithTotalCountGte(t *testing.T) {
+	var buf bytes.Buffer
+	items := []json.RawMessage{json.RawMessage(`{"id":1}`)}
+	tc := &client.TotalCount{Value: 10000, Relation: "gte"}
+
+	PrintPaginated(&buf, items, true, client.CreditMeta{}, tc)
+
+	var env struct {
+		Meta map[string]any `json:"meta"`
+	}
+	if err := json.Unmarshal(buf.Bytes(), &env); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	tcVal := env.Meta["total_count"].(map[string]any)
+	if int(tcVal["value"].(float64)) != 10000 {
+		t.Errorf("expected total_count.value=10000, got %v", tcVal["value"])
+	}
+	if tcVal["relation"] != "gte" {
+		t.Errorf("expected total_count.relation=gte, got %v", tcVal["relation"])
+	}
+}
+
+func TestPrintPaginatedNilTotalCountOmitted(t *testing.T) {
+	var buf bytes.Buffer
+	items := []json.RawMessage{json.RawMessage(`{"id":1}`)}
+
+	PrintPaginated(&buf, items, false, client.CreditMeta{}, nil)
+
+	var env struct {
+		Meta map[string]any `json:"meta"`
+	}
+	if err := json.Unmarshal(buf.Bytes(), &env); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	if _, ok := env.Meta["total_count"]; ok {
+		t.Error("expected total_count to be absent when nil")
 	}
 }
