@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -353,9 +354,9 @@ func TestQueryParametersSent(t *testing.T) {
 		Timeout: 5 * time.Second,
 	})
 
-	_, err := c.Get(context.Background(), "/permits/search", map[string]string{
-		"geo_id": "ZIP_90210",
-		"from":   "2024-01-01",
+	_, err := c.Get(context.Background(), "/permits/search", url.Values{
+		"geo_id": {"ZIP_90210"},
+		"from":   {"2024-01-01"},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
