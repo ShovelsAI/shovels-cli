@@ -8,6 +8,7 @@ import (
 	"math"
 	"math/rand/v2"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -83,13 +84,13 @@ func New(opts Options) *Client {
 // baseURL) with the provided query parameters. It applies the configured
 // timeout as a context deadline covering the full request lifecycle including
 // retries. Returns the parsed response or an *APIError on failure.
-func (c *Client) Get(ctx context.Context, path string, query map[string]string) (*Response, error) {
+func (c *Client) Get(ctx context.Context, path string, query url.Values) (*Response, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
-	url := c.baseURL + path
+	u := c.baseURL + path
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, networkError(err)
 	}
@@ -98,11 +99,7 @@ func (c *Client) Get(ctx context.Context, path string, query map[string]string) 
 	req.Header.Set("User-Agent", "shovels-cli/"+c.version)
 
 	if len(query) > 0 {
-		q := req.URL.Query()
-		for k, v := range query {
-			q.Set(k, v)
-		}
-		req.URL.RawQuery = q.Encode()
+		req.URL.RawQuery = query.Encode()
 	}
 
 	return c.doWithRetry(ctx, req)

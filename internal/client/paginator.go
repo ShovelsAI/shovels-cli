@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 )
@@ -98,17 +99,17 @@ type PaginatedResult struct {
 // Paginate fetches records from a paginated API endpoint, following cursors
 // until the requested limit is reached or no more results exist. Returns
 // the full result or an error -- partial results are never exposed.
-func (c *Client) Paginate(ctx context.Context, path string, query map[string]string, lc LimitConfig) (*PaginatedResult, error) {
+func (c *Client) Paginate(ctx context.Context, path string, query url.Values, lc LimitConfig) (*PaginatedResult, error) {
 	effective := lc.EffectiveLimit()
 	if effective > MaxCeiling {
 		effective = MaxCeiling
 	}
 	collected := make([]json.RawMessage, 0, min(effective, apiPageSizeMax))
 
-	// Clone query map to avoid mutating the caller's map.
-	q := make(map[string]string, len(query)+2)
+	// Clone query values to avoid mutating the caller's map.
+	q := make(url.Values, len(query)+2)
 	for k, v := range query {
-		q[k] = v
+		q[k] = append([]string(nil), v...)
 	}
 
 	var lastCredits CreditMeta
@@ -120,7 +121,7 @@ func (c *Client) Paginate(ctx context.Context, path string, query map[string]str
 		}
 
 		pageSize := min(remaining, apiPageSizeMax)
-		q["size"] = strconv.Itoa(pageSize)
+		q.Set("size", strconv.Itoa(pageSize))
 
 		resp, err := c.Get(ctx, path, q)
 		if err != nil {
@@ -157,7 +158,7 @@ func (c *Client) Paginate(ctx context.Context, path string, query map[string]str
 			}, nil
 		}
 
-		q["cursor"] = *page.NextCursor
+		q.Set("cursor", *page.NextCursor)
 	}
 
 	// This branch handles the case where effective was already 0 or
