@@ -109,7 +109,7 @@ func TestContractorsSearchBasic(t *testing.T) {
 	result := runCLIWithEnv(t, env,
 		"--base-url", srv.URL,
 		"contractors", "search",
-		"--geo-id", "ZIP_90210",
+		"--geo-id", "90210",
 		"--permit-from", "2024-01-01",
 		"--permit-to", "2024-12-31",
 	)
@@ -153,8 +153,8 @@ func TestContractorsSearchBasic(t *testing.T) {
 		t.Fatalf("expected 1 API request, got %d", len(*queries))
 	}
 	q := (*queries)[0]
-	if q["geo_id"][0] != "ZIP_90210" {
-		t.Errorf("expected geo_id=ZIP_90210, got %q", q["geo_id"])
+	if q["geo_id"][0] != "90210" {
+		t.Errorf("expected geo_id=90210, got %q", q["geo_id"])
 	}
 	if q["permit_from"][0] != "2024-01-01" {
 		t.Errorf("expected permit_from=2024-01-01, got %q", q["permit_from"])
@@ -173,7 +173,7 @@ func TestContractorsSearchClassificationFilter(t *testing.T) {
 	result := runCLIWithEnv(t, env,
 		"--base-url", srv.URL,
 		"contractors", "search",
-		"--geo-id", "ZIP_90210",
+		"--geo-id", "90210",
 		"--permit-from", "2024-01-01",
 		"--permit-to", "2024-12-31",
 		"--contractor-classification", "general_building",
@@ -215,7 +215,7 @@ func TestContractorsSearchNoTallies(t *testing.T) {
 	result := runCLIWithEnv(t, env,
 		"--base-url", srv.URL,
 		"contractors", "search",
-		"--geo-id", "ZIP_90210",
+		"--geo-id", "90210",
 		"--permit-from", "2024-01-01",
 		"--permit-to", "2024-12-31",
 		"--no-tallies",
@@ -254,7 +254,7 @@ func TestContractorsSearchNoResults(t *testing.T) {
 	result := runCLIWithEnv(t, env,
 		"--base-url", srv.URL,
 		"contractors", "search",
-		"--geo-id", "ZIP_99999",
+		"--geo-id", "99999",
 		"--permit-from", "2024-01-01",
 		"--permit-to", "2024-12-31",
 	)
@@ -293,7 +293,7 @@ func TestContractorsSearchNoTalliesOmittedByDefault(t *testing.T) {
 	result := runCLIWithEnv(t, env,
 		"--base-url", srv.URL,
 		"contractors", "search",
-		"--geo-id", "ZIP_90210",
+		"--geo-id", "90210",
 		"--permit-from", "2024-01-01",
 		"--permit-to", "2024-12-31",
 	)
@@ -370,7 +370,7 @@ func TestContractorsSearchRequiresAuth(t *testing.T) {
 
 	result := runCLIWithEnv(t, env,
 		"contractors", "search",
-		"--geo-id", "ZIP_90210",
+		"--geo-id", "90210",
 		"--permit-from", "2024-01-01",
 		"--permit-to", "2024-12-31",
 	)
@@ -392,7 +392,7 @@ func TestContractorsSearchInvalidDateFormat(t *testing.T) {
 
 	result := runCLIWithEnv(t, env,
 		"contractors", "search",
-		"--geo-id", "ZIP_90210",
+		"--geo-id", "90210",
 		"--permit-from", "2024/01/01",
 		"--permit-to", "2024-12-31",
 	)
@@ -421,7 +421,7 @@ func TestContractorsSearchInvalidDateFormatTo(t *testing.T) {
 
 	result := runCLIWithEnv(t, env,
 		"contractors", "search",
-		"--geo-id", "ZIP_90210",
+		"--geo-id", "90210",
 		"--permit-from", "2024-01-01",
 		"--permit-to", "12-31-2024",
 	)
@@ -466,7 +466,7 @@ func TestContractorsSearchPagination(t *testing.T) {
 		"--base-url", srv.URL,
 		"--limit", "100",
 		"contractors", "search",
-		"--geo-id", "ZIP_90210",
+		"--geo-id", "90210",
 		"--permit-from", "2024-01-01",
 		"--permit-to", "2024-12-31",
 	)
@@ -511,7 +511,7 @@ func TestContractorsSearchIncludeCount(t *testing.T) {
 	result := runCLIWithEnv(t, env,
 		"--base-url", srv.URL,
 		"contractors", "search",
-		"--geo-id", "ZIP_90210",
+		"--geo-id", "90210",
 		"--permit-from", "2024-01-01",
 		"--permit-to", "2024-12-31",
 		"--include-count",
@@ -559,7 +559,7 @@ func TestContractorsSearchNoIncludeCountByDefault(t *testing.T) {
 	result := runCLIWithEnv(t, env,
 		"--base-url", srv.URL,
 		"contractors", "search",
-		"--geo-id", "ZIP_90210",
+		"--geo-id", "90210",
 		"--permit-from", "2024-01-01",
 		"--permit-to", "2024-12-31",
 	)

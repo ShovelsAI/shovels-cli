@@ -109,7 +109,7 @@ func TestPermitsSearchBasic(t *testing.T) {
 	result := runCLIWithEnv(t, env,
 		"--base-url", srv.URL,
 		"permits", "search",
-		"--geo-id", "ZIP_90210",
+		"--geo-id", "90210",
 		"--permit-from", "2024-01-01",
 		"--permit-to", "2024-12-31",
 		"--tags", "solar",
@@ -154,8 +154,8 @@ func TestPermitsSearchBasic(t *testing.T) {
 		t.Fatalf("expected 1 API request, got %d", len(*queries))
 	}
 	q := (*queries)[0]
-	if q["geo_id"][0] != "ZIP_90210" {
-		t.Errorf("expected geo_id=ZIP_90210, got %q", q["geo_id"])
+	if q["geo_id"][0] != "90210" {
+		t.Errorf("expected geo_id=90210, got %q", q["geo_id"])
 	}
 	if q["permit_from"][0] != "2024-01-01" {
 		t.Errorf("expected permit_from=2024-01-01, got %q", q["permit_from"])
@@ -177,7 +177,7 @@ func TestPermitsSearchMultipleTags(t *testing.T) {
 	result := runCLIWithEnv(t, env,
 		"--base-url", srv.URL,
 		"permits", "search",
-		"--geo-id", "ZIP_90210",
+		"--geo-id", "90210",
 		"--permit-from", "2024-01-01",
 		"--permit-to", "2024-12-31",
 		"--tags", "solar",
@@ -211,7 +211,7 @@ func TestPermitsSearchExclusionTag(t *testing.T) {
 	result := runCLIWithEnv(t, env,
 		"--base-url", srv.URL,
 		"permits", "search",
-		"--geo-id", "ZIP_90210",
+		"--geo-id", "90210",
 		"--permit-from", "2024-01-01",
 		"--permit-to", "2024-12-31",
 		"--tags", "solar",
@@ -247,7 +247,7 @@ func TestPermitsSearchNoResults(t *testing.T) {
 	result := runCLIWithEnv(t, env,
 		"--base-url", srv.URL,
 		"permits", "search",
-		"--geo-id", "ZIP_99999",
+		"--geo-id", "99999",
 		"--permit-from", "2024-01-01",
 		"--permit-to", "2024-12-31",
 	)
@@ -286,7 +286,7 @@ func TestPermitsSearchOptionalFlagsOmitted(t *testing.T) {
 	result := runCLIWithEnv(t, env,
 		"--base-url", srv.URL,
 		"permits", "search",
-		"--geo-id", "ZIP_90210",
+		"--geo-id", "90210",
 		"--permit-from", "2024-01-01",
 		"--permit-to", "2024-12-31",
 	)
@@ -382,7 +382,7 @@ func TestPermitsSearchInvalidDateFormat(t *testing.T) {
 
 	result := runCLIWithEnv(t, env,
 		"permits", "search",
-		"--geo-id", "ZIP_90210",
+		"--geo-id", "90210",
 		"--permit-from", "2024/01/01",
 		"--permit-to", "2024-12-31",
 	)
@@ -416,7 +416,7 @@ func TestPermitsSearchQueryTooLong(t *testing.T) {
 
 	result := runCLIWithEnv(t, env,
 		"permits", "search",
-		"--geo-id", "ZIP_90210",
+		"--geo-id", "90210",
 		"--permit-from", "2024-01-01",
 		"--permit-to", "2024-12-31",
 		"--query", longQuery,
@@ -446,7 +446,7 @@ func TestPermitsSearchInvalidStatus(t *testing.T) {
 
 	result := runCLIWithEnv(t, env,
 		"permits", "search",
-		"--geo-id", "ZIP_90210",
+		"--geo-id", "90210",
 		"--permit-from", "2024-01-01",
 		"--permit-to", "2024-12-31",
 		"--status", "invalid_status",
@@ -479,7 +479,7 @@ func TestPermitsSearchRequiresAuth(t *testing.T) {
 
 	result := runCLIWithEnv(t, env,
 		"permits", "search",
-		"--geo-id", "ZIP_90210",
+		"--geo-id", "90210",
 		"--permit-from", "2024-01-01",
 		"--permit-to", "2024-12-31",
 	)
@@ -521,7 +521,7 @@ func TestPermitsSearchPagination(t *testing.T) {
 		"--base-url", srv.URL,
 		"--limit", "100",
 		"permits", "search",
-		"--geo-id", "ZIP_90210",
+		"--geo-id", "90210",
 		"--permit-from", "2024-01-01",
 		"--permit-to", "2024-12-31",
 	)
@@ -565,7 +565,7 @@ func TestPermitsSearchQuery50CharsAccepted(t *testing.T) {
 	result := runCLIWithEnv(t, env,
 		"--base-url", srv.URL,
 		"permits", "search",
-		"--geo-id", "ZIP_90210",
+		"--geo-id", "90210",
 		"--permit-from", "2024-01-01",
 		"--permit-to", "2024-12-31",
 		"--query", exactQuery,
@@ -860,7 +860,7 @@ func TestPermitsSearchInvalidDateFormatTo(t *testing.T) {
 
 	result := runCLIWithEnv(t, env,
 		"permits", "search",
-		"--geo-id", "ZIP_90210",
+		"--geo-id", "90210",
 		"--permit-from", "2024-01-01",
 		"--permit-to", "12-31-2024",
 	)
@@ -889,7 +889,7 @@ func TestPermitsSearchIncludeCount(t *testing.T) {
 	result := runCLIWithEnv(t, env,
 		"--base-url", srv.URL,
 		"permits", "search",
-		"--geo-id", "ZIP_90210",
+		"--geo-id", "90210",
 		"--permit-from", "2024-01-01",
 		"--permit-to", "2024-12-31",
 		"--include-count",
@@ -937,7 +937,7 @@ func TestPermitsSearchNoIncludeCountByDefault(t *testing.T) {
 	result := runCLIWithEnv(t, env,
 		"--base-url", srv.URL,
 		"permits", "search",
-		"--geo-id", "ZIP_90210",
+		"--geo-id", "90210",
 		"--permit-from", "2024-01-01",
 		"--permit-to", "2024-12-31",
 	)
