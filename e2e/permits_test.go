@@ -95,7 +95,6 @@ func TestPermitsSearchBasic(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"permits", "search",
 		"--geo-id", "ZIP_90210",
@@ -164,7 +163,6 @@ func TestPermitsSearchMultipleTags(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"permits", "search",
 		"--geo-id", "ZIP_90210",
@@ -199,7 +197,6 @@ func TestPermitsSearchExclusionTag(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"permits", "search",
 		"--geo-id", "ZIP_90210",
@@ -236,7 +233,6 @@ func TestPermitsSearchNoResults(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"permits", "search",
 		"--geo-id", "ZIP_99999",
@@ -276,7 +272,6 @@ func TestPermitsSearchOptionalFlagsOmitted(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"permits", "search",
 		"--geo-id", "ZIP_90210",
@@ -322,7 +317,6 @@ func TestPermitsSearchMissingRequiredFlags(t *testing.T) {
 
 	// Missing all three required flags.
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"permits", "search",
 	)
 
@@ -353,7 +347,6 @@ func TestPermitsSearchMissingOneRequiredFlag(t *testing.T) {
 
 	// Missing --geo-id only.
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"permits", "search",
 		"--permit-from", "2024-01-01",
 		"--permit-to", "2024-12-31",
@@ -376,7 +369,6 @@ func TestPermitsSearchInvalidDateFormat(t *testing.T) {
 	env := withIsolatedConfig(t)
 
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"permits", "search",
 		"--geo-id", "ZIP_90210",
 		"--permit-from", "2024/01/01",
@@ -411,7 +403,6 @@ func TestPermitsSearchQueryTooLong(t *testing.T) {
 	longQuery := strings.Repeat("a", 51)
 
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"permits", "search",
 		"--geo-id", "ZIP_90210",
 		"--permit-from", "2024-01-01",
@@ -442,7 +433,6 @@ func TestPermitsSearchInvalidStatus(t *testing.T) {
 	env := withIsolatedConfig(t)
 
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"permits", "search",
 		"--geo-id", "ZIP_90210",
 		"--permit-from", "2024-01-01",
@@ -473,7 +463,7 @@ func TestPermitsSearchInvalidStatus(t *testing.T) {
 }
 
 func TestPermitsSearchRequiresAuth(t *testing.T) {
-	env := withIsolatedConfig(t)
+	env := withIsolatedConfigNoAuth(t)
 
 	result := runCLIWithEnv(t, env,
 		"permits", "search",
@@ -516,7 +506,6 @@ func TestPermitsSearchPagination(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"--limit", "100",
 		"permits", "search",
@@ -562,7 +551,6 @@ func TestPermitsSearchQuery50CharsAccepted(t *testing.T) {
 	env := withIsolatedConfig(t)
 	exactQuery := strings.Repeat("b", 50)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"permits", "search",
 		"--geo-id", "ZIP_90210",
@@ -627,7 +615,6 @@ func TestPermitsGetMultipleIDs(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"permits", "get", "P123", "P456",
 	)
@@ -681,7 +668,6 @@ func TestPermitsGetSingleID(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"permits", "get", "P123",
 	)
@@ -717,7 +703,6 @@ func TestPermitsGetSomeMissing(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"permits", "get", "P123", "P999", "P888",
 	)
@@ -765,7 +750,6 @@ func TestPermitsGetSomeMissing(t *testing.T) {
 func TestPermitsGetNoIDs(t *testing.T) {
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"permits", "get",
 	)
 
@@ -789,7 +773,6 @@ func TestPermitsGetTooManyIDs(t *testing.T) {
 	env := withIsolatedConfig(t)
 
 	args := []string{
-		"--api-key", "sk-test",
 		"permits", "get",
 	}
 	for i := range 51 {
@@ -827,7 +810,6 @@ func TestPermitsGetExactly50IDs(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	args := []string{
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"permits", "get",
 	}
@@ -865,7 +847,6 @@ func TestPermitsSearchInvalidDateFormatTo(t *testing.T) {
 	env := withIsolatedConfig(t)
 
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"permits", "search",
 		"--geo-id", "ZIP_90210",
 		"--permit-from", "2024-01-01",

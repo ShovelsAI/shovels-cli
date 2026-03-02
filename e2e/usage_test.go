@@ -45,7 +45,6 @@ func TestUsageBasic(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"usage",
 	)
@@ -99,7 +98,6 @@ func TestUsageUnlimitedPlan(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"usage",
 	)
@@ -134,7 +132,6 @@ func TestUsageNonPaginatedNoCountHasMore(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"usage",
 	)
@@ -163,7 +160,7 @@ func TestUsageNonPaginatedNoCountHasMore(t *testing.T) {
 }
 
 func TestUsageRequiresAuth(t *testing.T) {
-	env := withIsolatedConfig(t)
+	env := withIsolatedConfigNoAuth(t)
 
 	result := runCLIWithEnv(t, env, "usage")
 

@@ -24,7 +24,7 @@ var configShowCmd = &cobra.Command{
 	Short: "Display the resolved configuration as JSON (API key masked)",
 	Long: `Print the resolved configuration as a JSON object to stdout. The API key
 is masked for security (first 4 and last 4 characters shown). Values
-reflect the full precedence chain: --api-key flag > SHOVELS_API_KEY env > config file > default.
+reflect the full precedence chain: SHOVELS_API_KEY env > config file > default.
 
 Example:
   shovels config show`,

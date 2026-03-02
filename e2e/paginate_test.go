@@ -94,7 +94,6 @@ func TestPaginateDefaultLimit50(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"_test-paginate", "/search",
 	)
@@ -169,7 +168,6 @@ func TestPaginateLimit200MultiPage(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"--limit", "200",
 		"_test-paginate", "/search",
@@ -222,7 +220,6 @@ func TestPaginateLimitAll(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"--limit", "all",
 		"_test-paginate", "/search",
@@ -257,7 +254,6 @@ func TestPaginateLimit200ButOnly75Exist(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"--limit", "200",
 		"_test-paginate", "/search",
@@ -318,7 +314,6 @@ func TestPaginateLimit1(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"--limit", "1",
 		"_test-paginate", "/search",
@@ -369,7 +364,6 @@ func TestVersionEnvelopeFormat(t *testing.T) {
 func TestPaginateLimitNegative(t *testing.T) {
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--limit", "-1",
 		"_test-paginate", "/search",
 	)
@@ -387,7 +381,6 @@ func TestPaginateLimitNegative(t *testing.T) {
 func TestPaginateLimitZero(t *testing.T) {
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--limit", "0",
 		"_test-paginate", "/search",
 	)
@@ -405,7 +398,6 @@ func TestPaginateLimitZero(t *testing.T) {
 func TestPaginateLimitNonNumeric(t *testing.T) {
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--limit", "abc",
 		"_test-paginate", "/search",
 	)
@@ -426,7 +418,6 @@ func TestPaginateLimitNonNumeric(t *testing.T) {
 func TestPaginateLimitExceedsCeiling(t *testing.T) {
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--limit", "200000",
 		"_test-paginate", "/search",
 	)
@@ -444,7 +435,6 @@ func TestPaginateLimitExceedsCeiling(t *testing.T) {
 func TestPaginateMaxRecordsExceedsCeiling(t *testing.T) {
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--limit", "all",
 		"--max-records", "200000",
 		"_test-paginate", "/search",
@@ -490,7 +480,6 @@ func TestPaginateMidPaginationErrorNoPartialOutput(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"--no-retry",
 		"--limit", "250",
@@ -525,7 +514,6 @@ func TestNonPaginatedEnvelopeHasNoCountOrHasMore(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"_test-single", "/usage",
 	)
@@ -578,7 +566,6 @@ func TestPaginateLimitAllDefaultCap10K(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"--limit", "all",
 		"_test-paginate", "/search",
@@ -619,7 +606,6 @@ func TestPaginateLimitAllMaxRecordsOverride(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"--limit", "all",
 		"--max-records", "100",
@@ -662,7 +648,6 @@ func TestPaginateLimitAllMaxRecords50000ExceedsDefaultCap(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"--limit", "all",
 		"--max-records", "50000",
@@ -702,7 +687,6 @@ func TestPaginateCountEqualsActualDataLength(t *testing.T) {
 
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"--api-key", "sk-test",
 		"--base-url", srv.URL,
 		"_test-paginate", "/search",
 	)

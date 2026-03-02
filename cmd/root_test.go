@@ -7,32 +7,13 @@ import (
 )
 
 func TestGlobalFlagsRegistered(t *testing.T) {
-	expected := []string{"api-key", "limit", "max-records", "base-url", "no-retry", "timeout"}
+	expected := []string{"limit", "max-records", "base-url", "no-retry", "timeout"}
 	flags := rootCmd.PersistentFlags()
 
 	for _, name := range expected {
 		if flags.Lookup(name) == nil {
 			t.Errorf("expected persistent flag %q to be registered on root command", name)
 		}
-	}
-}
-
-func TestAPIKeyAccessibleFromSubcommand(t *testing.T) {
-	// Persistent flags on root are inherited by all subcommands.
-	// Verify that a subcommand (version) can look up --api-key.
-	f := versionCmd.InheritedFlags()
-	if f.Lookup("api-key") == nil {
-		t.Error("--api-key persistent flag not accessible from version subcommand")
-	}
-}
-
-func TestAPIKeyDefaultEmpty(t *testing.T) {
-	val, err := rootCmd.PersistentFlags().GetString("api-key")
-	if err != nil {
-		t.Fatalf("unexpected error getting api-key flag: %v", err)
-	}
-	if val != "" {
-		t.Errorf("expected empty default for --api-key, got %q", val)
 	}
 }
 

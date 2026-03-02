@@ -43,13 +43,13 @@ shovels version
 ### 1. Set your API key
 
 ```bash
-shovels config set api-key YOUR_API_KEY
+export SHOVELS_API_KEY=YOUR_API_KEY
 ```
 
-Or export it as an environment variable:
+Or save it to the config file:
 
 ```bash
-export SHOVELS_API_KEY=YOUR_API_KEY
+shovels config set api-key YOUR_API_KEY
 ```
 
 ### 2. Search permits
@@ -76,9 +76,8 @@ The CLI resolves the API key in this order:
 
 | Priority | Source | Example |
 |----------|--------|---------|
-| 1 | `--api-key` flag | `shovels permits search --api-key sk-abc ...` |
-| 2 | `SHOVELS_API_KEY` env var | `export SHOVELS_API_KEY=sk-abc` |
-| 3 | Config file | `~/.config/shovels/config.yaml` |
+| 1 | `SHOVELS_API_KEY` env var | `export SHOVELS_API_KEY=sk-abc` |
+| 2 | Config file | `~/.config/shovels/config.yaml` |
 
 ## Output format
 
@@ -217,7 +216,6 @@ shovels version
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--api-key` | | API key (overrides env var and config file) |
 | `--limit` | `50` | Maximum records: integer 1-100000 or `all` |
 | `--max-records` | `10000` | Upper bound when `--limit=all`, range 1-100000 |
 | `--base-url` | `https://api.shovels.ai/v2` | API base URL |

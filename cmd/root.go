@@ -51,23 +51,20 @@ Available resources:
   version       Print CLI version, git commit, and build date
 
 Authentication (checked in this order):
-  1. --api-key flag
-  2. SHOVELS_API_KEY environment variable
-  3. ~/.config/shovels/config.yaml
+  1. SHOVELS_API_KEY environment variable
+  2. ~/.config/shovels/config.yaml
 
 Quick start:
-  shovels config set api-key YOUR_API_KEY
+  export SHOVELS_API_KEY=your-key-here
+  # or: shovels config set api-key YOUR_API_KEY
   shovels permits search --geo-id ZIP_90210 --permit-from 2024-01-01 --permit-to 2024-12-31
   shovels contractors search --geo-id ZIP_90210 --permit-from 2024-01-01 --permit-to 2024-12-31 --tags solar`,
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		flagAPIKey, _ := cmd.Flags().GetString("api-key")
 		flagBaseURL, _ := cmd.Flags().GetString("base-url")
 
 		o := config.Overrides{
-			APIKey:     flagAPIKey,
-			APIKeySet:  cmd.Flags().Changed("api-key"),
 			BaseURL:    flagBaseURL,
 			BaseURLSet: cmd.Flags().Changed("base-url"),
 		}
@@ -104,7 +101,6 @@ func requiresAuth(cmd *cobra.Command) bool {
 
 func init() {
 	flags := rootCmd.PersistentFlags()
-	flags.String("api-key", "", "API key for authentication (overrides SHOVELS_API_KEY env var and config file)")
 	flags.String("limit", "50", `Maximum records to return: integer 1-100000 or "all" (default "50")`)
 	flags.Int("max-records", 10000, "Upper bound when --limit=all, range 1-100000 (default 10000)")
 	flags.String("base-url", "https://api.shovels.ai/v2", "API base URL (default https://api.shovels.ai/v2)")
