@@ -50,7 +50,7 @@ Response: {"data": [...], "meta": {"count": N, "has_more": bool, "credits_used":
 func runAddressesSearch(cmd *cobra.Command, args []string) error {
 	query, _ := cmd.Flags().GetString("query")
 	if query == "" {
-		output.PrintErrorTyped(os.Stderr, "query is required", 1, client.ErrorTypeValidation)
+		output.PrintErrorTyped(os.Stderr, "required flag missing: --query (-q)", 1, client.ErrorTypeValidation)
 		return &exitError{code: 1}
 	}
 
