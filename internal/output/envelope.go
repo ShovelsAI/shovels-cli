@@ -31,6 +31,33 @@ func PrintPaginated(w io.Writer, items []json.RawMessage, hasMore bool, credits 
 	_ = enc.Encode(env)
 }
 
+// PrintBatch writes a JSON envelope for non-paginated batch responses. The
+// data field contains the items array, meta includes count and credit
+// information, and meta.missing lists any requested IDs not found in the
+// response. The missing field is omitted entirely when all IDs are found.
+func PrintBatch(w io.Writer, items []json.RawMessage, missing []string, credits client.CreditMeta) {
+	meta := map[string]any{
+		"count": len(items),
+	}
+	if len(missing) > 0 {
+		meta["missing"] = missing
+	}
+	if credits.CreditsUsed != nil {
+		meta["credits_used"] = *credits.CreditsUsed
+	}
+	if credits.CreditsRemaining != nil {
+		meta["credits_remaining"] = *credits.CreditsRemaining
+	}
+
+	env := Envelope{
+		Data: items,
+		Meta: meta,
+	}
+	enc := json.NewEncoder(w)
+	enc.SetEscapeHTML(false)
+	_ = enc.Encode(env)
+}
+
 // PrintSingle writes a JSON envelope for non-paginated (single object) API
 // responses. The data field contains the object, and meta includes credit
 // information. No count or has_more fields are included.
