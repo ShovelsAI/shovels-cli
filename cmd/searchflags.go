@@ -27,8 +27,8 @@ func registerSearchFlags(cmd *cobra.Command) {
 
 	// Required filters
 	f.String("geo-id", "", "Geographic area ID: ZIP_90210, CITY_LOS_ANGELES_CA, COUNTY_LOS_ANGELES_CA, STATE_CA (required)")
-	f.String("from", "", "Start date in YYYY-MM-DD format (required)")
-	f.String("to", "", "End date in YYYY-MM-DD format (required)")
+	f.String("permit-from", "", "Permit start date in YYYY-MM-DD format (required)")
+	f.String("permit-to", "", "Permit end date in YYYY-MM-DD format (required)")
 
 	// Permit filters
 	f.StringSlice("tags", nil, "Permit tags, AND logic, prefix with - to exclude (e.g. solar, -roofing)")
@@ -64,7 +64,7 @@ func searchFlagGroups() []flagGroup {
 	return []flagGroup{
 		{
 			Title: "Required Flags",
-			Names: []string{"geo-id", "from", "to"},
+			Names: []string{"geo-id", "permit-from", "permit-to"},
 		},
 		{
 			Title: "Permit Filters",
@@ -99,18 +99,18 @@ func searchFlagGroups() []flagGroup {
 // printed to stderr) if validation fails.
 func validateSearchFlags(cmd *cobra.Command) error {
 	geoID, _ := cmd.Flags().GetString("geo-id")
-	from, _ := cmd.Flags().GetString("from")
-	to, _ := cmd.Flags().GetString("to")
+	from, _ := cmd.Flags().GetString("permit-from")
+	to, _ := cmd.Flags().GetString("permit-to")
 
 	var missing []string
 	if geoID == "" {
 		missing = append(missing, "--geo-id")
 	}
 	if from == "" {
-		missing = append(missing, "--from")
+		missing = append(missing, "--permit-from")
 	}
 	if to == "" {
-		missing = append(missing, "--to")
+		missing = append(missing, "--permit-to")
 	}
 	if len(missing) > 0 {
 		msg := fmt.Sprintf("required flag(s) missing: %s", strings.Join(missing, ", "))
@@ -119,11 +119,11 @@ func validateSearchFlags(cmd *cobra.Command) error {
 	}
 
 	if !datePattern.MatchString(from) {
-		output.PrintErrorTyped(os.Stderr, fmt.Sprintf("invalid date format for --from: %q (expected YYYY-MM-DD)", from), 1, client.ErrorTypeValidation)
+		output.PrintErrorTyped(os.Stderr, fmt.Sprintf("invalid date format for --permit-from: %q (expected YYYY-MM-DD)", from), 1, client.ErrorTypeValidation)
 		return &exitError{code: 1}
 	}
 	if !datePattern.MatchString(to) {
-		output.PrintErrorTyped(os.Stderr, fmt.Sprintf("invalid date format for --to: %q (expected YYYY-MM-DD)", to), 1, client.ErrorTypeValidation)
+		output.PrintErrorTyped(os.Stderr, fmt.Sprintf("invalid date format for --permit-to: %q (expected YYYY-MM-DD)", to), 1, client.ErrorTypeValidation)
 		return &exitError{code: 1}
 	}
 
@@ -150,8 +150,8 @@ func validateSearchFlags(cmd *cobra.Command) error {
 // filter parameters.
 func buildSearchQuery(cmd *cobra.Command) url.Values {
 	geoID, _ := cmd.Flags().GetString("geo-id")
-	from, _ := cmd.Flags().GetString("from")
-	to, _ := cmd.Flags().GetString("to")
+	from, _ := cmd.Flags().GetString("permit-from")
+	to, _ := cmd.Flags().GetString("permit-to")
 
 	q := url.Values{
 		"geo_id":      {geoID},

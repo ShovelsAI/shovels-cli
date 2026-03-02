@@ -99,8 +99,8 @@ func TestPermitsSearchBasic(t *testing.T) {
 		"--base-url", srv.URL,
 		"permits", "search",
 		"--geo-id", "ZIP_90210",
-		"--from", "2024-01-01",
-		"--to", "2024-12-31",
+		"--permit-from", "2024-01-01",
+		"--permit-to", "2024-12-31",
 		"--tags", "solar",
 	)
 
@@ -168,8 +168,8 @@ func TestPermitsSearchMultipleTags(t *testing.T) {
 		"--base-url", srv.URL,
 		"permits", "search",
 		"--geo-id", "ZIP_90210",
-		"--from", "2024-01-01",
-		"--to", "2024-12-31",
+		"--permit-from", "2024-01-01",
+		"--permit-to", "2024-12-31",
 		"--tags", "solar",
 		"--tags", "roofing",
 	)
@@ -203,8 +203,8 @@ func TestPermitsSearchExclusionTag(t *testing.T) {
 		"--base-url", srv.URL,
 		"permits", "search",
 		"--geo-id", "ZIP_90210",
-		"--from", "2024-01-01",
-		"--to", "2024-12-31",
+		"--permit-from", "2024-01-01",
+		"--permit-to", "2024-12-31",
 		"--tags", "solar",
 		"--tags=-roofing",
 	)
@@ -240,8 +240,8 @@ func TestPermitsSearchNoResults(t *testing.T) {
 		"--base-url", srv.URL,
 		"permits", "search",
 		"--geo-id", "ZIP_99999",
-		"--from", "2024-01-01",
-		"--to", "2024-12-31",
+		"--permit-from", "2024-01-01",
+		"--permit-to", "2024-12-31",
 	)
 
 	if result.ExitCode != 0 {
@@ -280,8 +280,8 @@ func TestPermitsSearchOptionalFlagsOmitted(t *testing.T) {
 		"--base-url", srv.URL,
 		"permits", "search",
 		"--geo-id", "ZIP_90210",
-		"--from", "2024-01-01",
-		"--to", "2024-12-31",
+		"--permit-from", "2024-01-01",
+		"--permit-to", "2024-12-31",
 	)
 
 	if result.ExitCode != 0 {
@@ -340,11 +340,11 @@ func TestPermitsSearchMissingRequiredFlags(t *testing.T) {
 	if !strings.Contains(p.Error, "--geo-id") {
 		t.Errorf("expected error to mention --geo-id, got: %s", p.Error)
 	}
-	if !strings.Contains(p.Error, "--from") {
-		t.Errorf("expected error to mention --from, got: %s", p.Error)
+	if !strings.Contains(p.Error, "--permit-from") {
+		t.Errorf("expected error to mention --permit-from, got: %s", p.Error)
 	}
-	if !strings.Contains(p.Error, "--to") {
-		t.Errorf("expected error to mention --to, got: %s", p.Error)
+	if !strings.Contains(p.Error, "--permit-to") {
+		t.Errorf("expected error to mention --permit-to, got: %s", p.Error)
 	}
 }
 
@@ -355,8 +355,8 @@ func TestPermitsSearchMissingOneRequiredFlag(t *testing.T) {
 	result := runCLIWithEnv(t, env,
 		"--api-key", "sk-test",
 		"permits", "search",
-		"--from", "2024-01-01",
-		"--to", "2024-12-31",
+		"--permit-from", "2024-01-01",
+		"--permit-to", "2024-12-31",
 	)
 
 	if result.ExitCode != 1 {
@@ -379,8 +379,8 @@ func TestPermitsSearchInvalidDateFormat(t *testing.T) {
 		"--api-key", "sk-test",
 		"permits", "search",
 		"--geo-id", "ZIP_90210",
-		"--from", "2024/01/01",
-		"--to", "2024-12-31",
+		"--permit-from", "2024/01/01",
+		"--permit-to", "2024-12-31",
 	)
 
 	if result.ExitCode != 1 {
@@ -397,8 +397,8 @@ func TestPermitsSearchInvalidDateFormat(t *testing.T) {
 	if !strings.Contains(p.Error, "invalid date format") {
 		t.Errorf("expected error about invalid date format, got: %s", p.Error)
 	}
-	if !strings.Contains(p.Error, "--from") {
-		t.Errorf("expected error to mention --from, got: %s", p.Error)
+	if !strings.Contains(p.Error, "--permit-from") {
+		t.Errorf("expected error to mention --permit-from, got: %s", p.Error)
 	}
 }
 
@@ -414,8 +414,8 @@ func TestPermitsSearchQueryTooLong(t *testing.T) {
 		"--api-key", "sk-test",
 		"permits", "search",
 		"--geo-id", "ZIP_90210",
-		"--from", "2024-01-01",
-		"--to", "2024-12-31",
+		"--permit-from", "2024-01-01",
+		"--permit-to", "2024-12-31",
 		"--query", longQuery,
 	)
 
@@ -445,8 +445,8 @@ func TestPermitsSearchInvalidStatus(t *testing.T) {
 		"--api-key", "sk-test",
 		"permits", "search",
 		"--geo-id", "ZIP_90210",
-		"--from", "2024-01-01",
-		"--to", "2024-12-31",
+		"--permit-from", "2024-01-01",
+		"--permit-to", "2024-12-31",
 		"--status", "invalid_status",
 	)
 
@@ -478,8 +478,8 @@ func TestPermitsSearchRequiresAuth(t *testing.T) {
 	result := runCLIWithEnv(t, env,
 		"permits", "search",
 		"--geo-id", "ZIP_90210",
-		"--from", "2024-01-01",
-		"--to", "2024-12-31",
+		"--permit-from", "2024-01-01",
+		"--permit-to", "2024-12-31",
 	)
 
 	if result.ExitCode != 2 {
@@ -521,8 +521,8 @@ func TestPermitsSearchPagination(t *testing.T) {
 		"--limit", "100",
 		"permits", "search",
 		"--geo-id", "ZIP_90210",
-		"--from", "2024-01-01",
-		"--to", "2024-12-31",
+		"--permit-from", "2024-01-01",
+		"--permit-to", "2024-12-31",
 	)
 
 	if result.ExitCode != 0 {
@@ -566,8 +566,8 @@ func TestPermitsSearchQuery50CharsAccepted(t *testing.T) {
 		"--base-url", srv.URL,
 		"permits", "search",
 		"--geo-id", "ZIP_90210",
-		"--from", "2024-01-01",
-		"--to", "2024-12-31",
+		"--permit-from", "2024-01-01",
+		"--permit-to", "2024-12-31",
 		"--query", exactQuery,
 	)
 
@@ -868,8 +868,8 @@ func TestPermitsSearchInvalidDateFormatTo(t *testing.T) {
 		"--api-key", "sk-test",
 		"permits", "search",
 		"--geo-id", "ZIP_90210",
-		"--from", "2024-01-01",
-		"--to", "12-31-2024",
+		"--permit-from", "2024-01-01",
+		"--permit-to", "12-31-2024",
 	)
 
 	if result.ExitCode != 1 {
@@ -880,7 +880,7 @@ func TestPermitsSearchInvalidDateFormatTo(t *testing.T) {
 	if p.ErrorType != "validation_error" {
 		t.Errorf("expected error_type %q, got %q", "validation_error", p.ErrorType)
 	}
-	if !strings.Contains(p.Error, "--to") {
-		t.Errorf("expected error to mention --to, got: %s", p.Error)
+	if !strings.Contains(p.Error, "--permit-to") {
+		t.Errorf("expected error to mention --permit-to, got: %s", p.Error)
 	}
 }

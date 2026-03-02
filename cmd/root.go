@@ -57,8 +57,8 @@ Authentication (checked in this order):
 
 Quick start:
   shovels config set api-key YOUR_API_KEY
-  shovels permits search --geo-id ZIP_90210 --from 2024-01-01 --to 2024-12-31
-  shovels contractors search --geo-id ZIP_90210 --from 2024-01-01 --to 2024-12-31 --tags solar`,
+  shovels permits search --geo-id ZIP_90210 --permit-from 2024-01-01 --permit-to 2024-12-31
+  shovels contractors search --geo-id ZIP_90210 --permit-from 2024-01-01 --permit-to 2024-12-31 --tags solar`,
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {

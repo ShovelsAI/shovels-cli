@@ -86,7 +86,7 @@ func TestPermitsSearchHelpShowsGroupedFlagsAndExamples(t *testing.T) {
 	}
 
 	// Required flags marked with "(required)".
-	requiredFlags := []string{"--geo-id", "--from", "--to"}
+	requiredFlags := []string{"--geo-id", "--permit-from", "--permit-to"}
 	for _, flag := range requiredFlags {
 		if !strings.Contains(out, flag) {
 			t.Errorf("permits search --help should contain required flag %q", flag)
@@ -278,7 +278,7 @@ func TestFlagDescriptionsIncludeValueHints(t *testing.T) {
 
 	out := result.Stdout
 
-	// --from and --to should mention YYYY-MM-DD format.
+	// --permit-from and --permit-to should mention YYYY-MM-DD format.
 	if !strings.Contains(out, "YYYY-MM-DD") {
 		t.Error("date flags should include YYYY-MM-DD format hint")
 	}
@@ -289,7 +289,7 @@ func TestFlagDescriptionsIncludeValueHints(t *testing.T) {
 	}
 
 	// Required flags should have "(required)" in their description.
-	// Count occurrences of "(required)" - should be at least 3 (geo-id, from, to).
+	// Count occurrences of "(required)" - should be at least 3 (geo-id, permit-from, permit-to).
 	reqCount := strings.Count(out, "(required)")
 	if reqCount < 3 {
 		t.Errorf("expected at least 3 required flag markers, found %d", reqCount)

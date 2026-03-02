@@ -40,18 +40,18 @@ classification filters, and minimum-value thresholds.
 
 Required flags:
   --geo-id GEO_ID   Geographic area: ZIP_90210, CITY_LOS_ANGELES_CA, COUNTY_LOS_ANGELES_CA, or STATE_CA (required)
-  --from DATE        Start date in YYYY-MM-DD format (required)
-  --to DATE          End date in YYYY-MM-DD format (required)
+  --permit-from DATE        Start date in YYYY-MM-DD format (required)
+  --permit-to DATE          End date in YYYY-MM-DD format (required)
 
 Examples:
   Search contractors in a zip code:
-    shovels contractors search --geo-id ZIP_90210 --from 2024-01-01 --to 2024-12-31
+    shovels contractors search --geo-id ZIP_90210 --permit-from 2024-01-01 --permit-to 2024-12-31
 
   Filter by contractor classification:
-    shovels contractors search --geo-id ZIP_90210 --from 2024-01-01 --to 2024-12-31 --contractor-classification general_building
+    shovels contractors search --geo-id ZIP_90210 --permit-from 2024-01-01 --permit-to 2024-12-31 --contractor-classification general_building
 
   Skip tallies for faster response:
-    shovels contractors search --geo-id ZIP_90210 --from 2024-01-01 --to 2024-12-31 --no-tallies`,
+    shovels contractors search --geo-id ZIP_90210 --permit-from 2024-01-01 --permit-to 2024-12-31 --no-tallies`,
 	Annotations: map[string]string{
 		AnnotationRequiresAuth: "true",
 	},
