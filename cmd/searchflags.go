@@ -42,8 +42,10 @@ func registerSearchFlags(cmd *cobra.Command) {
 	f.String("geo-id", "", `Geographic area ID (required). Formats:
   Zip code:  5-digit code directly (92024, 78701, 33139)
   State:     2-letter code directly (CA, TX, FL)
-  Address/city/county: opaque Shovels ID, resolve first:
-    shovels addresses search -q "Austin, TX" | jq '.data[0].geo_id'`)
+  City:      shovels cities search -q "Miami" | jq '.data[0].geo_id'
+  County:    shovels counties search -q "Los Angeles" | jq '.data[0].geo_id'
+  Jurisdiction: shovels jurisdictions search -q "Portland" | jq '.data[0].geo_id'
+  Address:   shovels addresses search -q "123 Main St" | jq '.data[0].geo_id'`)
 	f.String("permit-from", "", "Permit start date in YYYY-MM-DD format (required)")
 	f.String("permit-to", "", "Permit end date in YYYY-MM-DD format (required)")
 
@@ -146,7 +148,8 @@ func validateSearchFlags(cmd *cobra.Command) error {
 		msg := fmt.Sprintf(
 			"invalid --geo-id %q. Do not use prefixes like ZIP_, CITY_, COUNTY_, or STATE_. "+
 				"Use the zip code directly (e.g. 90210), the state code (e.g. CA), "+
-				"or resolve a city/address: shovels addresses search -q \"...\" | jq '.data[0].geo_id'",
+				"or resolve via: shovels cities search -q \"...\", shovels counties search -q \"...\", "+
+				"shovels jurisdictions search -q \"...\", or shovels addresses search -q \"...\"",
 			geoID,
 		)
 		output.PrintErrorTyped(os.Stderr, msg, 1, client.ErrorTypeValidation)

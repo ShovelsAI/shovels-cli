@@ -39,14 +39,17 @@ range. Supports permit tag filters, property type filters, contractor
 classification filters, and minimum-value thresholds.
 
 Required flags:
-  --geo-id       Geographic area: zip code (92024), state (CA), or Shovels ID from addresses search
+  --geo-id       Geographic area: zip code (92024), state (CA), or resolved Shovels ID
   --permit-from  Start date in YYYY-MM-DD format
   --permit-to    End date in YYYY-MM-DD format
 
 Geographic IDs:
-  Zip codes and states work directly (92024, CA). For cities, counties, or
-  addresses, resolve the ID first:
-    shovels addresses search -q "Austin, TX" | jq '.data[0].geo_id'
+  Zip codes and states work directly (92024, CA). For cities, counties,
+  jurisdictions, or addresses, resolve the ID first:
+    shovels cities search -q "Miami" | jq '.data[0].geo_id'
+    shovels counties search -q "Los Angeles" | jq '.data[0].geo_id'
+    shovels jurisdictions search -q "Portland" | jq '.data[0].geo_id'
+    shovels addresses search -q "123 Main St" | jq '.data[0].geo_id'
 
 Examples:
   Search contractors in a zip code:

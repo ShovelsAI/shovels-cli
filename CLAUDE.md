@@ -21,6 +21,10 @@ cmd/            cobra command tree (one file per resource)
   permits.go    permits search / get
   contractors.go
   addresses.go
+  cities.go     cities search (geo_id resolution)
+  counties.go   counties search (geo_id resolution)
+  jurisdictions.go  jurisdictions search (geo_id resolution)
+  tags.go       tags list (tag discovery)
   usage.go
   config.go
   version.go
@@ -71,17 +75,26 @@ The `--geo-id` flag accepts Shovels geographic identifiers. Two types keep their
 - **Zip codes:** use the 5-digit code directly — `92024`, `90210`, `78701`
 - **US states:** use the 2-letter abbreviation — `CA`, `TX`, `NY`
 
-All other geographies (addresses, cities, jurisdictions, counties) have **opaque Shovels IDs** that must be resolved first via `shovels addresses search`:
+All other geographies have **opaque Shovels IDs** that must be resolved first using the appropriate search command:
 
 ```bash
 # Resolve a city to its geo_id
-shovels addresses search -q "Encinitas, CA" | jq '.data[0].geo_id'
+shovels cities search -q "Miami" | jq '.data[0].geo_id'
+
+# Resolve a county
+shovels counties search -q "Los Angeles" | jq '.data[0].geo_id'
+
+# Resolve a jurisdiction
+shovels jurisdictions search -q "Portland" | jq '.data[0].geo_id'
+
+# Resolve an address
+shovels addresses search -q "123 Main St, Miami, FL" | jq '.data[0].geo_id'
 
 # Then use that geo_id in a search
 shovels permits search --geo-id <resolved_id> --permit-from 2024-01-01 --permit-to 2024-12-31
 ```
 
-**Never fabricate geo_ids.** Formats like `CITY_LOS_ANGELES_CA` or `COUNTY_LOS_ANGELES_CA` do not exist. Always resolve through the addresses search endpoint.
+**Never fabricate geo_ids.** Formats like `CITY_LOS_ANGELES_CA` or `COUNTY_LOS_ANGELES_CA` do not exist. Always resolve through `cities search`, `counties search`, `jurisdictions search`, or `addresses search`.
 
 ## Conventions
 

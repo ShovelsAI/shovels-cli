@@ -43,12 +43,16 @@ Every command outputs valid JSON to stdout. Errors go to stderr as JSON.
 Pipe output to jq, parse it programmatically, or feed it to another AI agent.
 
 Available resources:
-  permits       Search and retrieve building permits by location, date, type, and contractor
-  contractors   Search contractors, retrieve details, list their permits/employees/metrics
-  addresses     Search addresses by street, city, state, or zip code
-  usage         Check API credit consumption for the authenticated account
-  config        Read and write persistent settings (API key, base URL)
-  version       Print CLI version, git commit, and build date
+  permits         Search and retrieve building permits by location, date, type, and contractor
+  contractors     Search contractors, retrieve details, list their permits/employees/metrics
+  addresses       Search addresses by street, city, state, or zip code
+  cities          Search cities to resolve geo_ids for city-level queries
+  counties        Search counties to resolve geo_ids for county-level queries
+  jurisdictions   Search jurisdictions to resolve geo_ids for jurisdiction-level queries
+  tags            List valid permit tags for use in --tags filters
+  usage           Check API credit consumption for the authenticated account
+  config          Read and write persistent settings (API key, base URL)
+  version         Print CLI version, git commit, and build date
 
 Authentication (checked in this order):
   1. SHOVELS_API_KEY environment variable
@@ -58,7 +62,11 @@ Quick start:
   export SHOVELS_API_KEY=your-key-here
   # or: shovels config set api-key YOUR_API_KEY
   shovels permits search --geo-id 92024 --permit-from 2024-01-01 --permit-to 2024-12-31
-  shovels contractors search --geo-id 78701 --permit-from 2024-01-01 --permit-to 2024-12-31 --tags solar`,
+  shovels contractors search --geo-id 78701 --permit-from 2024-01-01 --permit-to 2024-12-31 --tags solar
+
+Resolve a city to a geo_id, then search:
+  GEO=$(shovels cities search -q "Miami" | jq -r '.data[0].geo_id')
+  shovels permits search --geo-id "$GEO" --permit-from 2024-01-01 --permit-to 2024-12-31`,
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {

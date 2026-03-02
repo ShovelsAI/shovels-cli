@@ -83,6 +83,14 @@ shovels
 │   └── metrics     Monthly performance metrics for a contractor
 ├── addresses
 │   └── search      Search addresses by street, city, state, or zip
+├── cities
+│   └── search      Search cities to resolve geo_ids
+├── counties
+│   └── search      Search counties to resolve geo_ids
+├── jurisdictions
+│   └── search      Search jurisdictions to resolve geo_ids
+├── tags
+│   └── list        List valid permit tags with descriptions
 ├── usage           Show API credit usage
 ├── config
 │   ├── set         Save a configuration value
@@ -119,7 +127,7 @@ shovels permits get P123 P456 P789
 
 **Optional flags:** `--include-count` returns `total_count` in meta (capped at 10,000)
 
-Geographic IDs: zip codes (`90210`), states (`CA`), or Shovels IDs resolved via `shovels addresses search -q "..."`
+Geographic IDs: zip codes (`90210`), states (`CA`), or Shovels IDs resolved via `shovels cities search`, `shovels counties search`, `shovels jurisdictions search`, or `shovels addresses search`
 
 ### contractors
 
@@ -162,6 +170,37 @@ shovels addresses search --query "90210" --limit 10
 ```
 
 **Required flags:** `--query` (or `-q`)
+
+### cities, counties, jurisdictions
+
+Resolve city, county, or jurisdiction names to Shovels geo_ids for use in `--geo-id`.
+
+```bash
+# Find a city's geo_id
+shovels cities search -q "Miami"
+
+# Find a county's geo_id
+shovels counties search -q "Los Angeles"
+
+# Find a jurisdiction's geo_id
+shovels jurisdictions search -q "Portland"
+
+# Workflow: resolve a city, then search permits
+GEO=$(shovels cities search -q "Miami" | jq -r '.data[0].geo_id')
+shovels permits search --geo-id "$GEO" --permit-from 2024-01-01 --permit-to 2024-12-31
+```
+
+**Required flags:** `--query` (or `-q`)
+
+### tags
+
+List valid permit tag values for use in `--tags` filters.
+
+```bash
+shovels tags list
+shovels tags list --limit all
+shovels tags list --limit 5
+```
 
 ### usage
 
