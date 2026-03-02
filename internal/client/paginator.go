@@ -159,11 +159,17 @@ func (c *Client) Paginate(ctx context.Context, path string, query url.Values, lc
 
 		collected = append(collected, page.Items...)
 
-		// No more pages available from the API.
+		// No more pages available from the API. Truncate to the
+		// effective limit because some endpoints (e.g. /cities/search)
+		// ignore the size parameter and return all matches at once.
 		if page.NextCursor == nil || *page.NextCursor == "" {
+			hasMore := len(collected) > effective
+			if hasMore {
+				collected = collected[:effective]
+			}
 			return &PaginatedResult{
 				Items:      collected,
-				HasMore:    false,
+				HasMore:    hasMore,
 				Credits:    lastCredits,
 				TotalCount: totalCount,
 			}, nil
