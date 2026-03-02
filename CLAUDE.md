@@ -68,6 +68,19 @@ go build -o shovels .
 goreleaser release --clean
 ```
 
+### Release Workflow
+
+Releases are triggered by pushing a semver tag to `main`. After merging a feature PR:
+
+```bash
+git checkout main
+git pull
+git tag v0.X.0    # minor bump for features, patch for fixes
+git push origin v0.X.0
+```
+
+The `release.yml` GitHub Action runs automatically: unit tests, then GoReleaser builds binaries and publishes the GitHub release. No manual release steps beyond the tag push.
+
 ## Geographic IDs (`--geo-id`)
 
 The `--geo-id` flag accepts Shovels geographic identifiers. Two types keep their natural IDs:
