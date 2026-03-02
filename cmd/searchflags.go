@@ -17,6 +17,9 @@ import (
 // validPermitStatuses lists the values the API accepts for permit_status.
 var validPermitStatuses = []string{"final", "in_review", "inactive", "active"}
 
+// validPropertyTypes lists the values the API accepts for property_type.
+var validPropertyTypes = []string{"residential", "commercial", "industrial"}
+
 // datePattern matches YYYY-MM-DD format.
 var datePattern = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 
@@ -174,6 +177,13 @@ func validateSearchFlags(cmd *cobra.Command) error {
 		}
 	}
 
+	propertyType, _ := cmd.Flags().GetString("property-type")
+	if propertyType != "" && !isValidPropertyType(propertyType) {
+		msg := fmt.Sprintf("invalid --property-type %q: valid options are %s", propertyType, strings.Join(validPropertyTypes, ", "))
+		output.PrintErrorTyped(os.Stderr, msg, 1, client.ErrorTypeValidation)
+		return &exitError{code: 1}
+	}
+
 	return nil
 }
 
@@ -323,6 +333,16 @@ func runPaginatedSearch(cmd *cobra.Command, endpoint string, queryFn func(url.Va
 // isValidStatus checks whether s is one of the API-accepted permit statuses.
 func isValidStatus(s string) bool {
 	for _, valid := range validPermitStatuses {
+		if s == valid {
+			return true
+		}
+	}
+	return false
+}
+
+// isValidPropertyType checks whether s is one of the API-accepted property types.
+func isValidPropertyType(s string) bool {
+	for _, valid := range validPropertyTypes {
 		if s == valid {
 			return true
 		}
