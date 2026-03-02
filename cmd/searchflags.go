@@ -20,6 +20,16 @@ var validPermitStatuses = []string{"final", "in_review", "inactive", "active"}
 // datePattern matches YYYY-MM-DD format.
 var datePattern = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 
+// badGeoIDPattern matches common wrong geo_id formats like ZIP_90210,
+// CITY_LOS_ANGELES_CA, COUNTY_*, STATE_CA, etc.
+var badGeoIDPattern = regexp.MustCompile(`^(?i)(ZIP|CITY|COUNTY|STATE|ADDR)_`)
+
+// validStatePattern matches 2-letter US state codes.
+var validStatePattern = regexp.MustCompile(`^[A-Z]{2}$`)
+
+// validZipPattern matches 5-digit US zip codes.
+var validZipPattern = regexp.MustCompile(`^\d{5}$`)
+
 // registerSearchFlags adds the common search flags shared by permits search
 // and contractors search onto the given command's flag set.
 func registerSearchFlags(cmd *cobra.Command) {
@@ -125,6 +135,17 @@ func validateSearchFlags(cmd *cobra.Command) error {
 	}
 	if len(missing) > 0 {
 		msg := fmt.Sprintf("required flag(s) missing: %s", strings.Join(missing, ", "))
+		output.PrintErrorTyped(os.Stderr, msg, 1, client.ErrorTypeValidation)
+		return &exitError{code: 1}
+	}
+
+	if badGeoIDPattern.MatchString(geoID) {
+		msg := fmt.Sprintf(
+			"invalid --geo-id %q. Do not use prefixes like ZIP_, CITY_, COUNTY_, or STATE_. "+
+				"Use the zip code directly (e.g. 90210), the state code (e.g. CA), "+
+				"or resolve a city/address: shovels addresses search -q \"...\" | jq '.data[0].geo_id'",
+			geoID,
+		)
 		output.PrintErrorTyped(os.Stderr, msg, 1, client.ErrorTypeValidation)
 		return &exitError{code: 1}
 	}
