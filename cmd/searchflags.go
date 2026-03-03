@@ -68,7 +68,12 @@ func registerSearchFlags(cmd *cobra.Command) {
 	f.Int("property-min-unit-count", 0, "Minimum number of units (integer)")
 
 	// Contractor filters
-	f.StringSlice("contractor-classification", nil, "Contractor classification, AND logic, prefix with - to exclude (e.g. general_building)")
+	f.StringSlice("contractor-classification", nil,
+		"Contractor classification, AND logic, prefix with - to exclude.\n"+
+			"Valid values: concrete_and_paving, demolition_and_excavation, electrical,\n"+
+			"fencing_and_glazing, framing_and_carpentry, general_building_contractor,\n"+
+			"general_engineering_contractor, hvac, landscaping_and_outdoor_work, other,\n"+
+			"plumbing, roofing, specialty_trades")
 	f.String("contractor-name", "", "Filter by contractor name or partial name (string)")
 	f.String("contractor-website", "", "Filter by contractor website domain, omit http/https (string)")
 	f.Int("contractor-min-total-job-value", 0, "Minimum lifetime contractor job value in dollars (integer)")
