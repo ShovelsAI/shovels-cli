@@ -28,6 +28,7 @@ cmd/            cobra command tree (one file per resource)
   usage.go
   config.go
   version.go
+evals/          LLM usability evals (build tag: eval)
 internal/
   client/       HTTP client (generated types, hand-crafted calls)
   config/       config file + env var resolution
@@ -54,6 +55,24 @@ internal/
 | Unit | `go test ./...` | No network calls, mock HTTP client |
 | E2E | `go test -tags=e2e ./e2e/...` | Builds binary, invokes as subprocess, requires `SHOVELS_API_KEY` |
 | Integration | `go test -tags=integration ./...` | Hits live API, requires `SHOVELS_API_KEY` |
+| LLM Evals | `go test -tags=eval ./evals/... -v -timeout 10m` | Blind LLM usability tests, requires `SHOVELS_API_KEY` + `claude` CLI |
+
+### LLM Evals
+
+The `evals/` directory contains LLM usability tests that verify help text is agent-friendly. Each scenario spawns a blind Claude agent with only `--help` access and a natural-language task (e.g., "Find building permits issued in Miami in 2024"). The agent must discover commands, resolve geo_ids, and produce valid results.
+
+Run after help text changes or before releases to catch usability regressions:
+
+```bash
+SHOVELS_API_KEY=sk-... go test -tags=eval ./evals/... -v -timeout 10m
+```
+
+- Builds binary from source (tests current code, not installed version)
+- 4 scenarios: permit search, contractor lookup, city geo_id resolution, tag discovery
+- Hard assertions: valid JSON output, correct domain (permits vs contractors), data present
+- Advisory: usability rating 1-5 logged per scenario (warns if < 4)
+- Requires `claude` CLI in PATH; skips gracefully if missing
+- ~5 minutes total, ~$0.50 in API costs
 
 ## Build & Release
 
