@@ -50,11 +50,6 @@ func runMetricsCurrent(cfg metricsConfig) func(*cobra.Command, []string) error {
 			return err
 		}
 
-		cl, err := newClientFromFlags(cmd)
-		if err != nil {
-			return err
-		}
-
 		q := url.Values{
 			"tag": {tag},
 		}
@@ -65,6 +60,21 @@ func runMetricsCurrent(cfg metricsConfig) func(*cobra.Command, []string) error {
 		setBoolFlag(cmd, "include-count", "include_count", q)
 
 		endpoint := fmt.Sprintf("/%s/%s/metrics/current", cfg.resource, args[0])
+
+		if _, err := validateTimeout(cmd); err != nil {
+			return err
+		}
+
+		if isDryRun(cmd) {
+			q.Set("size", fmt.Sprintf("%d", lc.FirstPageSize()))
+			return printDryRun(cmd, endpoint, q)
+		}
+
+		cl, err := newClientFromFlags(cmd)
+		if err != nil {
+			return err
+		}
+
 		result, err := cl.Paginate(context.Background(), endpoint, q, lc)
 		if err != nil {
 			return handleAPIError(err)
@@ -119,11 +129,6 @@ func runMetricsMonthly(cfg metricsConfig) func(*cobra.Command, []string) error {
 			return err
 		}
 
-		cl, err := newClientFromFlags(cmd)
-		if err != nil {
-			return err
-		}
-
 		q := url.Values{
 			"tag":         {tag},
 			"metric_from": {metricFrom},
@@ -136,6 +141,21 @@ func runMetricsMonthly(cfg metricsConfig) func(*cobra.Command, []string) error {
 		setBoolFlag(cmd, "include-count", "include_count", q)
 
 		endpoint := fmt.Sprintf("/%s/%s/metrics/monthly", cfg.resource, args[0])
+
+		if _, err := validateTimeout(cmd); err != nil {
+			return err
+		}
+
+		if isDryRun(cmd) {
+			q.Set("size", fmt.Sprintf("%d", lc.FirstPageSize()))
+			return printDryRun(cmd, endpoint, q)
+		}
+
+		cl, err := newClientFromFlags(cmd)
+		if err != nil {
+			return err
+		}
+
 		result, err := cl.Paginate(context.Background(), endpoint, q, lc)
 		if err != nil {
 			return handleAPIError(err)

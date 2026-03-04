@@ -28,6 +28,14 @@ For unlimited plans, credit_limit is null. Not paginated.`,
 }
 
 func runUsage(cmd *cobra.Command, args []string) error {
+	if _, err := validateTimeout(cmd); err != nil {
+		return err
+	}
+
+	if isDryRun(cmd) {
+		return printDryRun(cmd, "/usage", nil)
+	}
+
 	cl, err := newClientFromFlags(cmd)
 	if err != nil {
 		return err

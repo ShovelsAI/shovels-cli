@@ -109,14 +109,22 @@ func runContractorsGet(cmd *cobra.Command, args []string) error {
 		return &exitError{code: 1}
 	}
 
-	cl, err := newClientFromFlags(cmd)
-	if err != nil {
-		return err
-	}
-
 	q := url.Values{}
 	for _, id := range args {
 		q.Add("id", id)
+	}
+
+	if _, err := validateTimeout(cmd); err != nil {
+		return err
+	}
+
+	if isDryRun(cmd) {
+		return printDryRun(cmd, "/contractors", q)
+	}
+
+	cl, err := newClientFromFlags(cmd)
+	if err != nil {
+		return err
 	}
 
 	resp, err := cl.Get(cmd.Context(), "/contractors", q)
@@ -189,11 +197,6 @@ func runContractorsPermits(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	cl, err := newClientFromFlags(cmd)
-	if err != nil {
-		return err
-	}
-
 	var q url.Values
 	if cmd.Flags().Changed("include-count") {
 		q = url.Values{}
@@ -201,6 +204,24 @@ func runContractorsPermits(cmd *cobra.Command, args []string) error {
 	}
 
 	endpoint := fmt.Sprintf("/contractors/%s/permits", args[0])
+
+	if _, err := validateTimeout(cmd); err != nil {
+		return err
+	}
+
+	if isDryRun(cmd) {
+		if q == nil {
+			q = url.Values{}
+		}
+		q.Set("size", fmt.Sprintf("%d", lc.FirstPageSize()))
+		return printDryRun(cmd, endpoint, q)
+	}
+
+	cl, err := newClientFromFlags(cmd)
+	if err != nil {
+		return err
+	}
+
 	result, err := cl.Paginate(context.Background(), endpoint, q, lc)
 	if err != nil {
 		apiErr, ok := err.(*client.APIError)
@@ -244,12 +265,23 @@ func runContractorsEmployees(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	endpoint := fmt.Sprintf("/contractors/%s/employees", args[0])
+
+	if _, err := validateTimeout(cmd); err != nil {
+		return err
+	}
+
+	if isDryRun(cmd) {
+		q := url.Values{}
+		q.Set("size", fmt.Sprintf("%d", lc.FirstPageSize()))
+		return printDryRun(cmd, endpoint, q)
+	}
+
 	cl, err := newClientFromFlags(cmd)
 	if err != nil {
 		return err
 	}
 
-	endpoint := fmt.Sprintf("/contractors/%s/employees", args[0])
 	result, err := cl.Paginate(context.Background(), endpoint, nil, lc)
 	if err != nil {
 		apiErr, ok := err.(*client.APIError)
@@ -325,11 +357,6 @@ func runContractorsMetrics(cmd *cobra.Command, args []string) error {
 		return &exitError{code: 1}
 	}
 
-	cl, err := newClientFromFlags(cmd)
-	if err != nil {
-		return err
-	}
-
 	q := url.Values{
 		"metric_from":   {metricFrom},
 		"metric_to":     {metricTo},
@@ -338,6 +365,20 @@ func runContractorsMetrics(cmd *cobra.Command, args []string) error {
 	}
 
 	endpoint := fmt.Sprintf("/contractors/%s/metrics", args[0])
+
+	if _, err := validateTimeout(cmd); err != nil {
+		return err
+	}
+
+	if isDryRun(cmd) {
+		return printDryRun(cmd, endpoint, q)
+	}
+
+	cl, err := newClientFromFlags(cmd)
+	if err != nil {
+		return err
+	}
+
 	resp, err := cl.Get(context.Background(), endpoint, q)
 	if err != nil {
 		apiErr, ok := err.(*client.APIError)
