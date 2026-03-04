@@ -105,7 +105,7 @@ func touchCache(configDir string) {
 	now := time.Now()
 	if err := os.Chtimes(path, now, now); err != nil {
 		// File or directory may not exist yet; ensure parents exist.
-		if mkErr := os.MkdirAll(configDir, 0o755); mkErr != nil {
+		if mkErr := os.MkdirAll(configDir, 0o700); mkErr != nil {
 			return
 		}
 		f, createErr := os.Create(path)

@@ -2,8 +2,10 @@ package cmd
 
 import (
 	"testing"
+	"time"
 
 	"github.com/shovels-ai/shovels-cli/internal/config"
+	"github.com/shovels-ai/shovels-cli/internal/update"
 	"github.com/spf13/cobra"
 )
 
@@ -179,9 +181,40 @@ func TestAutoupdateEnabled_DefaultConfig(t *testing.T) {
 	}
 }
 
-func TestPersistentPostRunE_Exists(t *testing.T) {
-	if rootCmd.PersistentPostRunE == nil {
-		t.Error("expected PersistentPostRunE to be set on root command")
+// Behavior: GIVEN 10s total timeout WHEN goroutine still running at
+// program exit THEN program waits up to remaining time from the 10s
+// budget, then exits — even if the command itself returned an error.
+// This verifies waitForUpdate runs on error paths via defer in Execute().
+func TestWaitForUpdate_RunsOnCommandError(t *testing.T) {
+	// Pre-populate the update channel as if maybeStartUpdate had run
+	// before the command failed.
+	ch := make(chan *update.Result, 1)
+	ch <- &update.Result{Updated: true, OldVersion: "0.1.0", NewVersion: "0.2.0"}
+	updateResultCh = ch
+	updateCancel = func() {} // no-op cancel
+	updateStartTime = time.Now()
+
+	// Run a command that will fail (unknown subcommand). Cobra returns
+	// an error without calling PersistentPostRunE.
+	rootCmd.SetArgs([]string{"nonexistent-subcommand-xyz"})
+	code := Execute()
+	// Reset args so other tests are not affected.
+	rootCmd.SetArgs(nil)
+
+	if code == 0 {
+		t.Error("expected non-zero exit code for unknown subcommand")
+	}
+
+	// The defer in Execute() should have drained the channel via
+	// waitForUpdate(). If the channel still has a value, the wait
+	// did not run.
+	select {
+	case _, ok := <-ch:
+		if ok {
+			t.Error("expected update result channel to be drained by waitForUpdate")
+		}
+	default:
+		// Channel is empty — waitForUpdate consumed the result.
 	}
 }
 
