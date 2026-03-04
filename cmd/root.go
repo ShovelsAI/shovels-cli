@@ -49,6 +49,8 @@ Available resources:
   cities          Search cities to resolve geo_ids for city-level queries
   counties        Search counties to resolve geo_ids for county-level queries
   jurisdictions   Search jurisdictions to resolve geo_ids for jurisdiction-level queries
+  zipcodes        Search zip codes to find geo_ids for use with --geo-id
+  states          Search US states to find 2-letter abbreviation geo_ids
   tags            List valid permit tags for use in --tags filters
   usage           Check API credit consumption for the authenticated account
   config          Read and write persistent settings (API key, base URL)
