@@ -104,14 +104,22 @@ func runPermitsGet(cmd *cobra.Command, args []string) error {
 		return &exitError{code: 1}
 	}
 
-	cl, err := newClientFromFlags(cmd)
-	if err != nil {
-		return err
-	}
-
 	q := url.Values{}
 	for _, id := range args {
 		q.Add("id", id)
+	}
+
+	if _, err := validateTimeout(cmd); err != nil {
+		return err
+	}
+
+	if isDryRun(cmd) {
+		return printDryRun(cmd, "/permits", q)
+	}
+
+	cl, err := newClientFromFlags(cmd)
+	if err != nil {
+		return err
 	}
 
 	resp, err := cl.Get(cmd.Context(), "/permits", q)

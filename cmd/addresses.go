@@ -68,13 +68,22 @@ func runAddressesSearch(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	cl, err := newClientFromFlags(cmd)
-	if err != nil {
+	q := url.Values{
+		"q": {query},
+	}
+
+	if _, err := validateTimeout(cmd); err != nil {
 		return err
 	}
 
-	q := url.Values{
-		"q": {query},
+	if isDryRun(cmd) {
+		q.Set("size", fmt.Sprintf("%d", lc.FirstPageSize()))
+		return printDryRun(cmd, "/addresses/search", q)
+	}
+
+	cl, err := newClientFromFlags(cmd)
+	if err != nil {
+		return err
 	}
 
 	result, err := cl.Paginate(context.Background(), "/addresses/search", q, lc)
@@ -214,12 +223,23 @@ func runAddressesResidents(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	endpoint := fmt.Sprintf("/addresses/%s/residents", args[0])
+
+	if _, err := validateTimeout(cmd); err != nil {
+		return err
+	}
+
+	if isDryRun(cmd) {
+		q := url.Values{}
+		q.Set("size", fmt.Sprintf("%d", lc.FirstPageSize()))
+		return printDryRun(cmd, endpoint, q)
+	}
+
 	cl, err := newClientFromFlags(cmd)
 	if err != nil {
 		return err
 	}
 
-	endpoint := fmt.Sprintf("/addresses/%s/residents", args[0])
 	result, err := cl.Paginate(context.Background(), endpoint, nil, lc)
 	if err != nil {
 		return handleAPIError(err)

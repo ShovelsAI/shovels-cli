@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"os"
 
@@ -54,6 +55,16 @@ func runTagsList(cmd *cobra.Command, args []string) error {
 	lc, err := parseLimitConfig(cmd)
 	if err != nil {
 		return err
+	}
+
+	if _, err := validateTimeout(cmd); err != nil {
+		return err
+	}
+
+	if isDryRun(cmd) {
+		q := url.Values{}
+		q.Set("size", fmt.Sprintf("%d", lc.FirstPageSize()))
+		return printDryRun(cmd, "/list/tags", q)
 	}
 
 	cl, err := newClientFromFlags(cmd)

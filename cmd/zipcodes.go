@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"os"
 
@@ -69,13 +70,22 @@ func runZipcodesSearch(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	cl, err := newClientFromFlags(cmd)
-	if err != nil {
+	q := url.Values{
+		"q": {query},
+	}
+
+	if _, err := validateTimeout(cmd); err != nil {
 		return err
 	}
 
-	q := url.Values{
-		"q": {query},
+	if isDryRun(cmd) {
+		q.Set("size", fmt.Sprintf("%d", lc.FirstPageSize()))
+		return printDryRun(cmd, "/zipcodes/search", q)
+	}
+
+	cl, err := newClientFromFlags(cmd)
+	if err != nil {
+		return err
 	}
 
 	result, err := cl.Paginate(context.Background(), "/zipcodes/search", q, lc)
