@@ -1,11 +1,15 @@
 package cmd
 
 import (
+	"context"
+	"fmt"
 	"os"
+	"time"
 
 	"github.com/shovels-ai/shovels-cli/internal/client"
 	"github.com/shovels-ai/shovels-cli/internal/config"
 	"github.com/shovels-ai/shovels-cli/internal/output"
+	"github.com/shovels-ai/shovels-cli/internal/update"
 	"github.com/spf13/cobra"
 )
 
@@ -25,6 +29,17 @@ func ResolvedConfig() config.Config {
 // flagErrPrinted tracks whether SetFlagErrorFunc already emitted JSON to
 // stderr, preventing Execute from printing a duplicate error.
 var flagErrPrinted bool
+
+// updateResultCh receives the background autoupdate result. Nil when
+// autoupdate is disabled or was not started for this invocation.
+var updateResultCh chan *update.Result
+
+// updateCancel cancels the background update goroutine's context.
+var updateCancel context.CancelFunc
+
+// updateStartTime records when the update goroutine was launched,
+// allowing PersistentPostRunE to calculate remaining timeout budget.
+var updateStartTime time.Time
 
 // exitError carries a specific exit code through cobra's error chain.
 type exitError struct {
@@ -102,6 +117,11 @@ Resolve a city to a geo_id, then search:
 			return &exitError{code: 2}
 		}
 
+		maybeStartUpdate(cfg)
+		return nil
+	},
+	PersistentPostRunE: func(cmd *cobra.Command, args []string) error {
+		waitForUpdate()
 		return nil
 	},
 }
@@ -117,6 +137,86 @@ func requiresAuth(cmd *cobra.Command) bool {
 		}
 	}
 	return false
+}
+
+// autoupdateDisabled returns true when autoupdate should not run.
+func autoupdateDisabled(cfg config.Config) bool {
+	if !cfg.AutoupdateEnabled() {
+		return true
+	}
+	if buildVersion == "dev" {
+		return true
+	}
+	if os.Getenv("CI") != "" {
+		return true
+	}
+	return false
+}
+
+// maybeStartUpdate launches the background update goroutine if
+// autoupdate is enabled and the cache is stale.
+func maybeStartUpdate(cfg config.Config) {
+	if autoupdateDisabled(cfg) {
+		return
+	}
+
+	cfgDir, err := config.ConfigDir()
+	if err != nil {
+		return
+	}
+
+	// Check cache freshness before spawning a goroutine so that a
+	// fresh cache (< 24h) incurs zero overhead on every invocation.
+	if !update.CacheExpired(cfgDir, nil) {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), update.Timeout)
+	updateCancel = cancel
+	updateStartTime = time.Now()
+	updateResultCh = make(chan *update.Result, 1)
+
+	go func() {
+		defer cancel()
+		result := update.Check(ctx, update.Options{
+			CurrentVersion: buildVersion,
+			ConfigDir:      cfgDir,
+		})
+		updateResultCh <- result
+	}()
+}
+
+// waitForUpdate waits for the background update goroutine to finish
+// (up to the remaining 10s budget) and prints the notice to stderr.
+func waitForUpdate() {
+	if updateResultCh == nil {
+		return
+	}
+
+	remaining := update.Timeout - time.Since(updateStartTime)
+	if remaining <= 0 {
+		if updateCancel != nil {
+			updateCancel()
+		}
+		return
+	}
+
+	timer := time.NewTimer(remaining)
+	defer timer.Stop()
+
+	var result *update.Result
+	select {
+	case result = <-updateResultCh:
+	case <-timer.C:
+	}
+
+	if updateCancel != nil {
+		updateCancel()
+	}
+
+	if msg := update.NoticeMessage(result); msg != "" {
+		fmt.Fprint(os.Stderr, msg)
+	}
 }
 
 func init() {

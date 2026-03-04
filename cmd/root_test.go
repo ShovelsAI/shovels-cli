@@ -3,6 +3,7 @@ package cmd
 import (
 	"testing"
 
+	"github.com/shovels-ai/shovels-cli/internal/config"
 	"github.com/spf13/cobra"
 )
 
@@ -125,4 +126,68 @@ func TestExitErrorCode(t *testing.T) {
 	if err.Error() != "" {
 		t.Errorf("expected empty error string, got %q", err.Error())
 	}
+}
+
+func TestAutoupdateDisabled_DevBuild(t *testing.T) {
+	old := buildVersion
+	buildVersion = "dev"
+	defer func() { buildVersion = old }()
+
+	cfg := config.Config{}
+	if !autoupdateDisabled(cfg) {
+		t.Error("expected autoupdate to be disabled for dev build")
+	}
+}
+
+func TestAutoupdateDisabled_CIEnv(t *testing.T) {
+	old := buildVersion
+	buildVersion = "0.3.0"
+	defer func() { buildVersion = old }()
+
+	t.Setenv("CI", "true")
+
+	cfg := config.Config{}
+	if !autoupdateDisabled(cfg) {
+		t.Error("expected autoupdate to be disabled when CI env is set")
+	}
+}
+
+func TestAutoupdateDisabled_ConfigFalse(t *testing.T) {
+	old := buildVersion
+	buildVersion = "0.3.0"
+	defer func() { buildVersion = old }()
+
+	t.Setenv("CI", "")
+
+	v := false
+	cfg := config.Config{Autoupdate: &v}
+	if !autoupdateDisabled(cfg) {
+		t.Error("expected autoupdate to be disabled when config is false")
+	}
+}
+
+func TestAutoupdateEnabled_DefaultConfig(t *testing.T) {
+	old := buildVersion
+	buildVersion = "0.3.0"
+	defer func() { buildVersion = old }()
+
+	t.Setenv("CI", "")
+
+	cfg := config.Config{}
+	if autoupdateDisabled(cfg) {
+		t.Error("expected autoupdate to be enabled with default config")
+	}
+}
+
+func TestPersistentPostRunE_Exists(t *testing.T) {
+	if rootCmd.PersistentPostRunE == nil {
+		t.Error("expected PersistentPostRunE to be set on root command")
+	}
+}
+
+func TestWaitForUpdate_NilChannel(t *testing.T) {
+	// Ensure waitForUpdate doesn't panic when no goroutine was started.
+	updateResultCh = nil
+	updateCancel = nil
+	waitForUpdate()
 }
