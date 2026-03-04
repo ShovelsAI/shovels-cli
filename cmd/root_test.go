@@ -7,7 +7,7 @@ import (
 )
 
 func TestGlobalFlagsRegistered(t *testing.T) {
-	expected := []string{"limit", "max-records", "base-url", "no-retry", "timeout"}
+	expected := []string{"limit", "max-records", "base-url", "no-retry", "timeout", "dry-run"}
 	flags := rootCmd.PersistentFlags()
 
 	for _, name := range expected {
@@ -104,6 +104,16 @@ func TestVersionDoesNotRequireAuth(t *testing.T) {
 func TestConfigDoesNotRequireAuth(t *testing.T) {
 	if requiresAuth(configCmd) {
 		t.Error("config command should not require auth")
+	}
+}
+
+func TestDryRunDefaultFalse(t *testing.T) {
+	val, err := rootCmd.PersistentFlags().GetBool("dry-run")
+	if err != nil {
+		t.Fatalf("unexpected error getting dry-run flag: %v", err)
+	}
+	if val {
+		t.Error("expected --dry-run default to be false")
 	}
 }
 

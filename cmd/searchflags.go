@@ -273,17 +273,27 @@ func parseLimitConfig(cmd *cobra.Command) (client.LimitConfig, error) {
 	return lc, nil
 }
 
+// validateTimeout parses the --timeout flag and returns the duration.
+// Returns a non-nil error (already printed to stderr) if parsing fails.
+func validateTimeout(cmd *cobra.Command) (time.Duration, error) {
+	timeoutStr, _ := cmd.Flags().GetString("timeout")
+	timeout, err := time.ParseDuration(timeoutStr)
+	if err != nil {
+		output.PrintErrorTyped(os.Stderr, "invalid timeout: "+timeoutStr, 1, client.ErrorTypeValidation)
+		return 0, &exitError{code: 1}
+	}
+	return timeout, nil
+}
+
 // newClientFromFlags creates a client.Client from the resolved config and
 // the --timeout / --no-retry flags. Returns a non-nil error (already
 // printed to stderr) if timeout parsing fails.
 func newClientFromFlags(cmd *cobra.Command) (*client.Client, error) {
 	cfg := ResolvedConfig()
 
-	timeoutStr, _ := cmd.Flags().GetString("timeout")
-	timeout, err := time.ParseDuration(timeoutStr)
+	timeout, err := validateTimeout(cmd)
 	if err != nil {
-		output.PrintErrorTyped(os.Stderr, "invalid timeout: "+timeoutStr, 1, client.ErrorTypeValidation)
-		return nil, &exitError{code: 1}
+		return nil, err
 	}
 
 	noRetry, _ := cmd.Flags().GetBool("no-retry")
@@ -316,6 +326,15 @@ func runPaginatedSearch(cmd *cobra.Command, endpoint string, queryFn func(url.Va
 	setBoolFlag(cmd, "include-count", "include_count", q)
 	if queryFn != nil {
 		queryFn(q)
+	}
+
+	if _, err := validateTimeout(cmd); err != nil {
+		return err
+	}
+
+	if isDryRun(cmd) {
+		q.Set("size", fmt.Sprintf("%d", lc.FirstPageSize()))
+		return printDryRun(cmd, endpoint, q)
 	}
 
 	cl, err := newClientFromFlags(cmd)

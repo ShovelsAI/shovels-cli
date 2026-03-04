@@ -20,7 +20,7 @@ func TestHelpShowsCommandsAndGlobalFlags(t *testing.T) {
 	}
 
 	// Verify global flags are present.
-	requiredFlags := []string{"--limit", "--max-records", "--base-url", "--no-retry", "--timeout"}
+	requiredFlags := []string{"--limit", "--max-records", "--base-url", "--no-retry", "--timeout", "--dry-run"}
 	for _, flag := range requiredFlags {
 		if !strings.Contains(result.Stdout, flag) {
 			t.Errorf("--help output should contain global flag %q", flag)

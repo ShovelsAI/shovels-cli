@@ -93,7 +93,8 @@ Resolve a city to a geo_id, then search:
 		}
 		resolvedConfig = cfg
 
-		if requiresAuth(cmd) && cfg.APIKey == "" {
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		if requiresAuth(cmd) && cfg.APIKey == "" && !dryRun {
 			msg := "API key not configured. Set SHOVELS_API_KEY or run: shovels config set api-key <key>"
 			output.PrintErrorTyped(os.Stderr, msg, 2, client.ErrorTypeAuth)
 			return &exitError{code: 2}
@@ -123,6 +124,7 @@ func init() {
 	flags.String("base-url", "https://api.shovels.ai/v2", "API base URL (default https://api.shovels.ai/v2)")
 	flags.Bool("no-retry", false, "Disable automatic retry on HTTP 429 rate-limit responses")
 	flags.String("timeout", "30s", "Per-request timeout as a Go duration, e.g. 10s, 1m, 2m30s (default 30s)")
+	flags.Bool("dry-run", false, "Print the resolved HTTP request as JSON without calling the API or consuming credits")
 
 	// Emit JSON to stderr on flag-parsing errors instead of cobra's plain text.
 	rootCmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
