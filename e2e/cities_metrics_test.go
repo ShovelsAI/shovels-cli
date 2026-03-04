@@ -14,12 +14,15 @@ import (
 )
 
 // makeMetricsHandler returns an HTTP handler that serves paginated geo metrics
-// responses. The pathPrefix (e.g., "/cities") is used to validate the request
-// path contains the expected resource. The monthly flag controls whether each
-// item includes a "date" field.
+// responses. The pathPrefix (e.g., "/cities") determines the resource type and
+// controls whether property_type is included in response items (excluded for
+// "/addresses"). The monthly flag controls whether each item includes a "date"
+// field.
 func makeMetricsHandler(pathPrefix string, totalItems int, monthly bool, creditsUsed, creditsRemaining int) (http.Handler, *[]map[string][]string) {
 	var served atomic.Int32
 	capturedQueries := &[]map[string][]string{}
+
+	includePropertyType := pathPrefix != "/addresses"
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		params := map[string][]string{}
@@ -48,18 +51,23 @@ func makeMetricsHandler(pathPrefix string, totalItems int, monthly bool, credits
 		}
 		served.Add(int32(count))
 
+		ptField := ""
+		if includePropertyType {
+			ptField = `"property_type":"residential",`
+		}
+
 		items := make([]json.RawMessage, count)
 		for i := range count {
 			idx := start + i
 			if monthly {
 				items[i] = json.RawMessage(fmt.Sprintf(
-					`{"geo_id":"geo_%05d","tag":"solar","property_type":"residential","date":"2024-%02d-01","permit_count":%d,"contractor_count":%d,"avg_construction_duration":45,"avg_approval_duration":12,"total_job_value":850000000,"avg_inspection_pass_rate":87,"permit_active_count":23,"permit_in_review_count":5}`,
-					idx, (idx%12)+1, 100+idx, 20+idx,
+					`{"geo_id":"geo_%05d","tag":"solar",%s"date":"2024-%02d-01","permit_count":%d,"contractor_count":%d,"avg_construction_duration":45,"avg_approval_duration":12,"total_job_value":850000000,"avg_inspection_pass_rate":87,"permit_active_count":23,"permit_in_review_count":5}`,
+					idx, ptField, (idx%12)+1, 100+idx, 20+idx,
 				))
 			} else {
 				items[i] = json.RawMessage(fmt.Sprintf(
-					`{"geo_id":"geo_%05d","tag":"solar","property_type":"residential","permit_count":%d,"contractor_count":%d,"avg_construction_duration":45,"avg_approval_duration":12,"total_job_value":850000000,"avg_inspection_pass_rate":87,"permit_active_count":23,"permit_in_review_count":5}`,
-					idx, 100+idx, 20+idx,
+					`{"geo_id":"geo_%05d","tag":"solar",%s"permit_count":%d,"contractor_count":%d,"avg_construction_duration":45,"avg_approval_duration":12,"total_job_value":850000000,"avg_inspection_pass_rate":87,"permit_active_count":23,"permit_in_review_count":5}`,
+					idx, ptField, 100+idx, 20+idx,
 				))
 			}
 		}
