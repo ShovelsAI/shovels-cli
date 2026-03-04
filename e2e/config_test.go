@@ -338,6 +338,37 @@ func TestConfigSetThenShowRoundTrip(t *testing.T) {
 	}
 }
 
+func TestConfigShowWithMalformedConfigErrors(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, "shovels")
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(configDir, "config.yaml"), []byte("': bad yaml\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	result := runCLIWithEnv(t,
+		[]string{
+			"XDG_CONFIG_HOME=" + tmpDir,
+			"SHOVELS_API_KEY=",
+		},
+		"config", "show",
+	)
+
+	if result.ExitCode != 1 {
+		t.Fatalf("expected exit code 1 with malformed config, got %d; stdout: %s", result.ExitCode, result.Stdout)
+	}
+
+	p := parseStderrError(t, result.Stderr)
+	if p.Code != 1 {
+		t.Errorf("expected error code 1, got %d", p.Code)
+	}
+	if !strings.Contains(p.Error, "parsing config") {
+		t.Errorf("expected error about parsing config, got: %s", p.Error)
+	}
+}
+
 // --- Auth gating tests using the _test-auth fixture command ---
 
 func TestAuthNoAPIKeyExits2(t *testing.T) {
