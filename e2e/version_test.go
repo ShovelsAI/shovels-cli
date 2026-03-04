@@ -202,6 +202,61 @@ func TestVersionWithAPI500HasNullDataReleaseDate(t *testing.T) {
 	}
 }
 
+func TestVersionWithMalformedConfigAndEnvKeyFetchesReleaseDate(t *testing.T) {
+	// Spin up a test server that returns a valid release date for /meta/release.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `{"released_at":"2026-02-28"}`)
+	}))
+	defer srv.Close()
+
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, "shovels")
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(configDir, "config.yaml"), []byte("': bad yaml\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	result := runCLIWithEnv(t,
+		[]string{
+			"XDG_CONFIG_HOME=" + tmpDir,
+			"SHOVELS_API_KEY=sk-test-key",
+		},
+		"version", "--base-url", srv.URL,
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Errorf("expected empty stderr, got: %s", result.Stderr)
+	}
+
+	var envelope struct {
+		Data map[string]any `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(result.Stdout), &envelope); err != nil {
+		t.Fatalf("stdout is not valid JSON: %v\nstdout: %s", err, result.Stdout)
+	}
+
+	releaseDate, ok := envelope.Data["data_release_date"]
+	if !ok {
+		t.Fatal("data_release_date field is missing from version output")
+	}
+
+	// With a valid env API key, the fallback config must still fetch data_release_date.
+	dateStr, isString := releaseDate.(string)
+	if !isString || dateStr == "" {
+		t.Errorf("expected data_release_date to be a non-empty string, got %v", releaseDate)
+	}
+	if dateStr != "2026-02-28" {
+		t.Errorf("expected data_release_date %q, got %q", "2026-02-28", dateStr)
+	}
+}
+
 func TestVersionWithMalformedConfigExitsZero(t *testing.T) {
 	tmpDir := t.TempDir()
 	configDir := filepath.Join(tmpDir, "shovels")

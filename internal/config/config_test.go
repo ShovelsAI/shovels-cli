@@ -301,6 +301,57 @@ func TestConfigFilePath(t *testing.T) {
 	}
 }
 
+func TestFallbackConfigDefaults(t *testing.T) {
+	t.Setenv("SHOVELS_API_KEY", "")
+
+	cfg := FallbackConfig(Overrides{})
+	if cfg.BaseURL != DefaultBaseURL {
+		t.Errorf("expected base URL %q, got %q", DefaultBaseURL, cfg.BaseURL)
+	}
+	if cfg.MaxLimit != DefaultLimit {
+		t.Errorf("expected max limit %d, got %d", DefaultLimit, cfg.MaxLimit)
+	}
+	if cfg.APIKey != "" {
+		t.Errorf("expected empty APIKey, got %q", cfg.APIKey)
+	}
+}
+
+func TestFallbackConfigPicksUpEnvAPIKey(t *testing.T) {
+	t.Setenv("SHOVELS_API_KEY", "sk-from-env")
+
+	cfg := FallbackConfig(Overrides{})
+	if cfg.APIKey != "sk-from-env" {
+		t.Errorf("expected APIKey %q, got %q", "sk-from-env", cfg.APIKey)
+	}
+}
+
+func TestFallbackConfigPicksUpBaseURLOverride(t *testing.T) {
+	t.Setenv("SHOVELS_API_KEY", "")
+
+	cfg := FallbackConfig(Overrides{
+		BaseURL:    "https://custom.api/v1",
+		BaseURLSet: true,
+	})
+	if cfg.BaseURL != "https://custom.api/v1" {
+		t.Errorf("expected BaseURL %q, got %q", "https://custom.api/v1", cfg.BaseURL)
+	}
+}
+
+func TestFallbackConfigCombinesEnvAndFlag(t *testing.T) {
+	t.Setenv("SHOVELS_API_KEY", "sk-env-key")
+
+	cfg := FallbackConfig(Overrides{
+		BaseURL:    "https://mock.api/v2",
+		BaseURLSet: true,
+	})
+	if cfg.APIKey != "sk-env-key" {
+		t.Errorf("expected APIKey %q, got %q", "sk-env-key", cfg.APIKey)
+	}
+	if cfg.BaseURL != "https://mock.api/v2" {
+		t.Errorf("expected BaseURL %q, got %q", "https://mock.api/v2", cfg.BaseURL)
+	}
+}
+
 func TestConfigDirErrorWhenHomeDirUnavailable(t *testing.T) {
 	// Unset XDG_CONFIG_HOME so configDir falls through to os.UserHomeDir.
 	t.Setenv("XDG_CONFIG_HOME", "")

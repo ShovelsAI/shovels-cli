@@ -85,10 +85,7 @@ Resolve a city to a geo_id, then search:
 			// All other commands surface the config error so users know
 			// their config needs fixing.
 			if cmd.Name() == "version" {
-				resolvedConfig = config.Config{
-					BaseURL:  config.DefaultBaseURL,
-					MaxLimit: config.DefaultLimit,
-				}
+				resolvedConfig = config.FallbackConfig(o)
 				return nil
 			}
 			output.PrintErrorTyped(os.Stderr, err.Error(), 1, client.ErrorTypeClient)

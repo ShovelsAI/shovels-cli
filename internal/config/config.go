@@ -149,6 +149,26 @@ func Resolve(o Overrides) (Config, error) {
 	return cfg, nil
 }
 
+// FallbackConfig constructs a config from env vars and flag overrides only,
+// bypassing the config file. Used when the config file is malformed but the
+// command must still run (e.g., version).
+func FallbackConfig(o Overrides) Config {
+	cfg := Config{
+		BaseURL:  DefaultBaseURL,
+		MaxLimit: DefaultLimit,
+	}
+
+	if o.BaseURLSet {
+		cfg.BaseURL = o.BaseURL
+	}
+
+	if envKey := os.Getenv("SHOVELS_API_KEY"); envKey != "" {
+		cfg.APIKey = envKey
+	}
+
+	return cfg
+}
+
 // MaskAPIKey returns a masked version of the API key for display.
 // Keys shorter than 8 characters are fully masked. Otherwise shows
 // the first 4 and last 4 characters with *** in between.
