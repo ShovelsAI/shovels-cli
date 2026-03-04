@@ -82,6 +82,13 @@ func (lc LimitConfig) EffectiveLimit() int {
 	return lc.Limit
 }
 
+// FirstPageSize returns the size parameter for the first API request.
+// This is min(effectiveLimit, apiPageSizeMax), matching the paginator's
+// behavior on its first iteration.
+func (lc LimitConfig) FirstPageSize() int {
+	return min(lc.EffectiveLimit(), apiPageSizeMax)
+}
+
 // TotalCount holds the server-side result count returned when include_count=true.
 // Value is capped at 10,000 by the API; Relation is "eq" for exact counts or
 // "gte" when the actual count exceeds the cap.

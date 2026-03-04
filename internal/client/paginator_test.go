@@ -528,6 +528,36 @@ func TestPaginateTotalCountCapturedFromFirstPage(t *testing.T) {
 	}
 }
 
+// --- FirstPageSize tests ---
+
+func TestFirstPageSizeSmallLimit(t *testing.T) {
+	lc := LimitConfig{Limit: 10}
+	if got := lc.FirstPageSize(); got != 10 {
+		t.Errorf("expected 10, got %d", got)
+	}
+}
+
+func TestFirstPageSizeAtMax(t *testing.T) {
+	lc := LimitConfig{Limit: 50}
+	if got := lc.FirstPageSize(); got != 50 {
+		t.Errorf("expected 50, got %d", got)
+	}
+}
+
+func TestFirstPageSizeLargeLimit(t *testing.T) {
+	lc := LimitConfig{Limit: 200}
+	if got := lc.FirstPageSize(); got != 50 {
+		t.Errorf("expected 50 (capped at page size max), got %d", got)
+	}
+}
+
+func TestFirstPageSizeAll(t *testing.T) {
+	lc := LimitConfig{All: true, MaxRecords: DefaultMaxRecords}
+	if got := lc.FirstPageSize(); got != 50 {
+		t.Errorf("expected 50 for --limit=all, got %d", got)
+	}
+}
+
 func TestPaginateTotalCountNilWhenNotPresent(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		resp := struct {
