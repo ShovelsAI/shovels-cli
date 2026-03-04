@@ -375,6 +375,24 @@ func setIntFlag(cmd *cobra.Command, flag, param string, q url.Values) {
 	}
 }
 
+// rejectDateFlagsOnCurrent installs a FlagErrorFunc on cmd that rewrites
+// "unknown flag: --metric-from" and "unknown flag: --metric-to" into a
+// user-friendly validation error explaining these flags are monthly-only.
+func rejectDateFlagsOnCurrent(cmd *cobra.Command) {
+	cmd.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
+		msg := err.Error()
+		if strings.Contains(msg, "metric-from") || strings.Contains(msg, "metric-to") {
+			flagErrPrinted = true
+			output.PrintErrorTyped(os.Stderr, "flags --metric-from/--metric-to are only valid on the monthly variant", 1, client.ErrorTypeValidation)
+			return &exitError{code: 1}
+		}
+		// Fall through to the root-level flag error handler behavior.
+		flagErrPrinted = true
+		output.PrintErrorTyped(os.Stderr, err.Error(), 1, client.ErrorTypeClient)
+		return err
+	})
+}
+
 // setBoolFlag adds a query parameter only when the flag was explicitly set.
 func setBoolFlag(cmd *cobra.Command, flag, param string, q url.Values) {
 	if cmd.Flags().Changed(flag) {
