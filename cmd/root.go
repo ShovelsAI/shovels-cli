@@ -54,7 +54,7 @@ Available resources:
   tags            List valid permit tags for use in --tags filters
   usage           Check API credit consumption for the authenticated account
   config          Read and write persistent settings (API key, base URL)
-  version         Print CLI version, git commit, and build date
+  version         Print CLI version, git commit, build date, and API data freshness
 
 Authentication (checked in this order):
   1. SHOVELS_API_KEY environment variable
