@@ -428,6 +428,53 @@ func TestDetectNotFound_Silent(t *testing.T) {
 	}
 }
 
+// Behavior: GIVEN config directory doesn't exist (new user, no config
+// file yet) WHEN update check runs THEN cache file and parent
+// directories are created so the 24h throttle works on next invocation.
+func TestTouchCache_CreatesParentDirectories(t *testing.T) {
+	base := t.TempDir()
+	// configDir is a nested path that doesn't exist yet.
+	configDir := filepath.Join(base, "nonexistent", "config", "shovels")
+
+	fake := &fakeUpdater{
+		detectRelease: &selfupdate.Release{},
+		detectFound:   true,
+	}
+
+	result := Check(context.Background(), Options{
+		CurrentVersion: "0.3.0",
+		ConfigDir:      configDir,
+		Updater:        fake,
+		Clock:          fakeClock{now: time.Now()},
+		VersionCompare: neverNewer(),
+	})
+
+	if !fake.detectCalled {
+		t.Error("expected DetectLatest to be called when config dir is missing")
+	}
+	if result != nil {
+		t.Error("expected nil result when already on latest")
+	}
+	// Cache file must exist after the check, proving parent dirs were created.
+	assertCacheExists(t, configDir)
+
+	// Verify a second Check with fresh clock does NOT trigger a new check
+	// (cache throttle works).
+	fake2 := &fakeUpdater{
+		detectRelease: &selfupdate.Release{},
+		detectFound:   true,
+	}
+	Check(context.Background(), Options{
+		CurrentVersion: "0.3.0",
+		ConfigDir:      configDir,
+		Updater:        fake2,
+		Clock:          fakeClock{now: time.Now()},
+	})
+	if fake2.detectCalled {
+		t.Error("expected DetectLatest NOT to be called when cache was just written")
+	}
+}
+
 // --- helpers ---
 
 func writeStaleCacheFile(t *testing.T, dir string) {

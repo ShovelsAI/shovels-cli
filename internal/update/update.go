@@ -98,11 +98,16 @@ func CacheExpired(configDir string, clk Clock) bool {
 }
 
 // touchCache creates or updates the cache file's modification time.
+// It creates parent directories if they don't exist (e.g., first run
+// before config dir is established).
 func touchCache(configDir string) {
 	path := filepath.Join(configDir, cacheFileName)
 	now := time.Now()
 	if err := os.Chtimes(path, now, now); err != nil {
-		// File may not exist yet; create it.
+		// File or directory may not exist yet; ensure parents exist.
+		if mkErr := os.MkdirAll(configDir, 0o755); mkErr != nil {
+			return
+		}
 		f, createErr := os.Create(path)
 		if createErr != nil {
 			return
