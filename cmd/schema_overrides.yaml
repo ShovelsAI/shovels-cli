@@ -1,0 +1,573 @@
+# Hand-enriched field descriptions, units, and ranges for schema generation.
+# Overrides take precedence over OpenAPI descriptions on conflict.
+# Fields listed here that do not exist in the OpenAPI spec are ignored.
+
+permits search:
+  fields:
+    id:
+      description: "Unique permit identifier assigned by Shovels"
+    number:
+      description: "Permit number from the issuing jurisdiction"
+    description:
+      description: "Work description from the permit application"
+    jurisdiction:
+      description: "Name of the jurisdiction that issued the permit"
+    type:
+      description: "Permit type classification (e.g., building, electrical, plumbing)"
+    status:
+      description: "Current permit status"
+      enum: "active, final, in_review, inactive"
+    file_date:
+      description: "Date the permit application was filed"
+    issue_date:
+      description: "Date the permit was approved and issued"
+    final_date:
+      description: "Date the permit received final inspection approval"
+    start_date:
+      description: "Earliest date associated with the permit"
+    end_date:
+      description: "Latest date associated with the permit"
+    job_value:
+      description: "Total project value declared on the permit"
+      unit: "cents"
+    fees:
+      description: "Permit fees charged by the jurisdiction"
+      unit: "cents"
+    approval_duration:
+      description: "Days from filing to permit issuance"
+      unit: "days"
+    construction_duration:
+      description: "Days from issuance to final inspection"
+      unit: "days"
+    total_duration:
+      description: "Days from filing to final inspection"
+      unit: "days"
+    inspection_pass_rate:
+      description: "Percentage of inspections passed on first attempt"
+      range: "0-100"
+      unit: "percent"
+    contractor_id:
+      description: "ID of the contractor associated with this permit, null if unlinked"
+    tags:
+      description: "Permit classification tags (e.g., solar, roofing, electrical)"
+
+permits get:
+  fields:
+    id:
+      description: "Unique permit identifier assigned by Shovels"
+    number:
+      description: "Permit number from the issuing jurisdiction"
+    description:
+      description: "Work description from the permit application"
+    jurisdiction:
+      description: "Name of the jurisdiction that issued the permit"
+    type:
+      description: "Permit type classification (e.g., building, electrical, plumbing)"
+    status:
+      description: "Current permit status"
+      enum: "active, final, in_review, inactive"
+    job_value:
+      description: "Total project value declared on the permit"
+      unit: "cents"
+    fees:
+      description: "Permit fees charged by the jurisdiction"
+      unit: "cents"
+    approval_duration:
+      description: "Days from filing to permit issuance"
+      unit: "days"
+    construction_duration:
+      description: "Days from issuance to final inspection"
+      unit: "days"
+    total_duration:
+      description: "Days from filing to final inspection"
+      unit: "days"
+    inspection_pass_rate:
+      description: "Percentage of inspections passed on first attempt"
+      range: "0-100"
+      unit: "percent"
+    contractor_id:
+      description: "ID of the contractor associated with this permit, null if unlinked"
+    tags:
+      description: "Permit classification tags (e.g., solar, roofing, electrical)"
+
+contractors search:
+  fields:
+    id:
+      description: "Unique contractor identifier assigned by Shovels"
+    name:
+      description: "Contractor name from license records"
+    business_name:
+      description: "Registered business name"
+    business_type:
+      description: "Business entity type (e.g., corporation, LLC, sole proprietorship)"
+    classification:
+      description: "Primary license classification"
+    classification_derived:
+      description: "Shovels-derived contractor classifications based on permit history"
+    license:
+      description: "Contractor license number"
+    license_issue_date:
+      description: "Date the license was issued"
+    license_exp_date:
+      description: "Date the license expires"
+    phone:
+      description: "Contractor phone number"
+    email:
+      description: "Contractor email address"
+    website:
+      description: "Contractor website URL"
+    permit_count:
+      description: "Total number of permits associated with this contractor"
+    avg_job_value:
+      description: "Average job value across all permits"
+      unit: "cents"
+    total_job_value:
+      description: "Sum of job values across all permits"
+      unit: "cents"
+    avg_construction_duration:
+      description: "Average days from permit issuance to final inspection"
+      unit: "days"
+    avg_inspection_pass_rate:
+      description: "Average percentage of inspections passed on first attempt"
+      range: "0-100"
+      unit: "percent"
+    rating:
+      description: "Contractor rating score"
+    review_count:
+      description: "Number of reviews received"
+
+contractors get:
+  fields:
+    id:
+      description: "Unique contractor identifier assigned by Shovels"
+    name:
+      description: "Contractor name from license records"
+    business_name:
+      description: "Registered business name"
+    license:
+      description: "Contractor license number"
+    permit_count:
+      description: "Total number of permits associated with this contractor"
+    avg_job_value:
+      description: "Average job value across all permits"
+      unit: "cents"
+    total_job_value:
+      description: "Sum of job values across all permits"
+      unit: "cents"
+    avg_construction_duration:
+      description: "Average days from permit issuance to final inspection"
+      unit: "days"
+    avg_inspection_pass_rate:
+      description: "Average percentage of inspections passed on first attempt"
+      range: "0-100"
+      unit: "percent"
+
+contractors permits:
+  fields:
+    id:
+      description: "Unique permit identifier assigned by Shovels"
+    job_value:
+      description: "Total project value declared on the permit"
+      unit: "cents"
+    fees:
+      description: "Permit fees charged by the jurisdiction"
+      unit: "cents"
+    approval_duration:
+      description: "Days from filing to permit issuance"
+      unit: "days"
+    construction_duration:
+      description: "Days from issuance to final inspection"
+      unit: "days"
+    inspection_pass_rate:
+      description: "Percentage of inspections passed on first attempt"
+      range: "0-100"
+      unit: "percent"
+
+contractors employees:
+  fields:
+    id:
+      description: "Unique employee identifier"
+    contractor_id:
+      description: "ID of the contractor this employee belongs to"
+    name:
+      description: "Employee full name"
+    job_title:
+      description: "Employee job title"
+    seniority_level:
+      description: "Seniority level within the organization"
+    department:
+      description: "Department within the organization"
+    income_range:
+      description: "Estimated income range"
+    net_worth:
+      description: "Estimated net worth range"
+
+contractors metrics:
+  fields:
+    property_type:
+      description: "Property type filter applied to the metrics"
+    date:
+      description: "Month for which the metrics are calculated"
+    tag:
+      description: "Permit tag filter applied to the metrics"
+    permit_count:
+      description: "Number of permits in this period"
+    avg_job_value:
+      description: "Average job value for permits in this period"
+      unit: "cents"
+    total_job_value:
+      description: "Sum of job values for permits in this period"
+      unit: "cents"
+    avg_construction_duration:
+      description: "Average days from issuance to final inspection"
+      unit: "days"
+    avg_inspection_pass_rate:
+      description: "Average percentage of inspections passed on first attempt"
+      range: "0-100"
+      unit: "percent"
+
+cities search:
+  fields:
+    geo_id:
+      description: "Opaque Shovels geographic identifier for this city"
+    name:
+      description: "City name with county and state"
+    state:
+      description: "Two-letter US state abbreviation"
+
+cities metrics current:
+  fields:
+    geo_id:
+      description: "Shovels geographic identifier for this city"
+    tag:
+      description: "Permit tag filter applied to the metrics"
+    property_type:
+      description: "Property type filter applied to the metrics"
+    permit_count:
+      description: "Total number of permits matching the filters"
+    contractor_count:
+      description: "Number of distinct contractors on matching permits"
+    avg_construction_duration:
+      description: "Average days from issuance to final inspection"
+      unit: "days"
+    avg_approval_duration:
+      description: "Average days from filing to permit issuance"
+      unit: "days"
+    total_job_value:
+      description: "Sum of job values across matching permits"
+      unit: "cents"
+    avg_inspection_pass_rate:
+      description: "Average percentage of inspections passed on first attempt"
+      range: "0-100"
+      unit: "percent"
+    permit_active_count:
+      description: "Number of currently active permits"
+    permit_in_review_count:
+      description: "Number of permits currently in review"
+
+cities metrics monthly:
+  fields:
+    date:
+      description: "Month for which the metrics are calculated"
+    geo_id:
+      description: "Shovels geographic identifier for this city"
+    tag:
+      description: "Permit tag filter applied to the metrics"
+    property_type:
+      description: "Property type filter applied to the metrics"
+    permit_count:
+      description: "Total number of permits matching the filters in this month"
+    contractor_count:
+      description: "Number of distinct contractors on matching permits in this month"
+    avg_construction_duration:
+      description: "Average days from issuance to final inspection"
+      unit: "days"
+    avg_approval_duration:
+      description: "Average days from filing to permit issuance"
+      unit: "days"
+    total_job_value:
+      description: "Sum of job values across matching permits in this month"
+      unit: "cents"
+    avg_inspection_pass_rate:
+      description: "Average percentage of inspections passed on first attempt"
+      range: "0-100"
+      unit: "percent"
+    permit_active_count:
+      description: "Number of currently active permits in this month"
+    permit_in_review_count:
+      description: "Number of permits currently in review in this month"
+
+counties search:
+  fields:
+    geo_id:
+      description: "Opaque Shovels geographic identifier for this county"
+    name:
+      description: "County name with state"
+    state:
+      description: "Two-letter US state abbreviation"
+
+counties metrics current:
+  fields:
+    geo_id:
+      description: "Shovels geographic identifier for this county"
+    tag:
+      description: "Permit tag filter applied to the metrics"
+    property_type:
+      description: "Property type filter applied to the metrics"
+    permit_count:
+      description: "Total number of permits matching the filters"
+    contractor_count:
+      description: "Number of distinct contractors on matching permits"
+    avg_construction_duration:
+      description: "Average days from issuance to final inspection"
+      unit: "days"
+    avg_approval_duration:
+      description: "Average days from filing to permit issuance"
+      unit: "days"
+    total_job_value:
+      description: "Sum of job values across matching permits"
+      unit: "cents"
+    avg_inspection_pass_rate:
+      description: "Average percentage of inspections passed on first attempt"
+      range: "0-100"
+      unit: "percent"
+    permit_active_count:
+      description: "Number of currently active permits"
+    permit_in_review_count:
+      description: "Number of permits currently in review"
+
+counties metrics monthly:
+  fields:
+    date:
+      description: "Month for which the metrics are calculated"
+    geo_id:
+      description: "Shovels geographic identifier for this county"
+    tag:
+      description: "Permit tag filter applied to the metrics"
+    property_type:
+      description: "Property type filter applied to the metrics"
+    permit_count:
+      description: "Total number of permits matching the filters in this month"
+    contractor_count:
+      description: "Number of distinct contractors on matching permits in this month"
+    avg_construction_duration:
+      description: "Average days from issuance to final inspection"
+      unit: "days"
+    avg_approval_duration:
+      description: "Average days from filing to permit issuance"
+      unit: "days"
+    total_job_value:
+      description: "Sum of job values across matching permits in this month"
+      unit: "cents"
+    avg_inspection_pass_rate:
+      description: "Average percentage of inspections passed on first attempt"
+      range: "0-100"
+      unit: "percent"
+    permit_active_count:
+      description: "Number of currently active permits in this month"
+    permit_in_review_count:
+      description: "Number of permits currently in review in this month"
+
+jurisdictions search:
+  fields:
+    geo_id:
+      description: "Opaque Shovels geographic identifier for this jurisdiction"
+    name:
+      description: "Jurisdiction name with state"
+    state:
+      description: "Two-letter US state abbreviation"
+
+jurisdictions metrics current:
+  fields:
+    geo_id:
+      description: "Shovels geographic identifier for this jurisdiction"
+    tag:
+      description: "Permit tag filter applied to the metrics"
+    property_type:
+      description: "Property type filter applied to the metrics"
+    permit_count:
+      description: "Total number of permits matching the filters"
+    contractor_count:
+      description: "Number of distinct contractors on matching permits"
+    avg_construction_duration:
+      description: "Average days from issuance to final inspection"
+      unit: "days"
+    avg_approval_duration:
+      description: "Average days from filing to permit issuance"
+      unit: "days"
+    total_job_value:
+      description: "Sum of job values across matching permits"
+      unit: "cents"
+    avg_inspection_pass_rate:
+      description: "Average percentage of inspections passed on first attempt"
+      range: "0-100"
+      unit: "percent"
+    permit_active_count:
+      description: "Number of currently active permits"
+    permit_in_review_count:
+      description: "Number of permits currently in review"
+
+jurisdictions metrics monthly:
+  fields:
+    date:
+      description: "Month for which the metrics are calculated"
+    geo_id:
+      description: "Shovels geographic identifier for this jurisdiction"
+    tag:
+      description: "Permit tag filter applied to the metrics"
+    property_type:
+      description: "Property type filter applied to the metrics"
+    permit_count:
+      description: "Total number of permits matching the filters in this month"
+    contractor_count:
+      description: "Number of distinct contractors on matching permits in this month"
+    avg_construction_duration:
+      description: "Average days from issuance to final inspection"
+      unit: "days"
+    avg_approval_duration:
+      description: "Average days from filing to permit issuance"
+      unit: "days"
+    total_job_value:
+      description: "Sum of job values across matching permits in this month"
+      unit: "cents"
+    avg_inspection_pass_rate:
+      description: "Average percentage of inspections passed on first attempt"
+      range: "0-100"
+      unit: "percent"
+    permit_active_count:
+      description: "Number of currently active permits in this month"
+    permit_in_review_count:
+      description: "Number of permits currently in review in this month"
+
+addresses search:
+  fields:
+    geo_id:
+      description: "Opaque Shovels geographic identifier for this address"
+    name:
+      description: "Full formatted address string"
+    street_no:
+      description: "Street number"
+    street:
+      description: "Street name"
+    city:
+      description: "City name"
+    county:
+      description: "County name"
+    zip_code:
+      description: "5-digit zip code"
+    state:
+      description: "Two-letter US state abbreviation"
+    jurisdiction:
+      description: "Jurisdiction name for this address"
+    lat:
+      description: "Latitude coordinate"
+    long:
+      description: "Longitude coordinate"
+
+addresses metrics current:
+  fields:
+    geo_id:
+      description: "Shovels geographic identifier for this address"
+    tag:
+      description: "Permit tag filter applied to the metrics"
+    permit_count:
+      description: "Total number of permits matching the filters"
+    contractor_count:
+      description: "Number of distinct contractors on matching permits"
+    avg_construction_duration:
+      description: "Average days from issuance to final inspection"
+      unit: "days"
+    avg_approval_duration:
+      description: "Average days from filing to permit issuance"
+      unit: "days"
+    total_job_value:
+      description: "Sum of job values across matching permits"
+      unit: "cents"
+    avg_inspection_pass_rate:
+      description: "Average percentage of inspections passed on first attempt"
+      range: "0-100"
+      unit: "percent"
+    permit_active_count:
+      description: "Number of currently active permits"
+    permit_in_review_count:
+      description: "Number of permits currently in review"
+
+addresses metrics monthly:
+  fields:
+    date:
+      description: "Month for which the metrics are calculated"
+    geo_id:
+      description: "Shovels geographic identifier for this address"
+    tag:
+      description: "Permit tag filter applied to the metrics"
+    permit_count:
+      description: "Total number of permits matching the filters in this month"
+    contractor_count:
+      description: "Number of distinct contractors on matching permits in this month"
+    avg_construction_duration:
+      description: "Average days from issuance to final inspection"
+      unit: "days"
+    avg_approval_duration:
+      description: "Average days from filing to permit issuance"
+      unit: "days"
+    total_job_value:
+      description: "Sum of job values across matching permits in this month"
+      unit: "cents"
+    avg_inspection_pass_rate:
+      description: "Average percentage of inspections passed on first attempt"
+      range: "0-100"
+      unit: "percent"
+    permit_active_count:
+      description: "Number of currently active permits in this month"
+    permit_in_review_count:
+      description: "Number of permits currently in review in this month"
+
+addresses residents:
+  fields:
+    name:
+      description: "Resident full name"
+    personal_emails:
+      description: "Personal email addresses"
+    phone:
+      description: "Phone number"
+    linkedin_url:
+      description: "LinkedIn profile URL"
+    net_worth:
+      description: "Estimated net worth range"
+    income_range:
+      description: "Estimated income range"
+    is_homeowner:
+      description: "Whether the resident owns the property"
+    street_no:
+      description: "Street number of the address"
+    street:
+      description: "Street name"
+    city:
+      description: "City name"
+    state:
+      description: "Two-letter US state abbreviation"
+    zip_code:
+      description: "5-digit zip code"
+    zip_code_ext:
+      description: "4-digit zip code extension"
+
+zipcodes search:
+  fields:
+    geo_id:
+      description: "5-digit zip code, used directly as geo_id"
+    state:
+      description: "Two-letter US state abbreviation"
+
+states search:
+  fields:
+    geo_id:
+      description: "Two-letter state abbreviation, used directly as geo_id"
+    name:
+      description: "Full state name"
+
+tags list:
+  fields:
+    id:
+      description: "Tag identifier for use in --tags flags"
+    description:
+      description: "Human-readable description of what the tag represents"
