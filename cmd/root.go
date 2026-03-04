@@ -38,7 +38,7 @@ var updateResultCh chan *update.Result
 var updateCancel context.CancelFunc
 
 // updateStartTime records when the update goroutine was launched,
-// allowing PersistentPostRunE to calculate remaining timeout budget.
+// allowing waitForUpdate to calculate remaining timeout budget.
 var updateStartTime time.Time
 
 // exitError carries a specific exit code through cobra's error chain.
@@ -118,10 +118,6 @@ Resolve a city to a geo_id, then search:
 		}
 
 		maybeStartUpdate(cfg)
-		return nil
-	},
-	PersistentPostRunE: func(cmd *cobra.Command, args []string) error {
-		waitForUpdate()
 		return nil
 	},
 }
@@ -239,6 +235,7 @@ func init() {
 // Execute runs the root command and returns the exit code.
 func Execute() int {
 	flagErrPrinted = false
+	defer waitForUpdate()
 	if err := rootCmd.Execute(); err != nil {
 		if e, ok := err.(*exitError); ok {
 			return e.code
