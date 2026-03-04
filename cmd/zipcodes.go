@@ -59,6 +59,10 @@ Response: {"data": [{"geo_id": "90210", "state": "CA"}, ...], "meta": {"count": 
 }
 
 func runZipcodesSearch(cmd *cobra.Command, args []string) error {
+	if handled, err := handleSchemaFlag(cmd, commandPathFromCobra(cmd)); handled {
+		return err
+	}
+
 	query, _ := cmd.Flags().GetString("query")
 	if query == "" {
 		output.PrintErrorTyped(os.Stderr, "required flag missing: --query (-q)", 1, client.ErrorTypeValidation)
@@ -99,6 +103,7 @@ func runZipcodesSearch(cmd *cobra.Command, args []string) error {
 
 func init() {
 	zipcodesSearchCmd.Flags().StringP("query", "q", "", "Zip code prefix or full code to search for, e.g. \"902\" or \"90210\" (required)")
+	registerSchemaFlag(zipcodesSearchCmd)
 
 	zipcodesCmd.AddCommand(zipcodesSearchCmd)
 	rootCmd.AddCommand(zipcodesCmd)

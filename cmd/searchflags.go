@@ -313,6 +313,10 @@ func newClientFromFlags(cmd *cobra.Command) (*client.Client, error) {
 // Callers can modify the query via the optional queryFn callback before
 // the request is made.
 func runPaginatedSearch(cmd *cobra.Command, endpoint string, queryFn func(url.Values)) error {
+	if handled, err := handleSchemaFlag(cmd, commandPathFromCobra(cmd)); handled {
+		return err
+	}
+
 	if err := validateSearchFlags(cmd); err != nil {
 		return err
 	}
