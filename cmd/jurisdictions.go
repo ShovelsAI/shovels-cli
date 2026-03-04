@@ -10,13 +10,20 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var jurisdictionsMetricsCfg = metricsConfig{
+	resource:            "jurisdictions",
+	requirePropertyType: true,
+}
+
 var jurisdictionsCmd = &cobra.Command{
 	Use:   "jurisdictions",
-	Short: "Search jurisdictions to resolve geo_ids for jurisdiction-level queries",
-	Long: `Query the Shovels jurisdiction database to resolve jurisdiction names into geo_ids.
+	Short: "Search jurisdictions and view permit activity metrics",
+	Long: `Query the Shovels jurisdiction database to resolve jurisdiction names into geo_ids,
+and retrieve permit activity metrics for jurisdictions.
 
 Available subcommands:
-  search   Search jurisdictions by name to get their geo_id for use in --geo-id
+  search    Search jurisdictions by name to get their geo_id for use in --geo-id
+  metrics   View permit activity metrics for a jurisdiction (current snapshot or monthly)
 
 Every response is a JSON envelope: {"data": [...], "meta": {...}}`,
 }
@@ -75,22 +82,112 @@ func runJurisdictionsSearch(cmd *cobra.Command, args []string) error {
 
 	result, err := cl.Paginate(context.Background(), "/jurisdictions/search", q, lc)
 	if err != nil {
-		apiErr, ok := err.(*client.APIError)
-		if ok {
-			output.PrintErrorTyped(os.Stderr, apiErr.Message, apiErr.ExitCode, apiErr.ErrorType)
-			return &exitError{code: apiErr.ExitCode}
-		}
-		output.PrintErrorTyped(os.Stderr, err.Error(), 1, client.ErrorTypeClient)
-		return &exitError{code: 1}
+		return handleAPIError(err)
 	}
 
 	output.PrintPaginated(cmd.OutOrStdout(), result.Items, result.HasMore, result.Credits, nil)
 	return nil
 }
 
+var jurisdictionsMetricsCmd = &cobra.Command{
+	Use:   "metrics",
+	Short: "View permit activity metrics for a jurisdiction (current snapshot or monthly)",
+	Long: `Retrieve permit activity metrics for a specific jurisdiction. Metrics summarize
+permit counts, contractor counts, job values, approval durations, and more.
+
+Available subcommands:
+  current   Current aggregate metrics snapshot for a jurisdiction
+  monthly   Monthly metrics time series for a jurisdiction over a date range
+
+Resolve a jurisdiction geo_id first:
+  GEO=$(shovels jurisdictions search -q "Portland" | jq -r '.data[0].geo_id')
+  shovels jurisdictions metrics current "$GEO" --tag solar --property-type residential`,
+}
+
+var jurisdictionsMetricsCurrentCmd = &cobra.Command{
+	Use:   "current GEO_ID",
+	Short: "Current aggregate metrics snapshot for a jurisdiction",
+	Long: `Retrieve current permit activity metrics for a jurisdiction. Returns aggregate
+data including permit counts, contractor counts, average construction duration,
+total job value, inspection pass rate, and active/in-review permit counts.
+
+Required flags:
+  --tag TEXT            Permit tag: solar, roofing, electrical, plumbing, etc. (required)
+  --property-type TEXT  Property type: residential, commercial, industrial (required)
+
+Optional flags:
+  --include-count       Request total result count in meta.total_count
+
+Examples:
+  Current solar metrics for a jurisdiction:
+    GEO=$(shovels jurisdictions search -q "Portland" | jq -r '.data[0].geo_id')
+    shovels jurisdictions metrics current "$GEO" --tag solar --property-type residential
+
+  With total count:
+    shovels jurisdictions metrics current ABC123 --tag solar --property-type residential --include-count
+
+Workflow — resolve jurisdiction, then query metrics:
+  GEO=$(shovels jurisdictions search -q "Miami-Dade" | jq -r '.data[0].geo_id')
+  shovels jurisdictions metrics current "$GEO" --tag solar --property-type residential
+
+Response fields: geo_id, tag, property_type, permit_count, contractor_count,
+avg_construction_duration, avg_approval_duration, total_job_value,
+avg_inspection_pass_rate, permit_active_count, permit_in_review_count`,
+	Args: cobra.ExactArgs(1),
+	Annotations: map[string]string{
+		AnnotationRequiresAuth: "true",
+	},
+	RunE: runMetricsCurrent(jurisdictionsMetricsCfg),
+}
+
+var jurisdictionsMetricsMonthlyCmd = &cobra.Command{
+	Use:   "monthly GEO_ID",
+	Short: "Monthly metrics time series for a jurisdiction over a date range",
+	Long: `Retrieve monthly permit activity metrics for a jurisdiction over a specified
+date range. Returns one record per month with a date field, plus permit counts,
+contractor counts, average construction duration, total job value,
+inspection pass rate, and active/in-review permit counts.
+
+Required flags:
+  --tag TEXT            Permit tag: solar, roofing, electrical, plumbing, etc. (required)
+  --property-type TEXT  Property type: residential, commercial, industrial (required)
+  --metric-from DATE   Start date in YYYY-MM-DD format (required)
+  --metric-to DATE     End date in YYYY-MM-DD format (required)
+
+Optional flags:
+  --include-count       Request total result count in meta.total_count
+
+Examples:
+  Monthly solar metrics for a jurisdiction in 2024:
+    GEO=$(shovels jurisdictions search -q "Portland" | jq -r '.data[0].geo_id')
+    shovels jurisdictions metrics monthly "$GEO" --tag solar --property-type residential \
+      --metric-from 2024-01-01 --metric-to 2024-12-31
+
+Workflow — resolve jurisdiction, then query monthly metrics:
+  GEO=$(shovels jurisdictions search -q "Miami-Dade" | jq -r '.data[0].geo_id')
+  shovels jurisdictions metrics monthly "$GEO" --tag solar --property-type residential \
+    --metric-from 2024-01-01 --metric-to 2024-12-31
+
+Response fields: date, geo_id, tag, property_type, permit_count, contractor_count,
+avg_construction_duration, avg_approval_duration, total_job_value,
+avg_inspection_pass_rate, permit_active_count, permit_in_review_count`,
+	Args: cobra.ExactArgs(1),
+	Annotations: map[string]string{
+		AnnotationRequiresAuth: "true",
+	},
+	RunE: runMetricsMonthly(jurisdictionsMetricsCfg),
+}
+
 func init() {
 	jurisdictionsSearchCmd.Flags().StringP("query", "q", "", "Jurisdiction name to search for, e.g. \"Portland\" or \"Miami-Dade\" (required)")
 
+	registerMetricsCurrentFlags(jurisdictionsMetricsCurrentCmd, true)
+	registerMetricsMonthlyFlags(jurisdictionsMetricsMonthlyCmd, true)
+
+	jurisdictionsMetricsCmd.AddCommand(jurisdictionsMetricsCurrentCmd)
+	jurisdictionsMetricsCmd.AddCommand(jurisdictionsMetricsMonthlyCmd)
+
 	jurisdictionsCmd.AddCommand(jurisdictionsSearchCmd)
+	jurisdictionsCmd.AddCommand(jurisdictionsMetricsCmd)
 	rootCmd.AddCommand(jurisdictionsCmd)
 }
