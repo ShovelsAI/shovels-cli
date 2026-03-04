@@ -61,6 +61,10 @@ Response: {"data": [{"geo_id": "...", "name": "MIAMI, MIAMI-DADE, FL", "state": 
 }
 
 func runCitiesSearch(cmd *cobra.Command, args []string) error {
+	if handled, err := handleSchemaFlag(cmd, commandPathFromCobra(cmd)); handled {
+		return err
+	}
+
 	query, _ := cmd.Flags().GetString("query")
 	if query == "" {
 		output.PrintErrorTyped(os.Stderr, "required flag missing: --query (-q)", 1, client.ErrorTypeValidation)
@@ -143,7 +147,7 @@ Workflow — resolve city, then query metrics:
 Response fields: geo_id, tag, property_type, permit_count, contractor_count,
 avg_construction_duration, avg_approval_duration, total_job_value,
 avg_inspection_pass_rate, permit_active_count, permit_in_review_count`,
-	Args: cobra.ExactArgs(1),
+	Args: exactArgsUnlessSchema(1),
 	Annotations: map[string]string{
 		AnnotationRequiresAuth: "true",
 	},
@@ -181,7 +185,7 @@ Workflow — resolve city, then query monthly metrics:
 Response fields: date, geo_id, tag, property_type, permit_count, contractor_count,
 avg_construction_duration, avg_approval_duration, total_job_value,
 avg_inspection_pass_rate, permit_active_count, permit_in_review_count`,
-	Args: cobra.ExactArgs(1),
+	Args: exactArgsUnlessSchema(1),
 	Annotations: map[string]string{
 		AnnotationRequiresAuth: "true",
 	},
@@ -190,6 +194,9 @@ avg_inspection_pass_rate, permit_active_count, permit_in_review_count`,
 
 func init() {
 	citiesSearchCmd.Flags().StringP("query", "q", "", "City name to search for, e.g. \"Miami\" or \"San Francisco\" (required)")
+	registerSchemaFlag(citiesSearchCmd)
+	registerSchemaFlag(citiesMetricsCurrentCmd)
+	registerSchemaFlag(citiesMetricsMonthlyCmd)
 
 	registerMetricsCurrentFlags(citiesMetricsCurrentCmd, true)
 	registerMetricsMonthlyFlags(citiesMetricsMonthlyCmd, true)

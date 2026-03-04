@@ -59,6 +59,10 @@ Response: {"data": [{"geo_id": "CA", "name": "California"}, ...], "meta": {"coun
 }
 
 func runStatesSearch(cmd *cobra.Command, args []string) error {
+	if handled, err := handleSchemaFlag(cmd, commandPathFromCobra(cmd)); handled {
+		return err
+	}
+
 	query, _ := cmd.Flags().GetString("query")
 	if query == "" {
 		output.PrintErrorTyped(os.Stderr, "required flag missing: --query (-q)", 1, client.ErrorTypeValidation)
@@ -99,6 +103,7 @@ func runStatesSearch(cmd *cobra.Command, args []string) error {
 
 func init() {
 	statesSearchCmd.Flags().StringP("query", "q", "", "State name or abbreviation to search for, e.g. \"Cal\" or \"California\" (required)")
+	registerSchemaFlag(statesSearchCmd)
 
 	statesCmd.AddCommand(statesSearchCmd)
 	rootCmd.AddCommand(statesCmd)

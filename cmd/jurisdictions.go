@@ -61,6 +61,10 @@ Response: {"data": [{"geo_id": "...", "name": "PORTLAND, OR", "state": "OR"}, ..
 }
 
 func runJurisdictionsSearch(cmd *cobra.Command, args []string) error {
+	if handled, err := handleSchemaFlag(cmd, commandPathFromCobra(cmd)); handled {
+		return err
+	}
+
 	query, _ := cmd.Flags().GetString("query")
 	if query == "" {
 		output.PrintErrorTyped(os.Stderr, "required flag missing: --query (-q)", 1, client.ErrorTypeValidation)
@@ -143,7 +147,7 @@ Workflow — resolve jurisdiction, then query metrics:
 Response fields: geo_id, tag, property_type, permit_count, contractor_count,
 avg_construction_duration, avg_approval_duration, total_job_value,
 avg_inspection_pass_rate, permit_active_count, permit_in_review_count`,
-	Args: cobra.ExactArgs(1),
+	Args: exactArgsUnlessSchema(1),
 	Annotations: map[string]string{
 		AnnotationRequiresAuth: "true",
 	},
@@ -181,7 +185,7 @@ Workflow — resolve jurisdiction, then query monthly metrics:
 Response fields: date, geo_id, tag, property_type, permit_count, contractor_count,
 avg_construction_duration, avg_approval_duration, total_job_value,
 avg_inspection_pass_rate, permit_active_count, permit_in_review_count`,
-	Args: cobra.ExactArgs(1),
+	Args: exactArgsUnlessSchema(1),
 	Annotations: map[string]string{
 		AnnotationRequiresAuth: "true",
 	},
@@ -190,6 +194,9 @@ avg_inspection_pass_rate, permit_active_count, permit_in_review_count`,
 
 func init() {
 	jurisdictionsSearchCmd.Flags().StringP("query", "q", "", "Jurisdiction name to search for, e.g. \"Portland\" or \"Miami-Dade\" (required)")
+	registerSchemaFlag(jurisdictionsSearchCmd)
+	registerSchemaFlag(jurisdictionsMetricsCurrentCmd)
+	registerSchemaFlag(jurisdictionsMetricsMonthlyCmd)
 
 	registerMetricsCurrentFlags(jurisdictionsMetricsCurrentCmd, true)
 	registerMetricsMonthlyFlags(jurisdictionsMetricsMonthlyCmd, true)

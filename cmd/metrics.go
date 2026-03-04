@@ -27,6 +27,10 @@ type metricsConfig struct {
 // optional property-type validation, and rejects date flags.
 func runMetricsCurrent(cfg metricsConfig) func(*cobra.Command, []string) error {
 	return func(cmd *cobra.Command, args []string) error {
+		if handled, err := handleSchemaFlag(cmd, commandPathFromCobra(cmd)); handled {
+			return err
+		}
+
 		tag, _ := cmd.Flags().GetString("tag")
 
 		var missing []string
@@ -89,6 +93,10 @@ func runMetricsCurrent(cfg metricsConfig) func(*cobra.Command, []string) error {
 // calls the monthly metrics endpoint, and prints the paginated result.
 func runMetricsMonthly(cfg metricsConfig) func(*cobra.Command, []string) error {
 	return func(cmd *cobra.Command, args []string) error {
+		if handled, err := handleSchemaFlag(cmd, commandPathFromCobra(cmd)); handled {
+			return err
+		}
+
 		tag, _ := cmd.Flags().GetString("tag")
 		metricFrom, _ := cmd.Flags().GetString("metric-from")
 		metricTo, _ := cmd.Flags().GetString("metric-to")

@@ -52,6 +52,7 @@ Available resources:
   zipcodes        Search zip codes to find geo_ids for use with --geo-id
   states          Search US states to find 2-letter abbreviation geo_ids
   tags            List valid permit tags for use in --tags filters
+  schema          Show annotated JSON response schema for any command (offline, no API call)
   usage           Check API credit consumption for the authenticated account
   config          Read and write persistent settings (API key, base URL)
   version         Print CLI version, git commit, build date, and API data freshness
@@ -94,7 +95,8 @@ Resolve a city to a geo_id, then search:
 		resolvedConfig = cfg
 
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
-		if requiresAuth(cmd) && cfg.APIKey == "" && !dryRun {
+		schema := isSchema(cmd)
+		if requiresAuth(cmd) && cfg.APIKey == "" && !dryRun && !schema {
 			msg := "API key not configured. Set SHOVELS_API_KEY or run: shovels config set api-key <key>"
 			output.PrintErrorTyped(os.Stderr, msg, 2, client.ErrorTypeAuth)
 			return &exitError{code: 2}

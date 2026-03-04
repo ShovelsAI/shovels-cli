@@ -100,6 +100,10 @@ Batch response:     {"data": [{...}, ...], "meta": {"count": N, "missing": [...]
 }
 
 func runContractorsGet(cmd *cobra.Command, args []string) error {
+	if handled, err := handleSchemaFlag(cmd, commandPathFromCobra(cmd)); handled {
+		return err
+	}
+
 	if len(args) == 0 {
 		output.PrintErrorTyped(os.Stderr, "at least one contractor ID required", 1, client.ErrorTypeValidation)
 		return &exitError{code: 1}
@@ -184,7 +188,7 @@ Examples:
     shovels contractors permits ABC123 --limit all
 
 Response: {"data": [...], "meta": {"count": N, "has_more": bool, "credits_used": N, ...}}`,
-	Args: cobra.ExactArgs(1),
+	Args: exactArgsUnlessSchema(1),
 	Annotations: map[string]string{
 		AnnotationRequiresAuth: "true",
 	},
@@ -192,6 +196,10 @@ Response: {"data": [...], "meta": {"count": N, "has_more": bool, "credits_used":
 }
 
 func runContractorsPermits(cmd *cobra.Command, args []string) error {
+	if handled, err := handleSchemaFlag(cmd, commandPathFromCobra(cmd)); handled {
+		return err
+	}
+
 	lc, err := parseLimitConfig(cmd)
 	if err != nil {
 		return err
@@ -252,7 +260,7 @@ Examples:
     shovels contractors employees ABC123 --limit all
 
 Response: {"data": [...], "meta": {"count": N, "has_more": bool, "credits_used": N, ...}}`,
-	Args: cobra.ExactArgs(1),
+	Args: exactArgsUnlessSchema(1),
 	Annotations: map[string]string{
 		AnnotationRequiresAuth: "true",
 	},
@@ -260,6 +268,10 @@ Response: {"data": [...], "meta": {"count": N, "has_more": bool, "credits_used":
 }
 
 func runContractorsEmployees(cmd *cobra.Command, args []string) error {
+	if handled, err := handleSchemaFlag(cmd, commandPathFromCobra(cmd)); handled {
+		return err
+	}
+
 	lc, err := parseLimitConfig(cmd)
 	if err != nil {
 		return err
@@ -316,7 +328,7 @@ Example:
 
 Response: {"data": [...], "meta": {"credits_used": N, "credits_remaining": N}}
 Metrics are not paginated. The response contains monthly aggregate data.`,
-	Args: cobra.ExactArgs(1),
+	Args: exactArgsUnlessSchema(1),
 	Annotations: map[string]string{
 		AnnotationRequiresAuth: "true",
 	},
@@ -324,6 +336,10 @@ Metrics are not paginated. The response contains monthly aggregate data.`,
 }
 
 func runContractorsMetrics(cmd *cobra.Command, args []string) error {
+	if handled, err := handleSchemaFlag(cmd, commandPathFromCobra(cmd)); handled {
+		return err
+	}
+
 	metricFrom, _ := cmd.Flags().GetString("metric-from")
 	metricTo, _ := cmd.Flags().GetString("metric-to")
 	propertyType, _ := cmd.Flags().GetString("property-type")
@@ -404,6 +420,11 @@ func runContractorsMetrics(cmd *cobra.Command, args []string) error {
 
 func init() {
 	registerSearchFlags(contractorsSearchCmd)
+	registerSchemaFlag(contractorsSearchCmd)
+	registerSchemaFlag(contractorsGetCmd)
+	registerSchemaFlag(contractorsPermitsCmd)
+	registerSchemaFlag(contractorsEmployeesCmd)
+	registerSchemaFlag(contractorsMetricsCmd)
 
 	// Contractors-specific flag
 	contractorsSearchCmd.Flags().Bool("no-tallies", false, "Omit tag and status tallies for faster response (sends include_tallies=false)")

@@ -57,6 +57,10 @@ Response: {"data": [...], "meta": {"count": N, "has_more": bool, "credits_used":
 }
 
 func runAddressesSearch(cmd *cobra.Command, args []string) error {
+	if handled, err := handleSchemaFlag(cmd, commandPathFromCobra(cmd)); handled {
+		return err
+	}
+
 	query, _ := cmd.Flags().GetString("query")
 	if query == "" {
 		output.PrintErrorTyped(os.Stderr, "required flag missing: --query (-q)", 1, client.ErrorTypeValidation)
@@ -138,7 +142,7 @@ Workflow — resolve address, then query metrics:
 Response fields: geo_id, tag, permit_count, contractor_count,
 avg_construction_duration, avg_approval_duration, total_job_value,
 avg_inspection_pass_rate, permit_active_count, permit_in_review_count`,
-	Args: cobra.ExactArgs(1),
+	Args: exactArgsUnlessSchema(1),
 	Annotations: map[string]string{
 		AnnotationRequiresAuth: "true",
 	},
@@ -175,7 +179,7 @@ Workflow — resolve address, then query monthly metrics:
 Response fields: date, geo_id, tag, permit_count, contractor_count,
 avg_construction_duration, avg_approval_duration, total_job_value,
 avg_inspection_pass_rate, permit_active_count, permit_in_review_count`,
-	Args: cobra.ExactArgs(1),
+	Args: exactArgsUnlessSchema(1),
 	Annotations: map[string]string{
 		AnnotationRequiresAuth: "true",
 	},
@@ -210,7 +214,7 @@ income_range, is_homeowner, street_no, street, city, state, zip_code,
 zip_code_ext
 
 Response: {"data": [...], "meta": {"count": N, "has_more": bool, "credits_used": N, ...}}`,
-	Args: cobra.ExactArgs(1),
+	Args: exactArgsUnlessSchema(1),
 	Annotations: map[string]string{
 		AnnotationRequiresAuth: "true",
 	},
@@ -218,6 +222,10 @@ Response: {"data": [...], "meta": {"count": N, "has_more": bool, "credits_used":
 }
 
 func runAddressesResidents(cmd *cobra.Command, args []string) error {
+	if handled, err := handleSchemaFlag(cmd, commandPathFromCobra(cmd)); handled {
+		return err
+	}
+
 	lc, err := parseLimitConfig(cmd)
 	if err != nil {
 		return err
@@ -251,6 +259,10 @@ func runAddressesResidents(cmd *cobra.Command, args []string) error {
 
 func init() {
 	addressesSearchCmd.Flags().StringP("query", "q", "", "Address search string, e.g. \"123 Main St\" or \"90210\" (required)")
+	registerSchemaFlag(addressesSearchCmd)
+	registerSchemaFlag(addressesMetricsCurrentCmd)
+	registerSchemaFlag(addressesMetricsMonthlyCmd)
+	registerSchemaFlag(addressesResidentsCmd)
 
 	registerMetricsCurrentFlags(addressesMetricsCurrentCmd, false)
 	registerMetricsMonthlyFlags(addressesMetricsMonthlyCmd, false)

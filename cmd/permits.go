@@ -95,6 +95,10 @@ IDs not found in the database appear in meta.missing.`,
 }
 
 func runPermitsGet(cmd *cobra.Command, args []string) error {
+	if handled, err := handleSchemaFlag(cmd, commandPathFromCobra(cmd)); handled {
+		return err
+	}
+
 	if len(args) == 0 {
 		output.PrintErrorTyped(os.Stderr, "at least one permit ID required", 1, client.ErrorTypeValidation)
 		return &exitError{code: 1}
@@ -170,6 +174,8 @@ func findMissingIDs(requested []string, items []json.RawMessage) []string {
 
 func init() {
 	registerSearchFlags(permitsSearchCmd)
+	registerSchemaFlag(permitsSearchCmd)
+	registerSchemaFlag(permitsGetCmd)
 
 	// Permits-specific flag
 	permitsSearchCmd.Flags().Bool("has-contractor", false, "Include only permits linked to a known contractor")

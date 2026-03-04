@@ -52,6 +52,10 @@ Response: {"data": [{"id": "solar", "description": "Solar panel installation"}, 
 }
 
 func runTagsList(cmd *cobra.Command, args []string) error {
+	if handled, err := handleSchemaFlag(cmd, commandPathFromCobra(cmd)); handled {
+		return err
+	}
+
 	lc, err := parseLimitConfig(cmd)
 	if err != nil {
 		return err
@@ -88,6 +92,8 @@ func runTagsList(cmd *cobra.Command, args []string) error {
 }
 
 func init() {
+	registerSchemaFlag(tagsListCmd)
+
 	tagsCmd.AddCommand(tagsListCmd)
 	rootCmd.AddCommand(tagsCmd)
 }
