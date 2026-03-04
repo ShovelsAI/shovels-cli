@@ -28,7 +28,7 @@ func TestRootHelpShowsDescriptionCommandsAndGlobalFlags(t *testing.T) {
 	}
 
 	// All resource commands must be listed.
-	commands := []string{"permits", "contractors", "addresses", "cities", "counties", "jurisdictions", "tags", "usage", "config", "version"}
+	commands := []string{"permits", "contractors", "addresses", "cities", "counties", "jurisdictions", "zipcodes", "states", "tags", "usage", "config", "version"}
 	for _, cmd := range commands {
 		if !strings.Contains(out, cmd) {
 			t.Errorf("root --help should list the %q command", cmd)
@@ -205,6 +205,10 @@ func TestHelpOutputIsPlainText(t *testing.T) {
 		{"counties", "search", "--help"},
 		{"jurisdictions", "--help"},
 		{"jurisdictions", "search", "--help"},
+		{"zipcodes", "--help"},
+		{"zipcodes", "search", "--help"},
+		{"states", "--help"},
+		{"states", "search", "--help"},
 		{"tags", "--help"},
 		{"tags", "list", "--help"},
 		{"usage", "--help"},
