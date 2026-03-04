@@ -2,15 +2,18 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 	"net/url"
 	"os"
-	"strings"
 
 	"github.com/shovels-ai/shovels-cli/internal/client"
 	"github.com/shovels-ai/shovels-cli/internal/output"
 	"github.com/spf13/cobra"
 )
+
+var citiesMetricsCfg = metricsConfig{
+	resource:            "cities",
+	requirePropertyType: true,
+}
 
 var citiesCmd = &cobra.Command{
 	Use:   "cities",
@@ -79,13 +82,7 @@ func runCitiesSearch(cmd *cobra.Command, args []string) error {
 
 	result, err := cl.Paginate(context.Background(), "/cities/search", q, lc)
 	if err != nil {
-		apiErr, ok := err.(*client.APIError)
-		if ok {
-			output.PrintErrorTyped(os.Stderr, apiErr.Message, apiErr.ExitCode, apiErr.ErrorType)
-			return &exitError{code: apiErr.ExitCode}
-		}
-		output.PrintErrorTyped(os.Stderr, err.Error(), 1, client.ErrorTypeClient)
-		return &exitError{code: 1}
+		return handleAPIError(err)
 	}
 
 	output.PrintPaginated(cmd.OutOrStdout(), result.Items, result.HasMore, result.Credits, nil)
@@ -140,56 +137,7 @@ avg_inspection_pass_rate, permit_active_count, permit_in_review_count`,
 	Annotations: map[string]string{
 		AnnotationRequiresAuth: "true",
 	},
-	RunE: runCitiesMetricsCurrent,
-}
-
-func runCitiesMetricsCurrent(cmd *cobra.Command, args []string) error {
-	tag, _ := cmd.Flags().GetString("tag")
-	propertyType, _ := cmd.Flags().GetString("property-type")
-
-	var missing []string
-	if tag == "" {
-		missing = append(missing, "--tag")
-	}
-	if propertyType == "" {
-		missing = append(missing, "--property-type")
-	}
-	if len(missing) > 0 {
-		msg := fmt.Sprintf("required flag(s) missing: %s", strings.Join(missing, ", "))
-		output.PrintErrorTyped(os.Stderr, msg, 1, client.ErrorTypeValidation)
-		return &exitError{code: 1}
-	}
-
-	lc, err := parseLimitConfig(cmd)
-	if err != nil {
-		return err
-	}
-
-	cl, err := newClientFromFlags(cmd)
-	if err != nil {
-		return err
-	}
-
-	q := url.Values{
-		"tag":           {tag},
-		"property_type": {propertyType},
-	}
-	setBoolFlag(cmd, "include-count", "include_count", q)
-
-	endpoint := fmt.Sprintf("/cities/%s/metrics/current", args[0])
-	result, err := cl.Paginate(context.Background(), endpoint, q, lc)
-	if err != nil {
-		apiErr, ok := err.(*client.APIError)
-		if ok {
-			output.PrintErrorTyped(os.Stderr, apiErr.Message, apiErr.ExitCode, apiErr.ErrorType)
-			return &exitError{code: apiErr.ExitCode}
-		}
-		output.PrintErrorTyped(os.Stderr, err.Error(), 1, client.ErrorTypeClient)
-		return &exitError{code: 1}
-	}
-
-	output.PrintPaginated(cmd.OutOrStdout(), result.Items, result.HasMore, result.Credits, result.TotalCount)
-	return nil
+	RunE: runMetricsCurrent(citiesMetricsCfg),
 }
 
 var citiesMetricsMonthlyCmd = &cobra.Command{
@@ -227,92 +175,14 @@ avg_inspection_pass_rate, permit_active_count, permit_in_review_count`,
 	Annotations: map[string]string{
 		AnnotationRequiresAuth: "true",
 	},
-	RunE: runCitiesMetricsMonthly,
-}
-
-func runCitiesMetricsMonthly(cmd *cobra.Command, args []string) error {
-	tag, _ := cmd.Flags().GetString("tag")
-	propertyType, _ := cmd.Flags().GetString("property-type")
-	metricFrom, _ := cmd.Flags().GetString("metric-from")
-	metricTo, _ := cmd.Flags().GetString("metric-to")
-
-	var missing []string
-	if tag == "" {
-		missing = append(missing, "--tag")
-	}
-	if propertyType == "" {
-		missing = append(missing, "--property-type")
-	}
-	if metricFrom == "" {
-		missing = append(missing, "--metric-from")
-	}
-	if metricTo == "" {
-		missing = append(missing, "--metric-to")
-	}
-	if len(missing) > 0 {
-		msg := fmt.Sprintf("required flag(s) missing: %s", strings.Join(missing, ", "))
-		output.PrintErrorTyped(os.Stderr, msg, 1, client.ErrorTypeValidation)
-		return &exitError{code: 1}
-	}
-
-	if !datePattern.MatchString(metricFrom) {
-		output.PrintErrorTyped(os.Stderr, fmt.Sprintf("invalid date format for --metric-from: %q (expected YYYY-MM-DD)", metricFrom), 1, client.ErrorTypeValidation)
-		return &exitError{code: 1}
-	}
-	if !datePattern.MatchString(metricTo) {
-		output.PrintErrorTyped(os.Stderr, fmt.Sprintf("invalid date format for --metric-to: %q (expected YYYY-MM-DD)", metricTo), 1, client.ErrorTypeValidation)
-		return &exitError{code: 1}
-	}
-
-	lc, err := parseLimitConfig(cmd)
-	if err != nil {
-		return err
-	}
-
-	cl, err := newClientFromFlags(cmd)
-	if err != nil {
-		return err
-	}
-
-	q := url.Values{
-		"tag":           {tag},
-		"property_type": {propertyType},
-		"metric_from":   {metricFrom},
-		"metric_to":     {metricTo},
-	}
-	setBoolFlag(cmd, "include-count", "include_count", q)
-
-	endpoint := fmt.Sprintf("/cities/%s/metrics/monthly", args[0])
-	result, err := cl.Paginate(context.Background(), endpoint, q, lc)
-	if err != nil {
-		apiErr, ok := err.(*client.APIError)
-		if ok {
-			output.PrintErrorTyped(os.Stderr, apiErr.Message, apiErr.ExitCode, apiErr.ErrorType)
-			return &exitError{code: apiErr.ExitCode}
-		}
-		output.PrintErrorTyped(os.Stderr, err.Error(), 1, client.ErrorTypeClient)
-		return &exitError{code: 1}
-	}
-
-	output.PrintPaginated(cmd.OutOrStdout(), result.Items, result.HasMore, result.Credits, result.TotalCount)
-	return nil
+	RunE: runMetricsMonthly(citiesMetricsCfg),
 }
 
 func init() {
 	citiesSearchCmd.Flags().StringP("query", "q", "", "City name to search for, e.g. \"Miami\" or \"San Francisco\" (required)")
 
-	// Metrics current flags
-	citiesMetricsCurrentCmd.Flags().String("tag", "", "Permit tag: solar, roofing, electrical, plumbing, etc. (required)")
-	citiesMetricsCurrentCmd.Flags().String("property-type", "", "Property type: residential, commercial, industrial (required)")
-	citiesMetricsCurrentCmd.Flags().Bool("include-count", false, "Request total result count (capped at 10,000). Returned as total_count in meta on first page")
-	rejectDateFlagsOnCurrent(citiesMetricsCurrentCmd)
-
-	// Metrics monthly flags
-	citiesMetricsMonthlyCmd.Flags().String("tag", "", "Permit tag: solar, roofing, electrical, plumbing, etc. (required)")
-	citiesMetricsMonthlyCmd.Flags().String("property-type", "", "Property type: residential, commercial, industrial (required)")
-	citiesMetricsMonthlyCmd.Flags().String("metric-from", "", "Start date in YYYY-MM-DD format (required)")
-	citiesMetricsMonthlyCmd.Flags().String("metric-to", "", "End date in YYYY-MM-DD format (required)")
-	citiesMetricsMonthlyCmd.Flags().Bool("include-count", false, "Request total result count (capped at 10,000). Returned as total_count in meta on first page")
+	registerMetricsCurrentFlags(citiesMetricsCurrentCmd, true)
+	registerMetricsMonthlyFlags(citiesMetricsMonthlyCmd, true)
 
 	citiesMetricsCmd.AddCommand(citiesMetricsCurrentCmd)
 	citiesMetricsCmd.AddCommand(citiesMetricsMonthlyCmd)
