@@ -81,6 +81,12 @@ Resolve a city to a geo_id, then search:
 
 		cfg, err := config.Resolve(o)
 		if err != nil {
+			// Commands that don't require auth (version, config) proceed
+			// with zero-value config so they never fail on bad config files.
+			if !requiresAuth(cmd) {
+				resolvedConfig = config.Config{BaseURL: config.DefaultBaseURL}
+				return nil
+			}
 			output.PrintErrorTyped(os.Stderr, err.Error(), 1, client.ErrorTypeClient)
 			return &exitError{code: 1}
 		}

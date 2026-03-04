@@ -4,6 +4,11 @@ package e2e
 
 import (
 	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -82,12 +87,15 @@ func TestVersionWithAPIKeyIncludesDataReleaseDate(t *testing.T) {
 }
 
 func TestVersionWithoutAPIKeyHasNullDataReleaseDate(t *testing.T) {
-	// Use isolated config with no auth to ensure no API key from any source.
 	env := withIsolatedConfigNoAuth(t)
 	result := runCLIWithEnv(t, env, "version")
 
 	if result.ExitCode != 0 {
 		t.Fatalf("expected exit code 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Errorf("expected empty stderr for silent degradation, got: %s", result.Stderr)
 	}
 
 	var envelope struct {
@@ -106,7 +114,6 @@ func TestVersionWithoutAPIKeyHasNullDataReleaseDate(t *testing.T) {
 		t.Errorf("expected data_release_date to be null without API key, got %v", releaseDate)
 	}
 
-	// Build info fields must still be present.
 	for _, key := range []string{"version", "commit", "date"} {
 		if _, exists := envelope.Data[key]; !exists {
 			t.Errorf("build info field %q is missing", key)
@@ -115,8 +122,6 @@ func TestVersionWithoutAPIKeyHasNullDataReleaseDate(t *testing.T) {
 }
 
 func TestVersionWithUnreachableAPIHasNullDataReleaseDate(t *testing.T) {
-	// Point to an unreachable base URL with a valid-looking API key and
-	// isolated config to avoid picking up a real config file.
 	tmpDir := t.TempDir()
 	result := runCLIWithEnv(t,
 		[]string{
@@ -128,6 +133,10 @@ func TestVersionWithUnreachableAPIHasNullDataReleaseDate(t *testing.T) {
 
 	if result.ExitCode != 0 {
 		t.Fatalf("expected exit code 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Errorf("expected empty stderr for silent degradation, got: %s", result.Stderr)
 	}
 
 	var envelope struct {
@@ -142,7 +151,95 @@ func TestVersionWithUnreachableAPIHasNullDataReleaseDate(t *testing.T) {
 		t.Errorf("expected data_release_date to be null with unreachable API, got %v", releaseDate)
 	}
 
-	// Build info must still be present.
+	for _, key := range []string{"version", "commit", "date"} {
+		if _, exists := envelope.Data[key]; !exists {
+			t.Errorf("build info field %q is missing", key)
+		}
+	}
+}
+
+func TestVersionWithAPI500HasNullDataReleaseDate(t *testing.T) {
+	// Spin up a test server that returns 500 for /meta/release.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, `{"error":"internal server error"}`)
+	}))
+	defer srv.Close()
+
+	tmpDir := t.TempDir()
+	result := runCLIWithEnv(t,
+		[]string{
+			"SHOVELS_API_KEY=test-key",
+			"XDG_CONFIG_HOME=" + tmpDir,
+		},
+		"version", "--base-url", srv.URL,
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Errorf("expected empty stderr for silent degradation on API 500, got: %s", result.Stderr)
+	}
+
+	var envelope struct {
+		Data map[string]any `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(result.Stdout), &envelope); err != nil {
+		t.Fatalf("stdout is not valid JSON: %v\nstdout: %s", err, result.Stdout)
+	}
+
+	releaseDate := envelope.Data["data_release_date"]
+	if releaseDate != nil {
+		t.Errorf("expected data_release_date to be null on API 500, got %v", releaseDate)
+	}
+
+	for _, key := range []string{"version", "commit", "date"} {
+		if _, exists := envelope.Data[key]; !exists {
+			t.Errorf("build info field %q is missing", key)
+		}
+	}
+}
+
+func TestVersionWithMalformedConfigExitsZero(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, "shovels")
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(configDir, "config.yaml"), []byte("': bad yaml\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	result := runCLIWithEnv(t,
+		[]string{
+			"XDG_CONFIG_HOME=" + tmpDir,
+			"SHOVELS_API_KEY=",
+		},
+		"version",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit code 0 with malformed config, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Errorf("expected empty stderr for silent degradation on malformed config, got: %s", result.Stderr)
+	}
+
+	var envelope struct {
+		Data map[string]any `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(result.Stdout), &envelope); err != nil {
+		t.Fatalf("stdout is not valid JSON: %v\nstdout: %s", err, result.Stdout)
+	}
+
+	releaseDate := envelope.Data["data_release_date"]
+	if releaseDate != nil {
+		t.Errorf("expected data_release_date to be null with malformed config, got %v", releaseDate)
+	}
+
 	for _, key := range []string{"version", "commit", "date"} {
 		if _, exists := envelope.Data[key]; !exists {
 			t.Errorf("build info field %q is missing", key)
@@ -151,7 +248,6 @@ func TestVersionWithUnreachableAPIHasNullDataReleaseDate(t *testing.T) {
 }
 
 func TestVersionOutputHasDataReleaseDateField(t *testing.T) {
-	// Regardless of API key, the field must be present (may be null).
 	result := runCLI(t, "version")
 
 	if result.ExitCode != 0 {
