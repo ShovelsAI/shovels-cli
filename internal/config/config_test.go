@@ -392,3 +392,73 @@ func TestSaveToFileErrorWhenHomeDirUnavailable(t *testing.T) {
 		t.Errorf("expected config dir error, got: %v", err)
 	}
 }
+
+func TestAutoupdateEnabledDefaultsTrue(t *testing.T) {
+	cfg := Config{}
+	if !cfg.AutoupdateEnabled() {
+		t.Error("expected AutoupdateEnabled to default to true when Autoupdate is nil")
+	}
+}
+
+func TestAutoupdateEnabledExplicitTrue(t *testing.T) {
+	v := true
+	cfg := Config{Autoupdate: &v}
+	if !cfg.AutoupdateEnabled() {
+		t.Error("expected AutoupdateEnabled to return true")
+	}
+}
+
+func TestAutoupdateEnabledExplicitFalse(t *testing.T) {
+	v := false
+	cfg := Config{Autoupdate: &v}
+	if cfg.AutoupdateEnabled() {
+		t.Error("expected AutoupdateEnabled to return false")
+	}
+}
+
+func TestResolveAutoupdateFromFile(t *testing.T) {
+	tmpDir := withTempConfigDir(t)
+	t.Setenv("SHOVELS_API_KEY", "")
+
+	dir := filepath.Join(tmpDir, configDirName)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	content := []byte("autoupdate: false\n")
+	if err := os.WriteFile(filepath.Join(dir, configFileName), content, 0o600); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	cfg, err := Resolve(Overrides{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.AutoupdateEnabled() {
+		t.Error("expected autoupdate to be false from config file")
+	}
+}
+
+func TestResolveAutoupdateDefaultsTrue(t *testing.T) {
+	withTempConfigDir(t)
+	t.Setenv("SHOVELS_API_KEY", "")
+
+	cfg, err := Resolve(Overrides{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !cfg.AutoupdateEnabled() {
+		t.Error("expected autoupdate to default to true when not set in config")
+	}
+}
+
+func TestConfigDirExported(t *testing.T) {
+	withTempConfigDir(t)
+
+	dir, err := ConfigDir()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if dir == "" {
+		t.Error("expected non-empty config directory")
+	}
+}

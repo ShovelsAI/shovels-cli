@@ -22,15 +22,30 @@ const (
 
 // Config holds resolved configuration values from all sources.
 type Config struct {
-	APIKey   string `yaml:"api_key"`
-	BaseURL  string `yaml:"base_url,omitempty"`
-	MaxLimit int    `yaml:"default_limit,omitempty"`
+	APIKey     string `yaml:"api_key"`
+	BaseURL    string `yaml:"base_url,omitempty"`
+	MaxLimit   int    `yaml:"default_limit,omitempty"`
+	Autoupdate *bool  `yaml:"autoupdate,omitempty"`
 }
 
-// configDir returns the XDG-compliant config directory path.
+// AutoupdateEnabled returns whether autoupdate is enabled.
+// Defaults to true when the config field is nil (not explicitly set).
+func (c Config) AutoupdateEnabled() bool {
+	if c.Autoupdate == nil {
+		return true
+	}
+	return *c.Autoupdate
+}
+
+// ConfigDir returns the XDG-compliant config directory path.
 // It respects XDG_CONFIG_HOME if set, otherwise defaults to ~/.config.
 // Returns an error if neither XDG_CONFIG_HOME is set nor the home
 // directory can be determined.
+func ConfigDir() (string, error) {
+	return configDir()
+}
+
+// configDir returns the XDG-compliant config directory path.
 func configDir() (string, error) {
 	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
 		return filepath.Join(xdg, configDirName), nil
@@ -145,6 +160,9 @@ func Resolve(o Overrides) (Config, error) {
 	} else {
 		cfg.APIKey = fileCfg.APIKey
 	}
+
+	// Autoupdate: file (nil = default true)
+	cfg.Autoupdate = fileCfg.Autoupdate
 
 	return cfg, nil
 }
