@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"os"
 
@@ -17,13 +18,14 @@ var addressesMetricsCfg = metricsConfig{
 
 var addressesCmd = &cobra.Command{
 	Use:   "addresses",
-	Short: "Search addresses and view permit activity metrics",
-	Long: `Query the Shovels address database to search addresses and retrieve
-permit activity metrics.
+	Short: "Search addresses, view metrics, and look up residents",
+	Long: `Query the Shovels address database to search addresses, retrieve
+permit activity metrics, and look up resident information.
 
 Available subcommands:
-  search    Search addresses by street name, city, state, or zip code
-  metrics   View permit activity metrics for an address (current snapshot or monthly)
+  search     Search addresses by street name, city, state, or zip code
+  metrics    View permit activity metrics for an address (current snapshot or monthly)
+  residents  Look up residents at a specific address (personal information)
 
 Every response is a JSON envelope: {"data": [...], "meta": {...}}`,
 }
@@ -171,6 +173,62 @@ avg_inspection_pass_rate, permit_active_count, permit_in_review_count`,
 	RunE: runMetricsMonthly(addressesMetricsCfg),
 }
 
+var addressesResidentsCmd = &cobra.Command{
+	Use:   "residents GEO_ID",
+	Short: "Look up residents at a specific address",
+	Long: `Retrieve resident records for a specific address. This endpoint returns
+personal information including name, email, phone, LinkedIn URL, net worth,
+income range, and homeowner status. Access is controlled server-side by your
+API plan — requests return 403 if your account lacks resident data access.
+
+Positional argument:
+  GEO_ID   Address geo_id (resolve via addresses search first)
+
+Examples:
+  Look up residents at an address:
+    GEO=$(shovels addresses search -q "123 Main St, Miami, FL" | jq -r '.data[0].geo_id')
+    shovels addresses residents "$GEO"
+
+  Limit to first 10 residents:
+    shovels addresses residents "$GEO" --limit 10
+
+Workflow — resolve address, then look up residents:
+  GEO=$(shovels addresses search -q "456 Oak Ave, Portland, OR" | jq -r '.data[0].geo_id')
+  shovels addresses residents "$GEO"
+
+Response fields: name, personal_emails, phone, linkedin_url, net_worth,
+income_range, is_homeowner, street_no, street, city, state, zip_code,
+zip_code_ext
+
+Response: {"data": [...], "meta": {"count": N, "has_more": bool, "credits_used": N, ...}}`,
+	Args: cobra.ExactArgs(1),
+	Annotations: map[string]string{
+		AnnotationRequiresAuth: "true",
+	},
+	RunE: runAddressesResidents,
+}
+
+func runAddressesResidents(cmd *cobra.Command, args []string) error {
+	lc, err := parseLimitConfig(cmd)
+	if err != nil {
+		return err
+	}
+
+	cl, err := newClientFromFlags(cmd)
+	if err != nil {
+		return err
+	}
+
+	endpoint := fmt.Sprintf("/addresses/%s/residents", args[0])
+	result, err := cl.Paginate(context.Background(), endpoint, nil, lc)
+	if err != nil {
+		return handleAPIError(err)
+	}
+
+	output.PrintPaginated(cmd.OutOrStdout(), result.Items, result.HasMore, result.Credits, nil)
+	return nil
+}
+
 func init() {
 	addressesSearchCmd.Flags().StringP("query", "q", "", "Address search string, e.g. \"123 Main St\" or \"90210\" (required)")
 
@@ -182,5 +240,6 @@ func init() {
 
 	addressesCmd.AddCommand(addressesSearchCmd)
 	addressesCmd.AddCommand(addressesMetricsCmd)
+	addressesCmd.AddCommand(addressesResidentsCmd)
 	rootCmd.AddCommand(addressesCmd)
 }
