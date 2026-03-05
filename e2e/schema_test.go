@@ -10,11 +10,11 @@ import (
 
 // schemaOutput mirrors the JSON structure of schema command output.
 type schemaOutput struct {
-	SchemaVersion  int                    `json:"schema_version"`
-	Command        string                 `json:"command"`
-	ResponseFields map[string]any         `json:"response_fields"`
-	FieldIndex     []string               `json:"field_index"`
-	Filters        map[string]any         `json:"filters"`
+	SchemaVersion  int            `json:"schema_version"`
+	Command        string         `json:"command"`
+	ResponseFields map[string]any `json:"response_fields"`
+	FieldIndex     []string       `json:"field_index"`
+	Filters        map[string]any `json:"filters"`
 }
 
 func parseSchema(t *testing.T, stdout string) schemaOutput {
