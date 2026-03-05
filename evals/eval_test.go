@@ -242,47 +242,52 @@ func TestEval(t *testing.T) {
 				t.Error("agent reported failure")
 			}
 
-			// Verify final_output contains valid JSON. The agent may
-			// wrap the output in markdown or add commentary, so we
-			// extract the first JSON object if direct parse fails.
 			if report.FinalOutput == "" {
 				t.Fatal("agent returned empty final_output")
 			}
 
-			parsed := extractJSONObject(t, report.FinalOutput)
+			// Scenarios with custom validators handle their own
+			// output parsing (schema, dry-run, jq pipelines).
+			if sc.ValidateOutput != nil {
+				sc.ValidateOutput(t, report)
+			} else {
+				// Default validation for standard CLI envelope
+				// responses (data array + meta).
+				parsed := extractJSONObject(t, report.FinalOutput)
 
-			for _, field := range sc.MustHaveFields {
-				parts := strings.Split(field, ".")
-				if !hasNestedField(parsed, parts) {
-					t.Errorf("final_output missing required field %q", field)
+				for _, field := range sc.MustHaveFields {
+					parts := strings.Split(field, ".")
+					if !hasNestedField(parsed, parts) {
+						t.Errorf("final_output missing required field %q", field)
+					}
 				}
-			}
 
-			// Check data array has minimum results.
-			if sc.MinResults > 0 {
-				data, ok := parsed["data"].([]any)
-				if !ok {
-					t.Fatal("final_output has no data array")
+				if sc.MinResults > 0 {
+					data, ok := parsed["data"].([]any)
+					if !ok {
+						t.Fatal("final_output has no data array")
+					}
+					if len(data) < sc.MinResults {
+						t.Errorf("expected >= %d results, got %d", sc.MinResults, len(data))
+					}
 				}
-				if len(data) < sc.MinResults {
-					t.Errorf("expected >= %d results, got %d", sc.MinResults, len(data))
-				}
-			}
 
-			// Check domain correctness: verify the agent queried the
-			// right resource by looking for domain-specific fields.
-			// Permits have "number" (permit number); contractors have "license".
-			if sc.Domain != "" {
-				if data, ok := parsed["data"].([]any); ok && len(data) > 0 {
-					if first, ok := data[0].(map[string]any); ok {
-						switch sc.Domain {
-						case "permits":
-							if _, ok := first["number"]; !ok {
-								t.Error("expected permits result (field 'number'), got something else")
-							}
-						case "contractors":
-							if _, ok := first["license"]; !ok {
-								t.Error("expected contractors result (field 'license'), got something else")
+				// Check domain correctness: verify the agent queried
+				// the right resource by looking for domain-specific
+				// fields. Permits have "number"; contractors have
+				// "license".
+				if sc.Domain != "" {
+					if data, ok := parsed["data"].([]any); ok && len(data) > 0 {
+						if first, ok := data[0].(map[string]any); ok {
+							switch sc.Domain {
+							case "permits":
+								if _, ok := first["number"]; !ok {
+									t.Error("expected permits result (field 'number'), got something else")
+								}
+							case "contractors":
+								if _, ok := first["license"]; !ok {
+									t.Error("expected contractors result (field 'license'), got something else")
+								}
 							}
 						}
 					}
