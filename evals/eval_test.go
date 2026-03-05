@@ -294,11 +294,16 @@ func TestEval(t *testing.T) {
 				}
 			}
 
-			// --- Advisory logging (no hard fail) ---
+			// --- Usability rating gate ---
 
 			if report.UsabilityRating < 4 {
-				t.Logf("WARNING: low usability rating %d/5: %s",
-					report.UsabilityRating, report.UsabilityNotes)
+				if sc.EnforceUsability {
+					t.Errorf("usability rating %d/5 is below required minimum of 4: %s",
+						report.UsabilityRating, report.UsabilityNotes)
+				} else {
+					t.Logf("WARNING: low usability rating %d/5: %s",
+						report.UsabilityRating, report.UsabilityNotes)
+				}
 			}
 		})
 	}
