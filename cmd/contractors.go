@@ -90,6 +90,10 @@ positional arguments.
 Single ID returns the contractor object directly in data.
 Multiple IDs return an array in data, with meta.missing listing unfound IDs.
 
+Note: ID is a positional argument, not a flag.
+  Correct:   shovels contractors get C123
+  Incorrect: shovels contractors get --id C123
+
 Examples:
   Single contractor:
     shovels contractors get C123
@@ -183,6 +187,10 @@ var contractorsPermitsCmd = &cobra.Command{
 contractor ID as a positional argument. Results are paginated; use --limit to
 control how many records are returned.
 
+Note: ID is a positional argument, not a flag.
+  Correct:   shovels contractors permits ABC123
+  Incorrect: shovels contractors permits --id ABC123
+
 Examples:
   List permits for a contractor:
     shovels contractors permits ABC123
@@ -258,6 +266,10 @@ var contractorsEmployeesCmd = &cobra.Command{
 contractor ID as a positional argument. Results are paginated; use --limit to
 control how many records are returned.
 
+Note: ID is a positional argument, not a flag.
+  Correct:   shovels contractors employees ABC123
+  Incorrect: shovels contractors employees --id ABC123
+
 Examples:
   List employees for a contractor:
     shovels contractors employees ABC123
@@ -320,6 +332,10 @@ var contractorsMetricsCmd = &cobra.Command{
 	Short: "Get monthly performance metrics for a specific contractor",
 	Long: `Retrieve monthly performance metrics for a specific contractor. Accepts exactly
 one contractor ID as a positional argument. All four flags are required.
+
+Note: ID is a positional argument, not a flag.
+  Correct:   shovels contractors metrics ABC123 --metric-from ...
+  Incorrect: shovels contractors metrics --id ABC123
 
 Required flags:
   --metric-from YYYY-MM-DD     Metrics start date, inclusive (required)
