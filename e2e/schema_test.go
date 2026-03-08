@@ -353,19 +353,25 @@ func TestSchemaContractorsSearchGlobalScope(t *testing.T) {
 
 	out := parseSchema(t, result.Stdout)
 
-	// permit_count must say "NOT filtered by search parameters".
-	permitCount := fieldDescription(t, out, "permit_count")
-	if !strings.Contains(permitCount, "NOT filtered by search parameters") {
-		t.Errorf("permit_count should say 'NOT filtered by search parameters', got: %s", permitCount)
+	// Every GLOBAL field must say "NOT filtered by search parameters".
+	globalFields := []struct {
+		field      string
+		extraCheck string // additional substring that must appear
+	}{
+		{"permit_count", ""},
+		{"avg_job_value", "in cents"},
+		{"total_job_value", "in cents"},
+		{"avg_construction_duration", ""},
+		{"avg_inspection_pass_rate", ""},
 	}
-
-	// avg_job_value must have BOTH scope label and unit.
-	avgJobValue := fieldDescription(t, out, "avg_job_value")
-	if !strings.Contains(avgJobValue, "NOT filtered") {
-		t.Errorf("avg_job_value should have scope label, got: %s", avgJobValue)
-	}
-	if !strings.Contains(avgJobValue, "in cents") {
-		t.Errorf("avg_job_value should mention 'in cents', got: %s", avgJobValue)
+	for _, tc := range globalFields {
+		desc := fieldDescription(t, out, tc.field)
+		if !strings.Contains(desc, "NOT filtered by search parameters") {
+			t.Errorf("%s should say 'NOT filtered by search parameters', got: %s", tc.field, desc)
+		}
+		if tc.extraCheck != "" && !strings.Contains(desc, tc.extraCheck) {
+			t.Errorf("%s should contain %q, got: %s", tc.field, tc.extraCheck, desc)
+		}
 	}
 }
 
@@ -377,20 +383,20 @@ func TestSchemaContractorsSearchFilteredScope(t *testing.T) {
 
 	out := parseSchema(t, result.Stdout)
 
-	// tag_tally must say FILTERED with geo-id and date range references.
-	tagTally := fieldDescription(t, out, "tag_tally")
-	if !strings.Contains(tagTally, "FILTERED") || !strings.Contains(tagTally, "--geo-id") {
-		t.Errorf("tag_tally should say FILTERED with --geo-id, got: %s", tagTally)
+	// Every FILTERED field must say "FILTERED".
+	filteredFields := []struct {
+		field      string
+		mustContain []string
+	}{
+		{"tag_tally", []string{"FILTERED", "--geo-id"}},
+		{"status_tally", []string{"FILTERED", "active", "final", "unknown", "inactive", "in_review"}},
 	}
-
-	// status_tally must list available keys.
-	statusTally := fieldDescription(t, out, "status_tally")
-	if !strings.Contains(statusTally, "FILTERED") {
-		t.Errorf("status_tally should say FILTERED, got: %s", statusTally)
-	}
-	for _, key := range []string{"active", "final", "unknown", "inactive", "in_review"} {
-		if !strings.Contains(statusTally, key) {
-			t.Errorf("status_tally should list key %q, got: %s", key, statusTally)
+	for _, tc := range filteredFields {
+		desc := fieldDescription(t, out, tc.field)
+		for _, s := range tc.mustContain {
+			if !strings.Contains(desc, s) {
+				t.Errorf("%s should contain %q, got: %s", tc.field, s, desc)
+			}
 		}
 	}
 }
