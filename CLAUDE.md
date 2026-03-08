@@ -74,6 +74,14 @@ SHOVELS_API_KEY=sk-... go test -tags=eval ./evals/... -v -timeout 10m
 - Requires `claude` CLI in PATH; skips gracefully if missing
 - ~5 minutes total, ~$0.50 in API costs
 
+## Setup
+
+```bash
+git config core.hooksPath .githooks
+```
+
+This enables the pre-commit hook that runs gofmt, go vet, and unit tests — matching the CI checks in `.github/workflows/ci.yml`.
+
 ## Build & Release
 
 ```bash
