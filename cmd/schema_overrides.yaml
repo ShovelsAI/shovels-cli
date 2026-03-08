@@ -117,20 +117,24 @@ contractors search:
     website:
       description: "Contractor website URL"
     permit_count:
-      description: "Total number of permits associated with this contractor"
+      description: "GLOBAL (lifetime, NOT filtered by search parameters): Total number of permits ever associated with this contractor"
     avg_job_value:
-      description: "Average job value across all permits, in cents (divide by 100 for dollars)"
+      description: "GLOBAL (lifetime, NOT filtered by search parameters): Average job value across all permits, in cents (divide by 100 for dollars)"
       unit: "cents"
     total_job_value:
-      description: "Sum of job values across all permits, in cents (divide by 100 for dollars)"
+      description: "GLOBAL (lifetime, NOT filtered by search parameters): Sum of job values across all permits, in cents (divide by 100 for dollars)"
       unit: "cents"
     avg_construction_duration:
-      description: "Average days from permit issuance to final inspection"
+      description: "GLOBAL (lifetime, NOT filtered by search parameters): Average days from permit issuance to final inspection"
       unit: "days"
     avg_inspection_pass_rate:
-      description: "Average percentage of inspections passed on first attempt"
+      description: "GLOBAL (lifetime, NOT filtered by search parameters): Average percentage of inspections passed on first attempt"
       range: "0-100"
       unit: "percent"
+    tag_tally:
+      description: "FILTERED (by --geo-id, --permit-from, --permit-to, and --tags): Count of permits per tag within the search area and date range. Sum may exceed permit_count because a single permit can have multiple tags"
+    status_tally:
+      description: "FILTERED (by --geo-id, --permit-from, --permit-to, and --tags): Count of permits per status within the search area and date range. Available keys: active, final, unknown, inactive, in_review"
     rating:
       description: "Contractor rating score"
     review_count:
@@ -161,6 +165,10 @@ contractors get:
       description: "Average percentage of inspections passed on first attempt"
       range: "0-100"
       unit: "percent"
+    tag_tally:
+      description: "Unfiltered lifetime counts: Total permits per tag across all time and locations. Sum may exceed permit_count because a single permit can have multiple tags"
+    status_tally:
+      description: "Unfiltered lifetime counts: Total permits per status across all time and locations. Available keys: active, final, unknown, inactive, in_review"
 
 contractors permits:
   fields:

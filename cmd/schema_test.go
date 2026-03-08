@@ -556,3 +556,179 @@ func TestMalformedYAMLReturnsError(t *testing.T) {
 		t.Error("expected parse error for malformed YAML")
 	}
 }
+
+// TestContractorsSearchGlobalFieldsLabeledNotFiltered verifies that
+// lifetime aggregate fields on contractors search carry the GLOBAL scope
+// label so agents know these are NOT filtered by search parameters.
+func TestContractorsSearchGlobalFieldsLabeledNotFiltered(t *testing.T) {
+	s := LookupSchema("contractors search")
+	if s == nil {
+		t.Fatal("contractors search schema not found")
+	}
+
+	globalFields := []string{
+		"permit_count",
+		"avg_job_value",
+		"total_job_value",
+		"avg_construction_duration",
+		"avg_inspection_pass_rate",
+	}
+	for _, name := range globalFields {
+		f, ok := s.ResponseFields[name]
+		if !ok {
+			t.Errorf("contractors search missing field %q", name)
+			continue
+		}
+		if !strings.Contains(f.Description, "NOT filtered by search parameters") {
+			t.Errorf("contractors search field %q should say 'NOT filtered by search parameters', got: %s", name, f.Description)
+		}
+	}
+}
+
+// TestContractorsSearchFilteredFieldsLabeledFiltered verifies that
+// tag_tally and status_tally on contractors search carry the FILTERED
+// scope label indicating they reflect the search query.
+func TestContractorsSearchFilteredFieldsLabeledFiltered(t *testing.T) {
+	s := LookupSchema("contractors search")
+	if s == nil {
+		t.Fatal("contractors search schema not found")
+	}
+
+	f, ok := s.ResponseFields["tag_tally"]
+	if !ok {
+		t.Fatal("contractors search missing tag_tally field")
+	}
+	if !strings.Contains(f.Description, "FILTERED") || !strings.Contains(f.Description, "--geo-id") {
+		t.Errorf("tag_tally should say FILTERED with --geo-id reference, got: %s", f.Description)
+	}
+
+	f, ok = s.ResponseFields["status_tally"]
+	if !ok {
+		t.Fatal("contractors search missing status_tally field")
+	}
+	if !strings.Contains(f.Description, "FILTERED") {
+		t.Errorf("status_tally should say FILTERED, got: %s", f.Description)
+	}
+}
+
+// TestContractorsGetTalliesLabeledUnfiltered verifies that tag_tally and
+// status_tally on contractors get carry the "Unfiltered lifetime" label
+// (different scope than contractors search).
+func TestContractorsGetTalliesLabeledUnfiltered(t *testing.T) {
+	s := LookupSchema("contractors get")
+	if s == nil {
+		t.Fatal("contractors get schema not found")
+	}
+
+	f, ok := s.ResponseFields["tag_tally"]
+	if !ok {
+		t.Fatal("contractors get missing tag_tally field")
+	}
+	if !strings.Contains(f.Description, "Unfiltered lifetime") {
+		t.Errorf("contractors get tag_tally should say 'Unfiltered lifetime', got: %s", f.Description)
+	}
+
+	f, ok = s.ResponseFields["status_tally"]
+	if !ok {
+		t.Fatal("contractors get missing status_tally field")
+	}
+	if !strings.Contains(f.Description, "Unfiltered lifetime") {
+		t.Errorf("contractors get status_tally should say 'Unfiltered lifetime', got: %s", f.Description)
+	}
+}
+
+// TestContractorsSearchTagTallyDocumentsMultipleTagsPerPermit verifies
+// the tag_tally description explains that its sum can exceed permit_count.
+func TestContractorsSearchTagTallyDocumentsMultipleTagsPerPermit(t *testing.T) {
+	s := LookupSchema("contractors search")
+	if s == nil {
+		t.Fatal("contractors search schema not found")
+	}
+
+	f := s.ResponseFields["tag_tally"]
+	if !strings.Contains(f.Description, "exceed permit_count") {
+		t.Errorf("tag_tally should document that sum can exceed permit_count, got: %s", f.Description)
+	}
+}
+
+// TestContractorsSearchStatusTallyListsKeys verifies the status_tally
+// description lists available status keys.
+func TestContractorsSearchStatusTallyListsKeys(t *testing.T) {
+	s := LookupSchema("contractors search")
+	if s == nil {
+		t.Fatal("contractors search schema not found")
+	}
+
+	f := s.ResponseFields["status_tally"]
+	for _, key := range []string{"active", "final", "unknown", "inactive", "in_review"} {
+		if !strings.Contains(f.Description, key) {
+			t.Errorf("status_tally description should list key %q, got: %s", key, f.Description)
+		}
+	}
+}
+
+// TestContractorsSearchAvgJobValueHasScopeAndUnit verifies avg_job_value
+// has BOTH the scope label and the unit in its description.
+func TestContractorsSearchAvgJobValueHasScopeAndUnit(t *testing.T) {
+	s := LookupSchema("contractors search")
+	if s == nil {
+		t.Fatal("contractors search schema not found")
+	}
+
+	f := s.ResponseFields["avg_job_value"]
+	if !strings.Contains(f.Description, "NOT filtered") {
+		t.Errorf("avg_job_value should have scope label, got: %s", f.Description)
+	}
+	if !strings.Contains(f.Description, "in cents") {
+		t.Errorf("avg_job_value should mention 'in cents', got: %s", f.Description)
+	}
+}
+
+// TestContractorsSearchEveryFieldHasScopeLabel verifies that every
+// contractor search field is unambiguously labeled as either GLOBAL
+// or FILTERED (no unlabeled aggregate fields).
+func TestContractorsSearchEveryFieldHasScopeLabel(t *testing.T) {
+	s := LookupSchema("contractors search")
+	if s == nil {
+		t.Fatal("contractors search schema not found")
+	}
+
+	// Fields that must have scope labels.
+	scopedFields := map[string]string{
+		"permit_count":            "GLOBAL",
+		"avg_job_value":           "GLOBAL",
+		"total_job_value":         "GLOBAL",
+		"avg_construction_duration": "GLOBAL",
+		"avg_inspection_pass_rate":  "GLOBAL",
+		"tag_tally":               "FILTERED",
+		"status_tally":            "FILTERED",
+	}
+
+	for name, expectedLabel := range scopedFields {
+		f, ok := s.ResponseFields[name]
+		if !ok {
+			t.Errorf("contractors search missing field %q", name)
+			continue
+		}
+		if !strings.Contains(f.Description, expectedLabel) {
+			t.Errorf("contractors search field %q should contain %q, got: %s", name, expectedLabel, f.Description)
+		}
+	}
+}
+
+// TestContractorsGetVsSearchScopingDiffers verifies that tag_tally has
+// different scope descriptions between contractors search and get.
+func TestContractorsGetVsSearchScopingDiffers(t *testing.T) {
+	searchSchema := LookupSchema("contractors search")
+	getSchema := LookupSchema("contractors get")
+	if searchSchema == nil || getSchema == nil {
+		t.Fatal("contractors search or get schema not found")
+	}
+
+	searchDesc := searchSchema.ResponseFields["tag_tally"].Description
+	getDesc := getSchema.ResponseFields["tag_tally"].Description
+
+	if searchDesc == getDesc {
+		t.Errorf("tag_tally descriptions should differ between search and get, both say: %s", searchDesc)
+	}
+}

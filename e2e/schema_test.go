@@ -340,3 +340,122 @@ func TestSchemaContractorsMetricsViaFlag(t *testing.T) {
 		t.Errorf("expected schema for contractors metrics, got %q", out.Command)
 	}
 }
+
+// =======================================================================
+// Contractor scope labels
+// =======================================================================
+
+func TestSchemaContractorsSearchGlobalScope(t *testing.T) {
+	result := runCLI(t, "schema", "contractors", "search")
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	out := parseSchema(t, result.Stdout)
+
+	// permit_count must say "NOT filtered by search parameters".
+	permitCount := fieldDescription(t, out, "permit_count")
+	if !strings.Contains(permitCount, "NOT filtered by search parameters") {
+		t.Errorf("permit_count should say 'NOT filtered by search parameters', got: %s", permitCount)
+	}
+
+	// avg_job_value must have BOTH scope label and unit.
+	avgJobValue := fieldDescription(t, out, "avg_job_value")
+	if !strings.Contains(avgJobValue, "NOT filtered") {
+		t.Errorf("avg_job_value should have scope label, got: %s", avgJobValue)
+	}
+	if !strings.Contains(avgJobValue, "in cents") {
+		t.Errorf("avg_job_value should mention 'in cents', got: %s", avgJobValue)
+	}
+}
+
+func TestSchemaContractorsSearchFilteredScope(t *testing.T) {
+	result := runCLI(t, "schema", "contractors", "search")
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	out := parseSchema(t, result.Stdout)
+
+	// tag_tally must say FILTERED with geo-id and date range references.
+	tagTally := fieldDescription(t, out, "tag_tally")
+	if !strings.Contains(tagTally, "FILTERED") || !strings.Contains(tagTally, "--geo-id") {
+		t.Errorf("tag_tally should say FILTERED with --geo-id, got: %s", tagTally)
+	}
+
+	// status_tally must list available keys.
+	statusTally := fieldDescription(t, out, "status_tally")
+	if !strings.Contains(statusTally, "FILTERED") {
+		t.Errorf("status_tally should say FILTERED, got: %s", statusTally)
+	}
+	for _, key := range []string{"active", "final", "unknown", "inactive", "in_review"} {
+		if !strings.Contains(statusTally, key) {
+			t.Errorf("status_tally should list key %q, got: %s", key, statusTally)
+		}
+	}
+}
+
+func TestSchemaContractorsGetUnfilteredScope(t *testing.T) {
+	result := runCLI(t, "schema", "contractors", "get")
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	out := parseSchema(t, result.Stdout)
+
+	// tag_tally on get must say "Unfiltered lifetime".
+	tagTally := fieldDescription(t, out, "tag_tally")
+	if !strings.Contains(tagTally, "Unfiltered lifetime") {
+		t.Errorf("contractors get tag_tally should say 'Unfiltered lifetime', got: %s", tagTally)
+	}
+}
+
+func TestSchemaContractorsSearchTagTallyExceedsPermitCount(t *testing.T) {
+	result := runCLI(t, "schema", "contractors", "search")
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	out := parseSchema(t, result.Stdout)
+	tagTally := fieldDescription(t, out, "tag_tally")
+	if !strings.Contains(tagTally, "exceed permit_count") {
+		t.Errorf("tag_tally should explain sum can exceed permit_count, got: %s", tagTally)
+	}
+}
+
+func TestSchemaContractorsGetVsSearchScopeDiffers(t *testing.T) {
+	searchResult := runCLI(t, "schema", "contractors", "search")
+	getResult := runCLI(t, "schema", "contractors", "get")
+
+	if searchResult.ExitCode != 0 || getResult.ExitCode != 0 {
+		t.Fatal("schema commands failed")
+	}
+
+	searchOut := parseSchema(t, searchResult.Stdout)
+	getOut := parseSchema(t, getResult.Stdout)
+
+	searchTagTally := fieldDescription(t, searchOut, "tag_tally")
+	getTagTally := fieldDescription(t, getOut, "tag_tally")
+
+	if searchTagTally == getTagTally {
+		t.Errorf("tag_tally descriptions should differ between search and get, both say: %s", searchTagTally)
+	}
+}
+
+// fieldDescription extracts the description string from a response field.
+func fieldDescription(t *testing.T, out schemaOutput, field string) string {
+	t.Helper()
+	raw, ok := out.ResponseFields[field]
+	if !ok {
+		t.Fatalf("response_fields missing %q", field)
+	}
+	m, ok := raw.(map[string]any)
+	if !ok {
+		t.Fatalf("field %q is not an object", field)
+	}
+	desc, ok := m["description"].(string)
+	if !ok {
+		t.Fatalf("field %q has no description string", field)
+	}
+	return desc
+}
