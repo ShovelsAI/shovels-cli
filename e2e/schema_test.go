@@ -385,7 +385,7 @@ func TestSchemaContractorsSearchFilteredScope(t *testing.T) {
 
 	// Every FILTERED field must say "FILTERED".
 	filteredFields := []struct {
-		field      string
+		field       string
 		mustContain []string
 	}{
 		{"tag_tally", []string{"FILTERED", "--geo-id"}},

@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Pre-commit hook: mirrors CI checks from .github/workflows/ci.yml
+# Install: git config core.hooksPath .githooks
+set -euo pipefail
+
+echo "==> Checking gofmt..."
+unformatted=$(gofmt -l . 2>&1 || true)
+if [ -n "$unformatted" ]; then
+  echo "Files not formatted (run 'gofmt -w .'):"
+  echo "$unformatted"
+  exit 1
+fi
+
+echo "==> Running go vet..."
+go vet ./...
+
+echo "==> Running unit tests..."
+go test ./...
+
+echo "==> All checks passed."
