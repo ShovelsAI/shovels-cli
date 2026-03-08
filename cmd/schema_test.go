@@ -695,13 +695,13 @@ func TestContractorsSearchEveryFieldHasScopeLabel(t *testing.T) {
 
 	// Fields that must have scope labels.
 	scopedFields := map[string]string{
-		"permit_count":            "GLOBAL",
-		"avg_job_value":           "GLOBAL",
-		"total_job_value":         "GLOBAL",
+		"permit_count":              "GLOBAL",
+		"avg_job_value":             "GLOBAL",
+		"total_job_value":           "GLOBAL",
 		"avg_construction_duration": "GLOBAL",
 		"avg_inspection_pass_rate":  "GLOBAL",
-		"tag_tally":               "FILTERED",
-		"status_tally":            "FILTERED",
+		"tag_tally":                 "FILTERED",
+		"status_tally":              "FILTERED",
 	}
 
 	for name, expectedLabel := range scopedFields {
