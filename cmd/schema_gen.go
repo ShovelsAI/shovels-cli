@@ -371,12 +371,12 @@ func addSearchFilters(filters map[string]schemaField) {
 	filters["--min-approval-duration"] = schemaField{Type: "integer", Description: "Minimum approval duration in days"}
 	filters["--min-construction-duration"] = schemaField{Type: "integer", Description: "Minimum construction duration in days"}
 	filters["--min-inspection-pr"] = schemaField{Type: "integer", Description: "Minimum inspection pass rate, 0-100"}
-	filters["--min-job-value"] = schemaField{Type: "integer", Description: "Minimum job value in dollars"}
-	filters["--min-fees"] = schemaField{Type: "integer", Description: "Minimum permit fees in dollars"}
+	filters["--min-job-value"] = schemaField{Type: "integer", Description: "Minimum job value in cents (5000000 = $50,000)", Unit: "cents"}
+	filters["--min-fees"] = schemaField{Type: "integer", Description: "Minimum permit fees in cents (100000 = $1,000)", Unit: "cents"}
 
 	// Property filters
 	filters["--property-type"] = schemaField{Type: "string", Description: "Property type: residential, commercial, industrial"}
-	filters["--property-min-market-value"] = schemaField{Type: "integer", Description: "Minimum assessed market value in dollars"}
+	filters["--property-min-market-value"] = schemaField{Type: "integer", Description: "Minimum assessed market value in cents (50000000 = $500,000)", Unit: "cents"}
 	filters["--property-min-building-area"] = schemaField{Type: "integer", Description: "Minimum building area in square feet"}
 	filters["--property-min-lot-size"] = schemaField{Type: "integer", Description: "Minimum lot size in square feet"}
 	filters["--property-min-story-count"] = schemaField{Type: "integer", Description: "Minimum number of stories"}
@@ -386,7 +386,7 @@ func addSearchFilters(filters map[string]schemaField) {
 	filters["--contractor-classification"] = schemaField{Type: "string[]", Description: "Contractor classification, AND logic, prefix with - to exclude"}
 	filters["--contractor-name"] = schemaField{Type: "string", Description: "Filter by contractor name or partial name"}
 	filters["--contractor-website"] = schemaField{Type: "string", Description: "Filter by contractor website domain"}
-	filters["--contractor-min-total-job-value"] = schemaField{Type: "integer", Description: "Minimum lifetime contractor job value in dollars"}
+	filters["--contractor-min-total-job-value"] = schemaField{Type: "integer", Description: "Minimum lifetime contractor job value in cents (10000000 = $100,000)", Unit: "cents"}
 	filters["--contractor-min-total-permits-count"] = schemaField{Type: "integer", Description: "Minimum lifetime permits count"}
 	filters["--contractor-min-inspection-pr"] = schemaField{Type: "integer", Description: "Minimum lifetime inspection pass rate, 0-100"}
 	filters["--contractor-license"] = schemaField{Type: "string", Description: "Filter by contractor license number"}
@@ -405,7 +405,7 @@ func buildFilters(def commandDef) map[string]schemaField {
 		filters["--has-contractor"] = schemaField{Type: "boolean", Description: "Include only permits linked to a known contractor"}
 	case "contractors_search":
 		addSearchFilters(filters)
-		filters["--no-tallies"] = schemaField{Type: "boolean", Description: "Omit tag and status tallies for faster response"}
+		filters["--no-tallies"] = schemaField{Type: "boolean", Description: "Omit tag_tally and status_tally arrays for faster response. Warning: tallies are the only contractor search fields filtered by your date/geo/tag query — all other permit counts (permit_count, etc.) are lifetime global totals"}
 	case "get":
 		filters["ID"] = schemaField{Type: "string", Description: "One or more IDs as positional arguments (max 50)"}
 	case "geo_search":
@@ -508,6 +508,9 @@ func writeSchemaData(path string, schemas map[string]commandSchemaData) error {
 			fmt.Fprintf(f, "\t\t\t\t%q: {Type: %q", fn, filter.Type)
 			if filter.Description != "" {
 				fmt.Fprintf(f, ", Description: %q", filter.Description)
+			}
+			if filter.Unit != "" {
+				fmt.Fprintf(f, ", Unit: %q", filter.Unit)
 			}
 			fmt.Fprintf(f, "},\n")
 		}

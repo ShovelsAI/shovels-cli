@@ -59,8 +59,8 @@ Examples:
   Exclude a tag with dash prefix:
     shovels permits search --geo-id 78701 --permit-from 2024-01-01 --permit-to 2024-12-31 --tags solar --tags=-roofing
 
-  Filter by property type and minimum job value:
-    shovels permits search --geo-id CA --permit-from 2024-01-01 --permit-to 2024-12-31 --property-type residential --min-job-value 50000`,
+  Filter by property type and minimum job value (values in cents, 5000000 = $50,000):
+    shovels permits search --geo-id CA --permit-from 2024-01-01 --permit-to 2024-12-31 --property-type residential --min-job-value 5000000`,
 	Annotations: map[string]string{
 		AnnotationRequiresAuth: "true",
 	},
