@@ -163,7 +163,46 @@ func TestContractorsSearchHelpScopingSectionIsConcise(t *testing.T) {
 		}
 	}
 
-	if sectionLines > 6 {
-		t.Errorf("scoping section should be concise (3-6 lines), got %d lines", sectionLines)
+	if sectionLines < 3 || sectionLines > 5 {
+		t.Errorf("scoping section should be concise (3-5 lines), got %d lines", sectionLines)
+	}
+}
+
+// TestContractorsSearchHelpNoTalliesWarningIsConcise verifies that the
+// --no-tallies flag description is concise (1-2 lines per spec boundary).
+func TestContractorsSearchHelpNoTalliesWarningIsConcise(t *testing.T) {
+	result := runCLI(t, "contractors", "search", "--help")
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	lines := strings.Split(result.Stdout, "\n")
+	flagLineIdx := -1
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "--no-tallies") {
+			flagLineIdx = i
+			break
+		}
+	}
+	if flagLineIdx == -1 {
+		t.Fatal("could not find --no-tallies flag line in help output")
+	}
+
+	// Count continuation lines: cobra wraps long descriptions as indented
+	// lines immediately following the flag line.
+	descLines := 1
+	for i := flagLineIdx + 1; i < len(lines); i++ {
+		trimmed := strings.TrimSpace(lines[i])
+		// A continuation line is non-empty and does not start with "--" (next flag).
+		if trimmed == "" || strings.HasPrefix(trimmed, "--") || strings.HasPrefix(trimmed, "-") {
+			break
+		}
+		descLines++
+	}
+
+	if descLines > 2 {
+		t.Errorf("--no-tallies warning should be concise (1-2 lines), got %d lines", descLines)
 	}
 }
