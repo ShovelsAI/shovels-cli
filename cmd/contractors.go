@@ -65,7 +65,9 @@ Response field scoping:
   Most response fields (permit_count, avg_job_value, total_job_value) are GLOBAL
   lifetime stats — they are NOT filtered by your search parameters.
   Only tag_tally and status_tally reflect your --geo-id and date filters.
-  To count permits matching your search, sum the values in tag_tally or status_tally.`,
+  To count permits matching your search, sum the values in tag_tally or status_tally.
+
+Tip: run with --schema to see all response field names, types, and units before querying.`,
 	Annotations: map[string]string{
 		AnnotationRequiresAuth: "true",
 	},
@@ -102,7 +104,9 @@ Examples:
     shovels contractors get C123 C456 C789
 
 Single ID response: {"data": {<contractor>}, "meta": {"credits_used": N, ...}}
-Batch response:     {"data": [{...}, ...], "meta": {"count": N, "missing": [...], ...}}`,
+Batch response:     {"data": [{...}, ...], "meta": {"count": N, "missing": [...], ...}}
+
+Tip: run with --schema to see all response field names, types, and units before querying.`,
 	Annotations: map[string]string{
 		AnnotationRequiresAuth: "true",
 	},

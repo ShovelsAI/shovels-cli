@@ -72,6 +72,9 @@ Available resources:
   config          Read and write persistent settings (API key, base URL)
   version         Print CLI version, git commit, build date, and API data freshness
 
+Inspect response fields before querying:
+  Add --schema to any search or get command to see field names, types, and units without making an API call.
+
 Authentication (checked in this order):
   1. SHOVELS_API_KEY environment variable
   2. ~/.config/shovels/config.yaml
