@@ -60,7 +60,9 @@ Examples:
     shovels permits search --geo-id 78701 --permit-from 2024-01-01 --permit-to 2024-12-31 --tags solar --tags=-roofing
 
   Filter by property type and minimum job value (values in cents, 5000000 = $50,000):
-    shovels permits search --geo-id CA --permit-from 2024-01-01 --permit-to 2024-12-31 --property-type residential --min-job-value 5000000`,
+    shovels permits search --geo-id CA --permit-from 2024-01-01 --permit-to 2024-12-31 --property-type residential --min-job-value 5000000
+
+Tip: run with --schema to see all response field names, types, and units before querying.`,
 	Annotations: map[string]string{
 		AnnotationRequiresAuth: "true",
 	},
