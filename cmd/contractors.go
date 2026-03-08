@@ -59,7 +59,13 @@ Examples:
     shovels contractors search --geo-id 92024 --permit-from 2024-01-01 --permit-to 2024-12-31 --contractor-classification general_building
 
   Skip tallies for faster response:
-    shovels contractors search --geo-id CA --permit-from 2024-01-01 --permit-to 2024-12-31 --no-tallies`,
+    shovels contractors search --geo-id CA --permit-from 2024-01-01 --permit-to 2024-12-31 --no-tallies
+
+Response field scoping:
+  Most response fields (permit_count, avg_job_value, total_job_value) are GLOBAL
+  lifetime stats — they are NOT filtered by your search parameters.
+  Only tag_tally and status_tally reflect your --geo-id and date filters.
+  To count permits matching your search, sum the values in tag_tally or status_tally.`,
 	Annotations: map[string]string{
 		AnnotationRequiresAuth: "true",
 	},
@@ -427,7 +433,7 @@ func init() {
 	registerSchemaFlag(contractorsMetricsCmd)
 
 	// Contractors-specific flag
-	contractorsSearchCmd.Flags().Bool("no-tallies", false, "Omit tag and status tallies for faster response (sends include_tallies=false)")
+	contractorsSearchCmd.Flags().Bool("no-tallies", false, "Omit tag_tally and status_tally for faster response. Warning: tallies are the only search-filtered permit counts — without them, all remaining fields are unfiltered lifetime stats")
 
 	groups := searchFlagGroups()
 	// Append no-tallies to the existing Response Options group.
