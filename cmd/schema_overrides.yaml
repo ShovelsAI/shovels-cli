@@ -28,10 +28,10 @@ permits search:
     end_date:
       description: "Latest date associated with the permit"
     job_value:
-      description: "Total project value declared on the permit"
+      description: "Total project value declared on the permit, in cents (divide by 100 for dollars)"
       unit: "cents"
     fees:
-      description: "Permit fees charged by the jurisdiction"
+      description: "Permit fees charged by the jurisdiction, in cents (divide by 100 for dollars)"
       unit: "cents"
     approval_duration:
       description: "Days from filing to permit issuance"
@@ -67,10 +67,10 @@ permits get:
       description: "Current permit status"
       enum: "active, final, in_review, inactive"
     job_value:
-      description: "Total project value declared on the permit"
+      description: "Total project value declared on the permit, in cents (divide by 100 for dollars)"
       unit: "cents"
     fees:
-      description: "Permit fees charged by the jurisdiction"
+      description: "Permit fees charged by the jurisdiction, in cents (divide by 100 for dollars)"
       unit: "cents"
     approval_duration:
       description: "Days from filing to permit issuance"
@@ -119,10 +119,10 @@ contractors search:
     permit_count:
       description: "Total number of permits associated with this contractor"
     avg_job_value:
-      description: "Average job value across all permits"
+      description: "Average job value across all permits, in cents (divide by 100 for dollars)"
       unit: "cents"
     total_job_value:
-      description: "Sum of job values across all permits"
+      description: "Sum of job values across all permits, in cents (divide by 100 for dollars)"
       unit: "cents"
     avg_construction_duration:
       description: "Average days from permit issuance to final inspection"
@@ -149,10 +149,10 @@ contractors get:
     permit_count:
       description: "Total number of permits associated with this contractor"
     avg_job_value:
-      description: "Average job value across all permits"
+      description: "Average job value across all permits, in cents (divide by 100 for dollars)"
       unit: "cents"
     total_job_value:
-      description: "Sum of job values across all permits"
+      description: "Sum of job values across all permits, in cents (divide by 100 for dollars)"
       unit: "cents"
     avg_construction_duration:
       description: "Average days from permit issuance to final inspection"
@@ -167,10 +167,10 @@ contractors permits:
     id:
       description: "Unique permit identifier assigned by Shovels"
     job_value:
-      description: "Total project value declared on the permit"
+      description: "Total project value declared on the permit, in cents (divide by 100 for dollars)"
       unit: "cents"
     fees:
-      description: "Permit fees charged by the jurisdiction"
+      description: "Permit fees charged by the jurisdiction, in cents (divide by 100 for dollars)"
       unit: "cents"
     approval_duration:
       description: "Days from filing to permit issuance"
@@ -213,10 +213,10 @@ contractors metrics:
     permit_count:
       description: "Number of permits in this period"
     avg_job_value:
-      description: "Average job value for permits in this period"
+      description: "Average job value for permits in this period, in cents (divide by 100 for dollars)"
       unit: "cents"
     total_job_value:
-      description: "Sum of job values for permits in this period"
+      description: "Sum of job values for permits in this period, in cents (divide by 100 for dollars)"
       unit: "cents"
     avg_construction_duration:
       description: "Average days from issuance to final inspection"
@@ -254,7 +254,7 @@ cities metrics current:
       description: "Average days from filing to permit issuance"
       unit: "days"
     total_job_value:
-      description: "Sum of job values across matching permits"
+      description: "Sum of job values across matching permits, in cents (divide by 100 for dollars)"
       unit: "cents"
     avg_inspection_pass_rate:
       description: "Average percentage of inspections passed on first attempt"
@@ -286,7 +286,7 @@ cities metrics monthly:
       description: "Average days from filing to permit issuance"
       unit: "days"
     total_job_value:
-      description: "Sum of job values across matching permits in this month"
+      description: "Sum of job values across matching permits in this month, in cents (divide by 100 for dollars)"
       unit: "cents"
     avg_inspection_pass_rate:
       description: "Average percentage of inspections passed on first attempt"
@@ -325,7 +325,7 @@ counties metrics current:
       description: "Average days from filing to permit issuance"
       unit: "days"
     total_job_value:
-      description: "Sum of job values across matching permits"
+      description: "Sum of job values across matching permits, in cents (divide by 100 for dollars)"
       unit: "cents"
     avg_inspection_pass_rate:
       description: "Average percentage of inspections passed on first attempt"
@@ -357,7 +357,7 @@ counties metrics monthly:
       description: "Average days from filing to permit issuance"
       unit: "days"
     total_job_value:
-      description: "Sum of job values across matching permits in this month"
+      description: "Sum of job values across matching permits in this month, in cents (divide by 100 for dollars)"
       unit: "cents"
     avg_inspection_pass_rate:
       description: "Average percentage of inspections passed on first attempt"
@@ -396,7 +396,7 @@ jurisdictions metrics current:
       description: "Average days from filing to permit issuance"
       unit: "days"
     total_job_value:
-      description: "Sum of job values across matching permits"
+      description: "Sum of job values across matching permits, in cents (divide by 100 for dollars)"
       unit: "cents"
     avg_inspection_pass_rate:
       description: "Average percentage of inspections passed on first attempt"
@@ -428,7 +428,7 @@ jurisdictions metrics monthly:
       description: "Average days from filing to permit issuance"
       unit: "days"
     total_job_value:
-      description: "Sum of job values across matching permits in this month"
+      description: "Sum of job values across matching permits in this month, in cents (divide by 100 for dollars)"
       unit: "cents"
     avg_inspection_pass_rate:
       description: "Average percentage of inspections passed on first attempt"
@@ -481,7 +481,7 @@ addresses metrics current:
       description: "Average days from filing to permit issuance"
       unit: "days"
     total_job_value:
-      description: "Sum of job values across matching permits"
+      description: "Sum of job values across matching permits, in cents (divide by 100 for dollars)"
       unit: "cents"
     avg_inspection_pass_rate:
       description: "Average percentage of inspections passed on first attempt"
@@ -511,7 +511,7 @@ addresses metrics monthly:
       description: "Average days from filing to permit issuance"
       unit: "days"
     total_job_value:
-      description: "Sum of job values across matching permits in this month"
+      description: "Sum of job values across matching permits in this month, in cents (divide by 100 for dollars)"
       unit: "cents"
     avg_inspection_pass_rate:
       description: "Average percentage of inspections passed on first attempt"
