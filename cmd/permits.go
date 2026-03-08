@@ -79,6 +79,10 @@ var permitsGetCmd = &cobra.Command{
 	Long: `Fetch specific building permits by ID. Accepts 1 to 50 permit IDs as
 positional arguments.
 
+Note: ID is a positional argument, not a flag.
+  Correct:   shovels permits get P123
+  Incorrect: shovels permits get --id P123
+
 Examples:
   Single permit:
     shovels permits get P123
