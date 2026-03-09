@@ -7,6 +7,24 @@ import (
 	"testing"
 )
 
+// allPropertyTypes lists the 9 API-accepted property type values.
+var allPropertyTypes = []string{
+	"residential", "commercial", "industrial",
+	"agricultural", "vacant land", "exempt",
+	"miscellaneous", "office", "recreational",
+}
+
+// assertAllPropertyTypes checks that stdout from a help command contains
+// every one of the 9 valid property type values.
+func assertAllPropertyTypes(t *testing.T, stdout, cmdName string) {
+	t.Helper()
+	for _, pt := range allPropertyTypes {
+		if !strings.Contains(stdout, pt) {
+			t.Errorf("%s --help should list property type %q", cmdName, pt)
+		}
+	}
+}
+
 // TestRootHelpShowsDescriptionCommandsAndGlobalFlags verifies that
 // `shovels --help` displays a one-line description, lists all resource
 // commands, and shows global flags with their default values.
@@ -145,6 +163,9 @@ func TestPermitsSearchHelpShowsGroupedFlagsAndExamples(t *testing.T) {
 			t.Errorf("permits search --help should contain optional flag %q", flag)
 		}
 	}
+
+	// All 9 property types must be listed in help text.
+	assertAllPropertyTypes(t, out, "permits search")
 
 	// Type hints should be present for typed flags.
 	typeHints := []string{"string", "int", "strings"}
@@ -349,6 +370,9 @@ func TestContractorsSearchHelpShowsGroupedFlags(t *testing.T) {
 	if !strings.Contains(out, "--no-tallies") {
 		t.Error("contractors search --help should contain --no-tallies flag")
 	}
+
+	// All 9 property types must be listed in help text.
+	assertAllPropertyTypes(t, out, "contractors search")
 }
 
 // TestContractorsMetricsHelpShowsRequiredFlags verifies that
@@ -373,6 +397,51 @@ func TestContractorsMetricsHelpShowsRequiredFlags(t *testing.T) {
 	reqCount := strings.Count(out, "(required)")
 	if reqCount < 4 {
 		t.Errorf("contractors metrics --help should mark at least 4 flags as required, found %d", reqCount)
+	}
+
+	// All 9 property types must be listed in help text.
+	assertAllPropertyTypes(t, out, "contractors metrics")
+}
+
+// TestCitiesMetricsHelpListsAllPropertyTypes verifies that
+// cities metrics current and monthly help text lists all 9 property types.
+func TestCitiesMetricsHelpListsAllPropertyTypes(t *testing.T) {
+	for _, sub := range []string{"current", "monthly"} {
+		t.Run(sub, func(t *testing.T) {
+			result := runCLI(t, "cities", "metrics", sub, "--help")
+			if result.ExitCode != 0 {
+				t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+			}
+			assertAllPropertyTypes(t, result.Stdout, "cities metrics "+sub)
+		})
+	}
+}
+
+// TestCountiesMetricsHelpListsAllPropertyTypes verifies that
+// counties metrics current and monthly help text lists all 9 property types.
+func TestCountiesMetricsHelpListsAllPropertyTypes(t *testing.T) {
+	for _, sub := range []string{"current", "monthly"} {
+		t.Run(sub, func(t *testing.T) {
+			result := runCLI(t, "counties", "metrics", sub, "--help")
+			if result.ExitCode != 0 {
+				t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+			}
+			assertAllPropertyTypes(t, result.Stdout, "counties metrics "+sub)
+		})
+	}
+}
+
+// TestJurisdictionsMetricsHelpListsAllPropertyTypes verifies that
+// jurisdictions metrics current and monthly help text lists all 9 property types.
+func TestJurisdictionsMetricsHelpListsAllPropertyTypes(t *testing.T) {
+	for _, sub := range []string{"current", "monthly"} {
+		t.Run(sub, func(t *testing.T) {
+			result := runCLI(t, "jurisdictions", "metrics", sub, "--help")
+			if result.ExitCode != 0 {
+				t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+			}
+			assertAllPropertyTypes(t, result.Stdout, "jurisdictions metrics "+sub)
+		})
 	}
 }
 

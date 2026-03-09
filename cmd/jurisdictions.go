@@ -127,7 +127,7 @@ total job value, inspection pass rate, and active/in-review permit counts.
 
 Required flags:
   --tag TEXT            Permit tag: solar, roofing, electrical, plumbing, etc. (required)
-  --property-type TEXT  Property type: residential, commercial, industrial (required)
+  --property-type TEXT  Property type: residential, commercial, industrial, agricultural, vacant land, exempt, miscellaneous, office, recreational (required)
 
 Optional flags:
   --include-count       Request total result count in meta.total_count
@@ -164,7 +164,7 @@ inspection pass rate, and active/in-review permit counts.
 
 Required flags:
   --tag TEXT            Permit tag: solar, roofing, electrical, plumbing, etc. (required)
-  --property-type TEXT  Property type: residential, commercial, industrial (required)
+  --property-type TEXT  Property type: residential, commercial, industrial, agricultural, vacant land, exempt, miscellaneous, office, recreational (required)
   --metric-from DATE   Start date in YYYY-MM-DD format (required)
   --metric-to DATE     End date in YYYY-MM-DD format (required)
 

@@ -180,7 +180,7 @@ func runMetricsMonthly(cfg metricsConfig) func(*cobra.Command, []string) error {
 func registerMetricsCurrentFlags(cmd *cobra.Command, withPropertyType bool) {
 	cmd.Flags().String("tag", "", "Permit tag: solar, roofing, electrical, plumbing, etc. (required)")
 	if withPropertyType {
-		cmd.Flags().String("property-type", "", "Property type: residential, commercial, industrial (required)")
+		cmd.Flags().String("property-type", "", "Property type: residential, commercial, industrial, agricultural, vacant land, exempt, miscellaneous, office, recreational (required)")
 	}
 	cmd.Flags().Bool("include-count", false, "Request total result count (capped at 10,000). Returned as total_count in meta on first page")
 	rejectDateFlagsOnCurrent(cmd)
@@ -192,7 +192,7 @@ func registerMetricsCurrentFlags(cmd *cobra.Command, withPropertyType bool) {
 func registerMetricsMonthlyFlags(cmd *cobra.Command, withPropertyType bool) {
 	cmd.Flags().String("tag", "", "Permit tag: solar, roofing, electrical, plumbing, etc. (required)")
 	if withPropertyType {
-		cmd.Flags().String("property-type", "", "Property type: residential, commercial, industrial (required)")
+		cmd.Flags().String("property-type", "", "Property type: residential, commercial, industrial, agricultural, vacant land, exempt, miscellaneous, office, recreational (required)")
 	}
 	cmd.Flags().String("metric-from", "", "Start date in YYYY-MM-DD format (required)")
 	cmd.Flags().String("metric-to", "", "End date in YYYY-MM-DD format (required)")

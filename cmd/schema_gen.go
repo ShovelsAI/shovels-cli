@@ -377,7 +377,7 @@ func addSearchFilters(filters map[string]schemaField) {
 	filters["--min-fees"] = schemaField{Type: "integer", Description: "Minimum permit fees in cents (100000 = $1,000)", Unit: "cents"}
 
 	// Property filters
-	filters["--property-type"] = schemaField{Type: "string", Description: "Property type: residential, commercial, industrial"}
+	filters["--property-type"] = schemaField{Type: "string", Description: "Property type: residential, commercial, industrial, agricultural, vacant land, exempt, miscellaneous, office, recreational"}
 	filters["--property-min-market-value"] = schemaField{Type: "integer", Description: "Minimum assessed market value in cents (50000000 = $500,000)", Unit: "cents"}
 	filters["--property-min-building-area"] = schemaField{Type: "integer", Description: "Minimum building area in square feet"}
 	filters["--property-min-lot-size"] = schemaField{Type: "integer", Description: "Minimum lot size in square feet"}
@@ -415,12 +415,12 @@ func buildFilters(def commandDef) map[string]schemaField {
 	case "metrics_prop":
 		filters["GEO_ID"] = schemaField{Type: "string", Description: "Geographic ID as positional argument"}
 		filters["--tag"] = schemaField{Type: "string", Description: "Permit tag: solar, roofing, electrical, etc."}
-		filters["--property-type"] = schemaField{Type: "string", Description: "Property type: residential, commercial, industrial"}
+		filters["--property-type"] = schemaField{Type: "string", Description: "Property type: residential, commercial, industrial, agricultural, vacant land, exempt, miscellaneous, office, recreational"}
 		filters["--include-count"] = schemaField{Type: "boolean", Description: "Request total result count in meta.total_count"}
 	case "metrics_prop_monthly":
 		filters["GEO_ID"] = schemaField{Type: "string", Description: "Geographic ID as positional argument"}
 		filters["--tag"] = schemaField{Type: "string", Description: "Permit tag: solar, roofing, electrical, etc."}
-		filters["--property-type"] = schemaField{Type: "string", Description: "Property type: residential, commercial, industrial"}
+		filters["--property-type"] = schemaField{Type: "string", Description: "Property type: residential, commercial, industrial, agricultural, vacant land, exempt, miscellaneous, office, recreational"}
 		filters["--metric-from"] = schemaField{Type: "date", Description: "Start date in YYYY-MM-DD format"}
 		filters["--metric-to"] = schemaField{Type: "date", Description: "End date in YYYY-MM-DD format"}
 		filters["--include-count"] = schemaField{Type: "boolean", Description: "Request total result count in meta.total_count"}
@@ -437,7 +437,7 @@ func buildFilters(def commandDef) map[string]schemaField {
 	case "contractor_metrics":
 		filters["ID"] = schemaField{Type: "string", Description: "Contractor ID as positional argument"}
 		filters["--tag"] = schemaField{Type: "string", Description: "Permit tag: solar, roofing, electrical, etc."}
-		filters["--property-type"] = schemaField{Type: "string", Description: "Property type: residential, commercial, industrial"}
+		filters["--property-type"] = schemaField{Type: "string", Description: "Property type: residential, commercial, industrial, agricultural, vacant land, exempt, miscellaneous, office, recreational"}
 		filters["--metric-from"] = schemaField{Type: "date", Description: "Start date in YYYY-MM-DD format"}
 		filters["--metric-to"] = schemaField{Type: "date", Description: "End date in YYYY-MM-DD format"}
 	case "none":

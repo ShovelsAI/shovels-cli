@@ -344,7 +344,7 @@ Note: ID is a positional argument, not a flag.
 Required flags:
   --metric-from YYYY-MM-DD     Metrics start date, inclusive (required)
   --metric-to YYYY-MM-DD       Metrics end date, inclusive (required)
-  --property-type TYPE          Property type: residential, commercial, industrial (required)
+  --property-type TYPE          Property type: residential, commercial, industrial, agricultural, vacant land, exempt, miscellaneous, office, recreational (required)
   --tag TAG                     Permit tag: solar, roofing, electrical, etc. (required)
 
 Example:
@@ -471,7 +471,7 @@ func init() {
 	// Metrics flags
 	contractorsMetricsCmd.Flags().String("metric-from", "", "Metrics start date in YYYY-MM-DD format (required)")
 	contractorsMetricsCmd.Flags().String("metric-to", "", "Metrics end date in YYYY-MM-DD format (required)")
-	contractorsMetricsCmd.Flags().String("property-type", "", "Property type: residential, commercial, industrial (required)")
+	contractorsMetricsCmd.Flags().String("property-type", "", "Property type: residential, commercial, industrial, agricultural, vacant land, exempt, miscellaneous, office, recreational (required)")
 	contractorsMetricsCmd.Flags().String("tag", "", "Permit tag: solar, roofing, electrical, plumbing, etc. (required)")
 
 	contractorsCmd.AddCommand(contractorsSearchCmd)

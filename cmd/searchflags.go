@@ -18,7 +18,11 @@ import (
 var validPermitStatuses = []string{"final", "in_review", "inactive", "active"}
 
 // validPropertyTypes lists the values the API accepts for property_type.
-var validPropertyTypes = []string{"residential", "commercial", "industrial"}
+var validPropertyTypes = []string{
+	"residential", "commercial", "industrial",
+	"agricultural", "vacant land", "exempt",
+	"miscellaneous", "office", "recreational",
+}
 
 // datePattern matches YYYY-MM-DD format.
 var datePattern = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
@@ -60,7 +64,7 @@ func registerSearchFlags(cmd *cobra.Command) {
 	f.Int("min-fees", 0, "Minimum permit fees in cents (100000 = $1,000)")
 
 	// Property filters
-	f.String("property-type", "", "Property type: residential, commercial, industrial")
+	f.String("property-type", "", "Property type: residential, commercial, industrial, agricultural, vacant land, exempt, miscellaneous, office, recreational")
 	f.Int("property-min-market-value", 0, "Minimum assessed market value in cents (50000000 = $500,000)")
 	f.Int("property-min-building-area", 0, "Minimum building area in square feet (integer)")
 	f.Int("property-min-lot-size", 0, "Minimum lot size in square feet (integer)")
