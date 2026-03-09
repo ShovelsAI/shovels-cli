@@ -190,7 +190,7 @@ func TestPaginateClampsBeyondCeiling(t *testing.T) {
 
 // --- Paginator page size calculation tests (boundary) ---
 
-func TestPaginateLimit75RequestsSizes50Then25(t *testing.T) {
+func TestPaginateLimit75SingleRequest(t *testing.T) {
 	var requestedSizes []int
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -202,16 +202,10 @@ func TestPaginateLimit75RequestsSizes50Then25(t *testing.T) {
 			items[i] = json.RawMessage(fmt.Sprintf(`{"id":%d}`, i))
 		}
 
-		var nextCursor *string
-		if len(requestedSizes) == 1 {
-			cursor := "page2"
-			nextCursor = &cursor
-		}
-
 		resp := struct {
 			Items      []json.RawMessage `json:"items"`
 			NextCursor *string           `json:"next_cursor"`
-		}{Items: items, NextCursor: nextCursor}
+		}{Items: items, NextCursor: nil}
 		w.Header().Set("X-Credits-Request", "10")
 		w.Header().Set("X-Credits-Remaining", "990")
 		json.NewEncoder(w).Encode(resp)
@@ -230,14 +224,11 @@ func TestPaginateLimit75RequestsSizes50Then25(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if len(requestedSizes) != 2 {
-		t.Fatalf("expected 2 requests, got %d", len(requestedSizes))
+	if len(requestedSizes) != 1 {
+		t.Fatalf("expected 1 request, got %d", len(requestedSizes))
 	}
-	if requestedSizes[0] != 50 {
-		t.Errorf("first request size: expected 50, got %d", requestedSizes[0])
-	}
-	if requestedSizes[1] != 25 {
-		t.Errorf("second request size: expected 25, got %d", requestedSizes[1])
+	if requestedSizes[0] != 75 {
+		t.Errorf("request size: expected 75, got %d", requestedSizes[0])
 	}
 	if len(result.Items) != 75 {
 		t.Errorf("expected 75 items, got %d", len(result.Items))
@@ -424,7 +415,7 @@ func TestPaginateMidPaginationError(t *testing.T) {
 		NoRetry: true,
 	})
 
-	lc := LimitConfig{Limit: 200}
+	lc := LimitConfig{Limit: 350}
 	_, err := c.Paginate(context.Background(), "/test", nil, lc)
 	if err == nil {
 		t.Fatal("expected error on mid-pagination failure")
@@ -537,24 +528,31 @@ func TestFirstPageSizeSmallLimit(t *testing.T) {
 	}
 }
 
-func TestFirstPageSizeAtMax(t *testing.T) {
+func TestFirstPageSizeBelowMax(t *testing.T) {
 	lc := LimitConfig{Limit: 50}
 	if got := lc.FirstPageSize(); got != 50 {
 		t.Errorf("expected 50, got %d", got)
 	}
 }
 
+func TestFirstPageSizeAtMax(t *testing.T) {
+	lc := LimitConfig{Limit: 100}
+	if got := lc.FirstPageSize(); got != 100 {
+		t.Errorf("expected 100, got %d", got)
+	}
+}
+
 func TestFirstPageSizeLargeLimit(t *testing.T) {
 	lc := LimitConfig{Limit: 200}
-	if got := lc.FirstPageSize(); got != 50 {
-		t.Errorf("expected 50 (capped at page size max), got %d", got)
+	if got := lc.FirstPageSize(); got != 100 {
+		t.Errorf("expected 100 (capped at page size max), got %d", got)
 	}
 }
 
 func TestFirstPageSizeAll(t *testing.T) {
 	lc := LimitConfig{All: true, MaxRecords: DefaultMaxRecords}
-	if got := lc.FirstPageSize(); got != 50 {
-		t.Errorf("expected 50 for --limit=all, got %d", got)
+	if got := lc.FirstPageSize(); got != 100 {
+		t.Errorf("expected 100 for --limit=all, got %d", got)
 	}
 }
 

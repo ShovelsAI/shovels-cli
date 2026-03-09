@@ -161,7 +161,7 @@ func TestDryRunBaseURLOverride(t *testing.T) {
 	}
 }
 
-func TestDryRunLimitAllShowsSize50(t *testing.T) {
+func TestDryRunLimitAllShowsSize100(t *testing.T) {
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
 		"--limit", "all",
@@ -181,8 +181,8 @@ func TestDryRunLimitAllShowsSize50(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected size to be number, got %T: %v", out.Params["size"], out.Params["size"])
 	}
-	if int(size) != 50 {
-		t.Errorf("expected size=50 for --limit all, got %v", size)
+	if int(size) != 100 {
+		t.Errorf("expected size=100 for --limit all, got %v", size)
 	}
 }
 
@@ -576,5 +576,30 @@ func TestDryRunSmallLimitShowsCorrectSize(t *testing.T) {
 	}
 	if int(size) != 10 {
 		t.Errorf("expected size=10 for --limit 10, got %v", size)
+	}
+}
+
+func TestDryRunLargeLimitCapsAtPageMax(t *testing.T) {
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--limit", "200",
+		"permits", "search",
+		"--geo-id", "92024",
+		"--permit-from", "2024-01-01",
+		"--permit-to", "2024-12-31",
+		"--dry-run",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	out := parseDryRun(t, result.Stdout)
+	size, ok := out.Params["size"].(float64)
+	if !ok {
+		t.Fatalf("expected size to be number, got %T: %v", out.Params["size"], out.Params["size"])
+	}
+	if int(size) != 100 {
+		t.Errorf("expected size=100 for --limit 200, got %v", size)
 	}
 }

@@ -137,7 +137,7 @@ func TestTagsListBasic(t *testing.T) {
 }
 
 func TestTagsListLimitAll(t *testing.T) {
-	// 120 total items requires 3 pages at size=50.
+	// 120 total items requires 2 pages at size=100.
 	handler, sizes := makeTagListHandler(120, 10, 9880)
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
@@ -173,13 +173,14 @@ func TestTagsListLimitAll(t *testing.T) {
 		t.Errorf("expected count=120, got %d", count)
 	}
 
-	// 120 items / 50 per page = 3 requests.
-	if len(*sizes) != 3 {
-		t.Fatalf("expected 3 API requests, got %d", len(*sizes))
+	// 120 items / 100 per page = 2 requests.
+	if len(*sizes) != 2 {
+		t.Fatalf("expected 2 API requests, got %d", len(*sizes))
 	}
-	for i, s := range *sizes {
-		if s != 50 {
-			t.Errorf("request %d: expected size=50, got %d", i+1, s)
+	expectedSizes := []int{100, 100}
+	for i, want := range expectedSizes {
+		if (*sizes)[i] != want {
+			t.Errorf("request %d: expected size=%d, got %d", i+1, want, (*sizes)[i])
 		}
 	}
 }
@@ -253,7 +254,7 @@ func TestTagsListRequiresAuth(t *testing.T) {
 // --- Boundary conditions ---
 
 func TestTagsListMultiPagePagination(t *testing.T) {
-	// 75 tags across 2 pages. Verifies cursor propagation with --limit all.
+	// 75 tags fit in a single request with page max of 100.
 	handler, sizes := makeTagListHandler(75, 5, 9925)
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
@@ -289,13 +290,11 @@ func TestTagsListMultiPagePagination(t *testing.T) {
 		t.Error("expected has_more=false when all items fetched")
 	}
 
-	// 75 items / 50 per page = 2 requests.
-	if len(*sizes) != 2 {
-		t.Fatalf("expected 2 API requests, got %d", len(*sizes))
+	// 75 items in a single request (below page max of 100).
+	if len(*sizes) != 1 {
+		t.Fatalf("expected 1 API request, got %d", len(*sizes))
 	}
-	for i, s := range *sizes {
-		if s != 50 {
-			t.Errorf("request %d: expected size=50, got %d", i+1, s)
-		}
+	if (*sizes)[0] != 100 {
+		t.Errorf("request 1: expected size=100, got %d", (*sizes)[0])
 	}
 }

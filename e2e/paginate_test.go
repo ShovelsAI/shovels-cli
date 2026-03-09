@@ -141,6 +141,41 @@ func TestPaginateDefaultLimit50(t *testing.T) {
 	}
 }
 
+func TestPaginateExplicitLimit50(t *testing.T) {
+	handler, sizes := makePaginatedHandler(200, 50, 9950)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--base-url", srv.URL,
+		"--limit", "50",
+		"_test-paginate", "/search",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	parsed := parseEnvelope(t, result.Stdout)
+
+	var data []json.RawMessage
+	if err := json.Unmarshal(parsed.Data, &data); err != nil {
+		t.Fatalf("expected data array: %v", err)
+	}
+	if len(data) != 50 {
+		t.Errorf("expected 50 items, got %d", len(data))
+	}
+
+	// The paginator uses min(limit, apiPageSizeMax) = min(50, 100) = 50.
+	if len(*sizes) != 1 {
+		t.Fatalf("expected 1 API request, got %d", len(*sizes))
+	}
+	if (*sizes)[0] != 50 {
+		t.Errorf("expected request size=50, got %d", (*sizes)[0])
+	}
+}
+
 func TestPaginateLimit200MultiPage(t *testing.T) {
 	var requestCount atomic.Int32
 	var requestedSizes []int
@@ -197,11 +232,11 @@ func TestPaginateLimit200MultiPage(t *testing.T) {
 		t.Error("expected has_more=true")
 	}
 
-	// 200 items / 50 per page = 4 requests, each with size=50.
-	if got := requestCount.Load(); got != 4 {
-		t.Errorf("expected 4 API requests, got %d", got)
+	// 200 items / 100 per page = 2 requests, each with size=100.
+	if got := requestCount.Load(); got != 2 {
+		t.Errorf("expected 2 API requests, got %d", got)
 	}
-	expectedSizes := []int{50, 50, 50, 50}
+	expectedSizes := []int{100, 100}
 	if len(requestedSizes) != len(expectedSizes) {
 		t.Fatalf("expected %d size entries, got %d: %v", len(expectedSizes), len(requestedSizes), requestedSizes)
 	}
@@ -281,17 +316,13 @@ func TestPaginateLimit200ButOnly75Exist(t *testing.T) {
 		t.Error("expected has_more=false when fewer results than limit")
 	}
 
-	// 75 items across 2 pages. The paginator requests size=50 for both because
-	// it cannot know the total count ahead of time. The second page returns only
-	// 25 items, signaling exhaustion via a nil cursor.
-	expectedSizes := []int{50, 50}
-	if len(*sizes) != len(expectedSizes) {
-		t.Fatalf("expected %d API requests, got %d: %v", len(expectedSizes), len(*sizes), *sizes)
+	// 75 items in a single request. The paginator requests size=100 (page max),
+	// and the server returns all 75 items with a nil cursor.
+	if len(*sizes) != 1 {
+		t.Fatalf("expected 1 API request, got %d: %v", len(*sizes), *sizes)
 	}
-	for i, want := range expectedSizes {
-		if (*sizes)[i] != want {
-			t.Errorf("request %d: expected size=%d, got %d", i+1, want, (*sizes)[i])
-		}
+	if (*sizes)[0] != 100 {
+		t.Errorf("request 1: expected size=100, got %d", (*sizes)[0])
 	}
 }
 
