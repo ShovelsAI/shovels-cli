@@ -140,7 +140,7 @@ Search contractors and retrieve their permits, employees, and metrics.
 shovels contractors search --geo-id 90210 --permit-from 2024-01-01 --permit-to 2024-12-31
 
 # Filter by classification
-shovels contractors search --geo-id 90210 --permit-from 2024-01-01 --permit-to 2024-12-31 --contractor-classification general_building
+shovels contractors search --geo-id 90210 --permit-from 2024-01-01 --permit-to 2024-12-31 --contractor-classification general_building_contractor
 
 # Retrieve by ID
 shovels contractors get C123

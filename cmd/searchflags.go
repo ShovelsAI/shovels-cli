@@ -24,6 +24,16 @@ var validPropertyTypes = []string{
 	"miscellaneous", "office", "recreational",
 }
 
+// validClassifications lists the values the API accepts for
+// contractor_classification_derived. Values may be prefixed with "-"
+// for exclusion; the prefix is stripped before enum validation.
+var validClassifications = []string{
+	"concrete_and_paving", "demolition_and_excavation", "electrical",
+	"fencing_and_glazing", "framing_and_carpentry", "general_building_contractor",
+	"general_engineering_contractor", "hvac", "landscaping_and_outdoor_work",
+	"other", "plumbing", "roofing", "specialty_trades",
+}
+
 // datePattern matches YYYY-MM-DD format.
 var datePattern = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 
@@ -194,6 +204,15 @@ func validateSearchFlags(cmd *cobra.Command) error {
 		msg := fmt.Sprintf("invalid --property-type %q: valid options are %s", propertyType, strings.Join(validPropertyTypes, ", "))
 		output.PrintErrorTyped(os.Stderr, msg, 1, client.ErrorTypeValidation)
 		return &exitError{code: 1}
+	}
+
+	classifications, _ := cmd.Flags().GetStringSlice("contractor-classification")
+	for _, c := range classifications {
+		if !isValidClassification(c) {
+			msg := fmt.Sprintf("invalid --contractor-classification value %q: valid options are %s", c, strings.Join(validClassifications, ", "))
+			output.PrintErrorTyped(os.Stderr, msg, 1, client.ErrorTypeValidation)
+			return &exitError{code: 1}
+		}
 	}
 
 	return nil
@@ -379,6 +398,19 @@ func isValidStatus(s string) bool {
 func isValidPropertyType(s string) bool {
 	for _, valid := range validPropertyTypes {
 		if s == valid {
+			return true
+		}
+	}
+	return false
+}
+
+// isValidClassification checks whether s is one of the API-accepted
+// contractor classifications. A leading "-" (exclusion prefix) is
+// stripped before matching.
+func isValidClassification(s string) bool {
+	bare := strings.TrimPrefix(s, "-")
+	for _, valid := range validClassifications {
+		if bare == valid {
 			return true
 		}
 	}

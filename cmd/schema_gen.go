@@ -385,7 +385,7 @@ func addSearchFilters(filters map[string]schemaField) {
 	filters["--property-min-unit-count"] = schemaField{Type: "integer", Description: "Minimum number of units"}
 
 	// Contractor filters
-	filters["--contractor-classification"] = schemaField{Type: "string[]", Description: "Contractor classification, AND logic, prefix with - to exclude"}
+	filters["--contractor-classification"] = schemaField{Type: "string[]", Description: "Contractor classification, AND logic, prefix with - to exclude. Valid values: concrete_and_paving, demolition_and_excavation, electrical, fencing_and_glazing, framing_and_carpentry, general_building_contractor, general_engineering_contractor, hvac, landscaping_and_outdoor_work, other, plumbing, roofing, specialty_trades"}
 	filters["--contractor-name"] = schemaField{Type: "string", Description: "Filter by contractor name or partial name"}
 	filters["--contractor-website"] = schemaField{Type: "string", Description: "Filter by contractor website domain"}
 	filters["--contractor-min-total-job-value"] = schemaField{Type: "integer", Description: "Minimum lifetime contractor job value in cents (10000000 = $100,000)", Unit: "cents"}

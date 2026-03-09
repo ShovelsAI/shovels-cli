@@ -373,6 +373,11 @@ func TestContractorsSearchHelpShowsGroupedFlags(t *testing.T) {
 
 	// All 9 property types must be listed in help text.
 	assertAllPropertyTypes(t, out, "contractors search")
+
+	// Help example should use full classification value, not truncated.
+	if !strings.Contains(out, "general_building_contractor") {
+		t.Error("contractors search --help example should use general_building_contractor")
+	}
 }
 
 // TestContractorsMetricsHelpShowsRequiredFlags verifies that
