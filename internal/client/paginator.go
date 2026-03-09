@@ -17,7 +17,7 @@ const MaxCeiling = 100_000
 const DefaultMaxRecords = 10_000
 
 // apiPageSizeMax is the maximum page size the API accepts per request.
-const apiPageSizeMax = 50
+const apiPageSizeMax = 100
 
 // LimitConfig holds the parsed --limit and --max-records values.
 type LimitConfig struct {

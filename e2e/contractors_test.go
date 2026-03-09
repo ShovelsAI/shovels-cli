@@ -494,9 +494,9 @@ func TestContractorsSearchPagination(t *testing.T) {
 		t.Error("expected has_more=true")
 	}
 
-	// 100 items / 50 per page = 2 API requests.
-	if got := requestCount.Load(); got != 2 {
-		t.Errorf("expected 2 API requests, got %d", got)
+	// 100 items in a single request (page max = 100).
+	if got := requestCount.Load(); got != 1 {
+		t.Errorf("expected 1 API request, got %d", got)
 	}
 }
 
@@ -1177,8 +1177,9 @@ func TestContractorsPermitsPagination(t *testing.T) {
 		t.Error("expected has_more=true")
 	}
 
-	if got := requestCount.Load(); got != 2 {
-		t.Errorf("expected 2 API requests, got %d", got)
+	// 100 items in a single request (page max = 100).
+	if got := requestCount.Load(); got != 1 {
+		t.Errorf("expected 1 API request, got %d", got)
 	}
 }
 

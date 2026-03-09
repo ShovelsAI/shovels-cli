@@ -361,7 +361,7 @@ func TestCitiesMetricsCurrentNoResults(t *testing.T) {
 }
 
 func TestCitiesMetricsMonthlyLimitAll(t *testing.T) {
-	// 60 items across 2 pages (50 per page).
+	// 60 items fit in a single page (page max = 100).
 	handler, queries := makeMetricsHandler("/cities", 60, true, 60, 9940)
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
@@ -391,9 +391,9 @@ func TestCitiesMetricsMonthlyLimitAll(t *testing.T) {
 		t.Errorf("expected 60 items with --limit all, got %d", len(data))
 	}
 
-	// Should have made 2 requests (page 1: 50 items, page 2: 10 items).
-	if len(*queries) != 2 {
-		t.Errorf("expected 2 API requests for 60 items, got %d", len(*queries))
+	// Should have made 1 request (all 60 items fit within page max of 100).
+	if len(*queries) != 1 {
+		t.Errorf("expected 1 API request for 60 items, got %d", len(*queries))
 	}
 }
 
