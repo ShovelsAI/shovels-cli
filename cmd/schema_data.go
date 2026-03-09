@@ -595,7 +595,7 @@ func init() {
 				"meta.credits_remaining",
 			},
 			Filters: map[string]SchemaField{
-				"--contractor-classification":          {Type: "string[]", Description: "Contractor classification, AND logic, prefix with - to exclude"},
+				"--contractor-classification":          {Type: "string[]", Description: "Contractor classification, AND logic, prefix with - to exclude. Valid values: concrete_and_paving, demolition_and_excavation, electrical, fencing_and_glazing, framing_and_carpentry, general_building_contractor, general_engineering_contractor, hvac, landscaping_and_outdoor_work, other, plumbing, roofing, specialty_trades"},
 				"--contractor-license":                 {Type: "string", Description: "Filter by contractor license number"},
 				"--contractor-min-inspection-pr":       {Type: "integer", Description: "Minimum lifetime inspection pass rate, 0-100"},
 				"--contractor-min-total-job-value":     {Type: "integer", Description: "Minimum lifetime contractor job value in cents (10000000 = $100,000)", Unit: "cents"},
@@ -988,7 +988,7 @@ func init() {
 				"meta.credits_remaining",
 			},
 			Filters: map[string]SchemaField{
-				"--contractor-classification":          {Type: "string[]", Description: "Contractor classification, AND logic, prefix with - to exclude"},
+				"--contractor-classification":          {Type: "string[]", Description: "Contractor classification, AND logic, prefix with - to exclude. Valid values: concrete_and_paving, demolition_and_excavation, electrical, fencing_and_glazing, framing_and_carpentry, general_building_contractor, general_engineering_contractor, hvac, landscaping_and_outdoor_work, other, plumbing, roofing, specialty_trades"},
 				"--contractor-license":                 {Type: "string", Description: "Filter by contractor license number"},
 				"--contractor-min-inspection-pr":       {Type: "integer", Description: "Minimum lifetime inspection pass rate, 0-100"},
 				"--contractor-min-total-job-value":     {Type: "integer", Description: "Minimum lifetime contractor job value in cents (10000000 = $100,000)", Unit: "cents"},

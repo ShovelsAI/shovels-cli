@@ -56,7 +56,7 @@ Examples:
     shovels contractors search --geo-id 78701 --permit-from 2024-01-01 --permit-to 2024-12-31
 
   Filter by contractor classification:
-    shovels contractors search --geo-id 92024 --permit-from 2024-01-01 --permit-to 2024-12-31 --contractor-classification general_building
+    shovels contractors search --geo-id 92024 --permit-from 2024-01-01 --permit-to 2024-12-31 --contractor-classification general_building_contractor
 
   Skip tallies for faster response:
     shovels contractors search --geo-id CA --permit-from 2024-01-01 --permit-to 2024-12-31 --no-tallies

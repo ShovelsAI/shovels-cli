@@ -61,7 +61,7 @@ func makeContractorSearchHandler(totalItems int, creditsUsed, creditsRemaining i
 		items := make([]json.RawMessage, count)
 		for i := range count {
 			items[i] = json.RawMessage(fmt.Sprintf(
-				`{"id":"C_%05d","name":"Contractor %d","classification":"general_building"}`,
+				`{"id":"C_%05d","name":"Contractor %d","classification":"general_building_contractor"}`,
 				start+i, start+i,
 			))
 		}
@@ -176,7 +176,7 @@ func TestContractorsSearchClassificationFilter(t *testing.T) {
 		"--geo-id", "90210",
 		"--permit-from", "2024-01-01",
 		"--permit-to", "2024-12-31",
-		"--contractor-classification", "general_building",
+		"--contractor-classification", "general_building_contractor",
 	)
 
 	if result.ExitCode != 0 {
@@ -199,8 +199,8 @@ func TestContractorsSearchClassificationFilter(t *testing.T) {
 	}
 	q := (*queries)[0]
 	cls := q["contractor_classification_derived"]
-	if len(cls) != 1 || cls[0] != "general_building" {
-		t.Errorf("expected contractor_classification_derived=[general_building], got %v", cls)
+	if len(cls) != 1 || cls[0] != "general_building_contractor" {
+		t.Errorf("expected contractor_classification_derived=[general_building_contractor], got %v", cls)
 	}
 }
 
@@ -600,7 +600,7 @@ func makeContractorGetHandler(knownIDs map[string]bool, creditsUsed, creditsRema
 		for _, id := range ids {
 			if knownIDs[id] {
 				items = append(items, json.RawMessage(fmt.Sprintf(
-					`{"id":%q,"name":"Contractor %s","classification":"general_building"}`, id, id,
+					`{"id":%q,"name":"Contractor %s","classification":"general_building_contractor"}`, id, id,
 				)))
 			}
 		}
