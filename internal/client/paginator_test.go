@@ -556,6 +556,191 @@ func TestFirstPageSizeAll(t *testing.T) {
 	}
 }
 
+func TestPaginateCreditsAccumulatedAcrossPages(t *testing.T) {
+	requestCount := 0
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		size, _ := strconv.Atoi(r.URL.Query().Get("size"))
+		items := make([]json.RawMessage, size)
+		for i := range size {
+			items[i] = json.RawMessage(fmt.Sprintf(`{"id":%d}`, i))
+		}
+
+		// Each page costs 10 credits; remaining decreases by 10 each time.
+		w.Header().Set("X-Credits-Request", "10")
+		w.Header().Set("X-Credits-Remaining", strconv.Itoa(1000-requestCount*10))
+
+		var cursor *string
+		if requestCount < 3 {
+			c := fmt.Sprintf("page%d", requestCount+1)
+			cursor = &c
+		}
+
+		resp := struct {
+			Items      []json.RawMessage `json:"items"`
+			NextCursor *string           `json:"next_cursor"`
+		}{Items: items, NextCursor: cursor}
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+
+	c := New(Options{
+		APIKey:  "test-key",
+		BaseURL: srv.URL,
+		Timeout: 5 * time.Second,
+	})
+
+	// Request 300 items → 3 pages of 100
+	lc := LimitConfig{Limit: 300}
+	result, err := c.Paginate(context.Background(), "/test", nil, lc)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result.CreditsUsed == nil {
+		t.Fatal("expected CreditsUsed to be non-nil")
+	}
+	if *result.CreditsUsed != 30 {
+		t.Errorf("expected accumulated CreditsUsed=30 (3 pages × 10), got %d", *result.CreditsUsed)
+	}
+	// CreditsRemaining should reflect the last page's value (most current balance).
+	if result.CreditsRemaining == nil {
+		t.Fatal("expected CreditsRemaining to be non-nil")
+	}
+	if *result.CreditsRemaining != 970 {
+		t.Errorf("expected CreditsRemaining=970, got %d", *result.CreditsRemaining)
+	}
+}
+
+func TestPaginateCreditsAccumulatedAtLimitBoundary(t *testing.T) {
+	// Tests the "reached limit with more pages available" exit path (line 191).
+	// Limit=250 across pages of 100 → 3 requests (100+100+50), all with credits.
+	requestCount := 0
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		size, _ := strconv.Atoi(r.URL.Query().Get("size"))
+		items := make([]json.RawMessage, size)
+		for i := range size {
+			items[i] = json.RawMessage(fmt.Sprintf(`{"id":%d}`, i))
+		}
+
+		w.Header().Set("X-Credits-Request", "10")
+		w.Header().Set("X-Credits-Remaining", strconv.Itoa(1000-requestCount*10))
+
+		// Always more pages available.
+		cursor := fmt.Sprintf("page%d", requestCount+1)
+		resp := struct {
+			Items      []json.RawMessage `json:"items"`
+			NextCursor *string           `json:"next_cursor"`
+		}{Items: items, NextCursor: &cursor}
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+
+	c := New(Options{
+		APIKey:  "test-key",
+		BaseURL: srv.URL,
+		Timeout: 5 * time.Second,
+	})
+
+	lc := LimitConfig{Limit: 250}
+	result, err := c.Paginate(context.Background(), "/test", nil, lc)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result.Items) != 250 {
+		t.Errorf("expected 250 items, got %d", len(result.Items))
+	}
+	if !result.HasMore {
+		t.Error("expected HasMore=true")
+	}
+	if result.CreditsUsed == nil {
+		t.Fatal("expected CreditsUsed to be non-nil")
+	}
+	if *result.CreditsUsed != 30 {
+		t.Errorf("expected accumulated CreditsUsed=30 (3 pages × 10), got %d", *result.CreditsUsed)
+	}
+	if *result.CreditsRemaining != 970 {
+		t.Errorf("expected CreditsRemaining=970, got %d", *result.CreditsRemaining)
+	}
+}
+
+func TestPaginateSinglePageCredits(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		size, _ := strconv.Atoi(r.URL.Query().Get("size"))
+		items := make([]json.RawMessage, size)
+		for i := range size {
+			items[i] = json.RawMessage(fmt.Sprintf(`{"id":%d}`, i))
+		}
+		w.Header().Set("X-Credits-Request", "5")
+		w.Header().Set("X-Credits-Remaining", "995")
+		resp := struct {
+			Items      []json.RawMessage `json:"items"`
+			NextCursor *string           `json:"next_cursor"`
+		}{Items: items, NextCursor: nil}
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+
+	c := New(Options{
+		APIKey:  "test-key",
+		BaseURL: srv.URL,
+		Timeout: 5 * time.Second,
+	})
+
+	lc := LimitConfig{Limit: 50}
+	result, err := c.Paginate(context.Background(), "/test", nil, lc)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result.CreditsUsed == nil {
+		t.Fatal("expected CreditsUsed to be non-nil")
+	}
+	if *result.CreditsUsed != 5 {
+		t.Errorf("expected CreditsUsed=5, got %d", *result.CreditsUsed)
+	}
+	if *result.CreditsRemaining != 995 {
+		t.Errorf("expected CreditsRemaining=995, got %d", *result.CreditsRemaining)
+	}
+}
+
+func TestPaginateCreditsNilWhenNotReturned(t *testing.T) {
+	// When the API returns no credit headers, CreditsUsed should stay nil.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := struct {
+			Items      []json.RawMessage `json:"items"`
+			NextCursor *string           `json:"next_cursor"`
+		}{
+			Items: []json.RawMessage{json.RawMessage(`{"id":1}`)},
+		}
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+
+	c := New(Options{
+		APIKey:  "test-key",
+		BaseURL: srv.URL,
+		Timeout: 5 * time.Second,
+	})
+
+	lc := LimitConfig{Limit: 10}
+	result, err := c.Paginate(context.Background(), "/test", nil, lc)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result.CreditsUsed != nil {
+		t.Errorf("expected CreditsUsed to be nil when API returns no credit headers, got %d", *result.CreditsUsed)
+	}
+	if result.CreditsRemaining != nil {
+		t.Errorf("expected CreditsRemaining to be nil, got %d", *result.CreditsRemaining)
+	}
+}
+
 func TestPaginateTotalCountNilWhenNotPresent(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		resp := struct {

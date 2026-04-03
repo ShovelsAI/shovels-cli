@@ -106,11 +106,25 @@ type pageResponse struct {
 
 // PaginatedResult holds the assembled output from paginating through an API
 // endpoint. All items are collected in memory before returning.
+//
+// CreditsUsed is the sum across all pages fetched. CreditsRemaining is from
+// the final response (the server's most current balance). Both are nil when
+// the API returns no credit headers.
 type PaginatedResult struct {
-	Items      []json.RawMessage
-	HasMore    bool
-	Credits    CreditMeta
-	TotalCount *TotalCount
+	Items            []json.RawMessage
+	HasMore          bool
+	CreditsUsed      *int
+	CreditsRemaining *int
+	TotalCount       *TotalCount
+}
+
+// creditsUsedPtr returns a pointer to total if any page reported credits,
+// or nil if no page included credit headers.
+func creditsUsedPtr(has bool, total int) *int {
+	if !has {
+		return nil
+	}
+	return &total
 }
 
 // Paginate fetches records from a paginated API endpoint, following cursors
@@ -129,7 +143,9 @@ func (c *Client) Paginate(ctx context.Context, path string, query url.Values, lc
 		q[k] = append([]string(nil), v...)
 	}
 
-	var lastCredits CreditMeta
+	var totalCreditsUsed int
+	var hasCreditsUsed bool
+	var lastCreditsRemaining *int
 	var totalCount *TotalCount
 	firstPage := true
 
@@ -146,7 +162,11 @@ func (c *Client) Paginate(ctx context.Context, path string, query url.Values, lc
 		if err != nil {
 			return nil, err
 		}
-		lastCredits = resp.Credits
+		if resp.Credits.CreditsUsed != nil {
+			totalCreditsUsed += *resp.Credits.CreditsUsed
+			hasCreditsUsed = true
+		}
+		lastCreditsRemaining = resp.Credits.CreditsRemaining
 
 		var page pageResponse
 		if err := json.Unmarshal(resp.Body, &page); err != nil {
@@ -175,20 +195,22 @@ func (c *Client) Paginate(ctx context.Context, path string, query url.Values, lc
 				collected = collected[:effective]
 			}
 			return &PaginatedResult{
-				Items:      collected,
-				HasMore:    hasMore,
-				Credits:    lastCredits,
-				TotalCount: totalCount,
+				Items:            collected,
+				HasMore:          hasMore,
+				CreditsUsed:      creditsUsedPtr(hasCreditsUsed, totalCreditsUsed),
+				CreditsRemaining: lastCreditsRemaining,
+				TotalCount:       totalCount,
 			}, nil
 		}
 
 		// Reached the requested limit with more pages available.
 		if len(collected) >= effective {
 			return &PaginatedResult{
-				Items:      collected[:effective],
-				HasMore:    true,
-				Credits:    lastCredits,
-				TotalCount: totalCount,
+				Items:            collected[:effective],
+				HasMore:          true,
+				CreditsUsed:      creditsUsedPtr(hasCreditsUsed, totalCreditsUsed),
+				CreditsRemaining: lastCreditsRemaining,
+				TotalCount:       totalCount,
 			}, nil
 		}
 
@@ -198,9 +220,10 @@ func (c *Client) Paginate(ctx context.Context, path string, query url.Values, lc
 	// This branch handles the case where effective was already 0 or
 	// we broke out of the loop after collecting enough items.
 	return &PaginatedResult{
-		Items:      collected,
-		HasMore:    len(collected) >= effective && effective > 0,
-		Credits:    lastCredits,
-		TotalCount: totalCount,
+		Items:            collected,
+		HasMore:          len(collected) >= effective && effective > 0,
+		CreditsUsed:      creditsUsedPtr(hasCreditsUsed, totalCreditsUsed),
+		CreditsRemaining: lastCreditsRemaining,
+		TotalCount:       totalCount,
 	}, nil
 }
