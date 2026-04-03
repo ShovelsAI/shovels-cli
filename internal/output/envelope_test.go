@@ -12,16 +12,12 @@ func intPtr(n int) *int { return &n }
 
 func TestPrintPaginatedEnvelopeShape(t *testing.T) {
 	var buf bytes.Buffer
-	items := []json.RawMessage{
-		json.RawMessage(`{"id":1}`),
-		json.RawMessage(`{"id":2}`),
-	}
-	credits := client.CreditMeta{
+	PrintPaginated(&buf, &client.PaginatedResult{
+		Items:            []json.RawMessage{json.RawMessage(`{"id":1}`), json.RawMessage(`{"id":2}`)},
+		HasMore:          true,
 		CreditsUsed:      intPtr(50),
 		CreditsRemaining: intPtr(9950),
-	}
-
-	PrintPaginated(&buf, items, true, credits, nil)
+	})
 
 	var env struct {
 		Data []json.RawMessage `json:"data"`
@@ -70,10 +66,9 @@ func TestPrintPaginatedEnvelopeShape(t *testing.T) {
 
 func TestPrintPaginatedNoCredits(t *testing.T) {
 	var buf bytes.Buffer
-	items := []json.RawMessage{json.RawMessage(`{"id":1}`)}
-	credits := client.CreditMeta{}
-
-	PrintPaginated(&buf, items, false, credits, nil)
+	PrintPaginated(&buf, &client.PaginatedResult{
+		Items: []json.RawMessage{json.RawMessage(`{"id":1}`)},
+	})
 
 	var env struct {
 		Data []json.RawMessage `json:"data"`
@@ -93,13 +88,9 @@ func TestPrintPaginatedNoCredits(t *testing.T) {
 
 func TestPrintPaginatedCountEqualsActualItems(t *testing.T) {
 	var buf bytes.Buffer
-	items := []json.RawMessage{
-		json.RawMessage(`{"id":1}`),
-		json.RawMessage(`{"id":2}`),
-		json.RawMessage(`{"id":3}`),
-	}
-
-	PrintPaginated(&buf, items, false, client.CreditMeta{}, nil)
+	PrintPaginated(&buf, &client.PaginatedResult{
+		Items: []json.RawMessage{json.RawMessage(`{"id":1}`), json.RawMessage(`{"id":2}`), json.RawMessage(`{"id":3}`)},
+	})
 
 	var env struct {
 		Meta map[string]any `json:"meta"`
@@ -273,14 +264,13 @@ func TestPrintSingleNoCredits(t *testing.T) {
 
 func TestPrintPaginatedWithTotalCount(t *testing.T) {
 	var buf bytes.Buffer
-	items := []json.RawMessage{json.RawMessage(`{"id":1}`)}
-	credits := client.CreditMeta{
+	PrintPaginated(&buf, &client.PaginatedResult{
+		Items:            []json.RawMessage{json.RawMessage(`{"id":1}`)},
+		HasMore:          true,
 		CreditsUsed:      intPtr(1),
 		CreditsRemaining: intPtr(9999),
-	}
-	tc := &client.TotalCount{Value: 1234, Relation: "eq"}
-
-	PrintPaginated(&buf, items, true, credits, tc)
+		TotalCount:       &client.TotalCount{Value: 1234, Relation: "eq"},
+	})
 
 	var env struct {
 		Data []json.RawMessage `json:"data"`
@@ -308,10 +298,11 @@ func TestPrintPaginatedWithTotalCount(t *testing.T) {
 
 func TestPrintPaginatedWithTotalCountGte(t *testing.T) {
 	var buf bytes.Buffer
-	items := []json.RawMessage{json.RawMessage(`{"id":1}`)}
-	tc := &client.TotalCount{Value: 10000, Relation: "gte"}
-
-	PrintPaginated(&buf, items, true, client.CreditMeta{}, tc)
+	PrintPaginated(&buf, &client.PaginatedResult{
+		Items:      []json.RawMessage{json.RawMessage(`{"id":1}`)},
+		HasMore:    true,
+		TotalCount: &client.TotalCount{Value: 10000, Relation: "gte"},
+	})
 
 	var env struct {
 		Meta map[string]any `json:"meta"`
@@ -331,9 +322,9 @@ func TestPrintPaginatedWithTotalCountGte(t *testing.T) {
 
 func TestPrintPaginatedNilTotalCountOmitted(t *testing.T) {
 	var buf bytes.Buffer
-	items := []json.RawMessage{json.RawMessage(`{"id":1}`)}
-
-	PrintPaginated(&buf, items, false, client.CreditMeta{}, nil)
+	PrintPaginated(&buf, &client.PaginatedResult{
+		Items: []json.RawMessage{json.RawMessage(`{"id":1}`)},
+	})
 
 	var env struct {
 		Meta map[string]any `json:"meta"`

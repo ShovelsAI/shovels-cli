@@ -7,28 +7,26 @@ import (
 	"github.com/shovels-ai/shovels-cli/internal/client"
 )
 
-// PrintPaginated writes a JSON envelope for paginated responses. The data
+// PrintPaginated writes a JSON envelope for a paginated result. The data
 // field contains the items array, and meta includes count, has_more, and
-// credit information from the last API response in the pagination sequence.
-// When totalCount is non-nil, meta includes a total_count object with value
-// and relation fields.
-func PrintPaginated(w io.Writer, items []json.RawMessage, hasMore bool, credits client.CreditMeta, totalCount *client.TotalCount) {
+// credit information aggregated across all pages in the pagination sequence.
+func PrintPaginated(w io.Writer, result *client.PaginatedResult) {
 	meta := map[string]any{
-		"count":    len(items),
-		"has_more": hasMore,
+		"count":    len(result.Items),
+		"has_more": result.HasMore,
 	}
-	if credits.CreditsUsed != nil {
-		meta["credits_used"] = *credits.CreditsUsed
+	if result.CreditsUsed != nil {
+		meta["credits_used"] = *result.CreditsUsed
 	}
-	if credits.CreditsRemaining != nil {
-		meta["credits_remaining"] = *credits.CreditsRemaining
+	if result.CreditsRemaining != nil {
+		meta["credits_remaining"] = *result.CreditsRemaining
 	}
-	if totalCount != nil {
-		meta["total_count"] = totalCount
+	if result.TotalCount != nil {
+		meta["total_count"] = result.TotalCount
 	}
 
 	env := Envelope{
-		Data: items,
+		Data: result.Items,
 		Meta: meta,
 	}
 	enc := json.NewEncoder(w)
