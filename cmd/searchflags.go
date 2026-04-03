@@ -380,7 +380,7 @@ func runPaginatedSearch(cmd *cobra.Command, endpoint string, queryFn func(url.Va
 		return &exitError{code: 1}
 	}
 
-	output.PrintPaginated(cmd.OutOrStdout(), result.Items, result.HasMore, result.Credits, result.TotalCount)
+	output.PrintPaginated(cmd.OutOrStdout(), result)
 	return nil
 }
 

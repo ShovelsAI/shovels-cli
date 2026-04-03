@@ -259,7 +259,7 @@ func runContractorsPermits(cmd *cobra.Command, args []string) error {
 		return &exitError{code: 1}
 	}
 
-	output.PrintPaginated(cmd.OutOrStdout(), result.Items, result.HasMore, result.Credits, result.TotalCount)
+	output.PrintPaginated(cmd.OutOrStdout(), result)
 	return nil
 }
 
@@ -327,7 +327,7 @@ func runContractorsEmployees(cmd *cobra.Command, args []string) error {
 		return &exitError{code: 1}
 	}
 
-	output.PrintPaginated(cmd.OutOrStdout(), result.Items, result.HasMore, result.Credits, nil)
+	output.PrintPaginated(cmd.OutOrStdout(), result)
 	return nil
 }
 

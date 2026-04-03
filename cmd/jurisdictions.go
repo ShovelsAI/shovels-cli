@@ -99,7 +99,7 @@ func runJurisdictionsSearch(cmd *cobra.Command, args []string) error {
 		return handleAPIError(err)
 	}
 
-	output.PrintPaginated(cmd.OutOrStdout(), result.Items, result.HasMore, result.Credits, nil)
+	output.PrintPaginated(cmd.OutOrStdout(), result)
 	return nil
 }
 

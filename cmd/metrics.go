@@ -84,7 +84,7 @@ func runMetricsCurrent(cfg metricsConfig) func(*cobra.Command, []string) error {
 			return handleAPIError(err)
 		}
 
-		output.PrintPaginated(cmd.OutOrStdout(), result.Items, result.HasMore, result.Credits, result.TotalCount)
+		output.PrintPaginated(cmd.OutOrStdout(), result)
 		return nil
 	}
 }
@@ -169,7 +169,7 @@ func runMetricsMonthly(cfg metricsConfig) func(*cobra.Command, []string) error {
 			return handleAPIError(err)
 		}
 
-		output.PrintPaginated(cmd.OutOrStdout(), result.Items, result.HasMore, result.Credits, result.TotalCount)
+		output.PrintPaginated(cmd.OutOrStdout(), result)
 		return nil
 	}
 }
