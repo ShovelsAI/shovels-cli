@@ -16,10 +16,14 @@ var usageCmd = &cobra.Command{
 consumed, credit limit, and other account details. Useful for monitoring
 quota before running large queries.
 
+The response also includes a daily_usage array breaking usage down per day
+over the rolling 30-day window. Each entry is {date, credits, expires} —
+the date (YYYY-MM-DD), credits consumed that day, and when those credits expire.
+
 Example:
   shovels usage
 
-Response: {"data": {"credits_used": N, "credit_limit": N, ...}, "meta": {"credits_used": N, ...}}
+Response: {"data": {"credits_used": N, "credit_limit": N, "daily_usage": [{"date": "2024-01-01", "credits": N, "expires": "..."}, ...]}, "meta": {"credits_used": N, ...}}
 For unlimited plans, credit_limit is null. Not paginated.`,
 	Annotations: map[string]string{
 		AnnotationRequiresAuth: "true",
