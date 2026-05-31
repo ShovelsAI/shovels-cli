@@ -38,6 +38,11 @@ var contractorsSearchCmd = &cobra.Command{
 range. Supports permit tag filters, property type filters, contractor
 classification filters, and minimum-value thresholds.
 
+Before filtering, ranking, or aggregating on a permit field like job_value or
+fees, run the credit-exempt coverage check first to confirm that field is
+reliably populated for the area:
+  shovels <geo> coverage GEO_ID --coverage-from 2024-01-01 --coverage-to 2024-12-31
+
 Required flags:
   --geo-id       Geographic area: zip code (92024), state (CA), or resolved Shovels ID
   --permit-from  Start date in YYYY-MM-DD format
@@ -67,10 +72,7 @@ Response field scoping:
   Only tag_tally and status_tally reflect your --geo-id and date filters.
   To count permits matching your search, sum the values in tag_tally or status_tally.
 
-Tip: run with --schema to see all response field names, types, and units before querying.
-Tip: before filtering, ranking, or aggregating on a specific field, check coverage first —
-  it is credit-exempt and flags permit fields that are NOT reliably populated for the area:
-    shovels <geo> coverage GEO_ID --coverage-from 2024-01-01 --coverage-to 2024-12-31`,
+Tip: run with --schema to see all response field names, types, and units before querying.`,
 	Annotations: map[string]string{
 		AnnotationRequiresAuth: "true",
 	},

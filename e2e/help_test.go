@@ -474,8 +474,10 @@ func TestRootHelpRecommendsCoverageInWorkflow(t *testing.T) {
 }
 
 // TestPermitsSearchHelpShowsCoverageTip verifies that
-// `shovels permits search --help` includes a tip pointing to the
-// credit-exempt coverage command as a pre-flight check.
+// `shovels permits search --help` includes a directive pointing to the
+// credit-exempt coverage command as a pre-flight check, and that the
+// directive appears BEFORE the required-flag content so imperative-task
+// agents see it before their first query.
 func TestPermitsSearchHelpShowsCoverageTip(t *testing.T) {
 	result := runCLI(t, "permits", "search", "--help")
 
@@ -485,17 +487,28 @@ func TestPermitsSearchHelpShowsCoverageTip(t *testing.T) {
 
 	out := result.Stdout
 
-	if !strings.Contains(out, "coverage GEO_ID") {
-		t.Error("permits search --help should point to `<geo> coverage GEO_ID`")
+	coverageIdx := strings.Index(out, "coverage GEO_ID")
+	if coverageIdx == -1 {
+		t.Fatal("permits search --help should point to `<geo> coverage GEO_ID`")
 	}
 	if !strings.Contains(out, "credit-exempt") {
-		t.Error("permits search --help coverage tip should mention credit-exempt")
+		t.Error("permits search --help coverage directive should mention credit-exempt")
+	}
+
+	requiredIdx := strings.Index(out, "Required flags:")
+	if requiredIdx == -1 {
+		t.Fatal("permits search --help should contain a Required flags section")
+	}
+	if coverageIdx > requiredIdx {
+		t.Error("permits search --help coverage directive should appear before the Required flags section")
 	}
 }
 
 // TestContractorsSearchHelpShowsCoverageTip verifies that
-// `shovels contractors search --help` includes a tip pointing to the
-// credit-exempt coverage command as a pre-flight check.
+// `shovels contractors search --help` includes a directive pointing to the
+// credit-exempt coverage command as a pre-flight check, and that the
+// directive appears BEFORE the required-flag content so imperative-task
+// agents see it before their first query.
 func TestContractorsSearchHelpShowsCoverageTip(t *testing.T) {
 	result := runCLI(t, "contractors", "search", "--help")
 
@@ -505,11 +518,20 @@ func TestContractorsSearchHelpShowsCoverageTip(t *testing.T) {
 
 	out := result.Stdout
 
-	if !strings.Contains(out, "coverage GEO_ID") {
-		t.Error("contractors search --help should point to `<geo> coverage GEO_ID`")
+	coverageIdx := strings.Index(out, "coverage GEO_ID")
+	if coverageIdx == -1 {
+		t.Fatal("contractors search --help should point to `<geo> coverage GEO_ID`")
 	}
 	if !strings.Contains(out, "credit-exempt") {
-		t.Error("contractors search --help coverage tip should mention credit-exempt")
+		t.Error("contractors search --help coverage directive should mention credit-exempt")
+	}
+
+	requiredIdx := strings.Index(out, "Required flags:")
+	if requiredIdx == -1 {
+		t.Fatal("contractors search --help should contain a Required flags section")
+	}
+	if coverageIdx > requiredIdx {
+		t.Error("contractors search --help coverage directive should appear before the Required flags section")
 	}
 }
 
