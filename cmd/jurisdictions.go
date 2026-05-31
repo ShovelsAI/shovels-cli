@@ -135,7 +135,10 @@ Available subcommands:
 
 Resolve a jurisdiction geo_id first:
   GEO=$(shovels jurisdictions search -q "Portland" | jq -r '.data[0].geo_id')
-  shovels jurisdictions metrics current "$GEO" --tag solar --property-type residential`,
+  shovels jurisdictions metrics current "$GEO" --tag solar --property-type residential
+
+` + metricsCoverageTip + `
+    shovels jurisdictions coverage "$GEO" --coverage-from 2024-01-01 --coverage-to 2024-12-31`,
 }
 
 var jurisdictionsMetricsCurrentCmd = &cobra.Command{

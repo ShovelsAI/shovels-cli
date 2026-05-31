@@ -62,7 +62,10 @@ Examples:
   Filter by property type and minimum job value (values in cents, 5000000 = $50,000):
     shovels permits search --geo-id CA --permit-from 2024-01-01 --permit-to 2024-12-31 --property-type residential --min-job-value 5000000
 
-Tip: run with --schema to see all response field names, types, and units before querying.`,
+Tip: run with --schema to see all response field names, types, and units before querying.
+Tip: before filtering, ranking, or aggregating on a specific field (e.g. --min-job-value),
+  check coverage first — it is credit-exempt and flags fields that are NOT reliably populated:
+    shovels <geo> coverage GEO_ID --coverage-from 2024-01-01 --coverage-to 2024-12-31`,
 	Annotations: map[string]string{
 		AnnotationRequiresAuth: "true",
 	},

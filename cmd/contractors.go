@@ -67,7 +67,10 @@ Response field scoping:
   Only tag_tally and status_tally reflect your --geo-id and date filters.
   To count permits matching your search, sum the values in tag_tally or status_tally.
 
-Tip: run with --schema to see all response field names, types, and units before querying.`,
+Tip: run with --schema to see all response field names, types, and units before querying.
+Tip: before filtering, ranking, or aggregating on a specific field, check coverage first —
+  it is credit-exempt and flags permit fields that are NOT reliably populated for the area:
+    shovels <geo> coverage GEO_ID --coverage-from 2024-01-01 --coverage-to 2024-12-31`,
 	Annotations: map[string]string{
 		AnnotationRequiresAuth: "true",
 	},
