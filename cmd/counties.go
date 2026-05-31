@@ -47,7 +47,7 @@ Required flags:
 
 This endpoint is credit-exempt and not paginated.
 
-Response: {"data": [{"field": "fees", "tier": "missing", "fill_pct": 0.02, "permits_total": 12034}, ...], "meta": {}}`)
+Response: {"data": [{"field": "fees", "tier": "missing", "fill_pct": 0.02, "permits_total": 12034}, ...], "meta": {}}`+coverageWhyMissing)
 
 var countiesSearchCmd = &cobra.Command{
 	Use:   "search",

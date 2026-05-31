@@ -22,6 +22,22 @@ const coverageEndpoint = "/meta/coverage"
 const metricsCoverageTip = `Tip: before aggregating on a specific field, check coverage first — it is credit-exempt
   and flags permit fields that are NOT reliably populated:`
 
+// coverageWhyMissing is the shared interpretation section appended to every
+// geo command's coverage Long help. It explains how to infer WHY a field is
+// unreliable from the existing response (the API exposes no reason field), so
+// all five geo commands document the same cause mapping. It is guidance on
+// inferring cause, not a definitive claim the CLI cannot make.
+const coverageWhyMissing = `
+
+Why a field is missing — two distinct causes, both inferable from the response:
+  - permits_total == 0: no permit data in this geography over this window. This
+    does NOT distinguish "Shovels does not cover this area" from "no permits
+    were filed in the period" — the two are indistinguishable here.
+  - permits_total > 0 with a low/zero fill_pct: the location IS covered (permits
+    exist), but the source jurisdiction(s) do not populate that field (e.g. one
+    that does not publish permit fees).
+A field absent from the data array is reliable (>=80% fill).`
+
 // coverageResponse wraps the bare {"items":[...]} body returned by the
 // coverage endpoint. Only the items array is forwarded to the envelope.
 type coverageResponse struct {
