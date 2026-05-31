@@ -33,6 +33,11 @@ var permitsSearchCmd = &cobra.Command{
 date range. Supports permit tag filters, property type filters, contractor
 filters, and minimum-value thresholds.
 
+Before filtering, ranking, or aggregating on a field like job_value or fees,
+run the credit-exempt coverage check first to confirm that field is reliably
+populated for the area:
+  shovels <geo> coverage GEO_ID --coverage-from 2024-01-01 --coverage-to 2024-12-31
+
 Required flags:
   --geo-id       Geographic area: zip code (92024), state (CA), or resolved Shovels ID
   --permit-from  Start date in YYYY-MM-DD format
@@ -62,10 +67,7 @@ Examples:
   Filter by property type and minimum job value (values in cents, 5000000 = $50,000):
     shovels permits search --geo-id CA --permit-from 2024-01-01 --permit-to 2024-12-31 --property-type residential --min-job-value 5000000
 
-Tip: run with --schema to see all response field names, types, and units before querying.
-Tip: before filtering, ranking, or aggregating on a specific field (e.g. --min-job-value),
-  check coverage first — it is credit-exempt and flags fields that are NOT reliably populated:
-    shovels <geo> coverage GEO_ID --coverage-from 2024-01-01 --coverage-to 2024-12-31`,
+Tip: run with --schema to see all response field names, types, and units before querying.`,
 	Annotations: map[string]string{
 		AnnotationRequiresAuth: "true",
 	},
