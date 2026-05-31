@@ -6,8 +6,28 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
+
+// TestUsageHelpMentionsDailyUsage verifies that `shovels usage --help`
+// documents the daily_usage breakdown field returned in the response.
+func TestUsageHelpMentionsDailyUsage(t *testing.T) {
+	result := runCLI(t, "usage", "--help")
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	out := result.Stdout
+
+	if !strings.Contains(out, "daily_usage") {
+		t.Error("usage --help should mention the daily_usage field")
+	}
+	if !strings.Contains(out, "30-day") {
+		t.Error("usage --help should describe the rolling 30-day window for daily_usage")
+	}
+}
 
 // makeUsageHandler returns an HTTP handler that serves a usage response.
 // The handler returns credit information in both the response body and headers.
