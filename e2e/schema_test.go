@@ -448,6 +448,88 @@ func TestSchemaContractorsGetVsSearchScopeDiffers(t *testing.T) {
 	}
 }
 
+// =======================================================================
+// Coverage schema
+// =======================================================================
+
+// TestSchemaCoveragePathsResolve verifies the 5 geo coverage schema paths
+// resolve and describe the data[] item fields, the tier enum, the
+// coverage date filters, and carry NO meta.* field index entries or
+// --include-count filter (coverage is non-paginated and credit-exempt).
+func TestSchemaCoveragePathsResolve(t *testing.T) {
+	for _, geo := range []string{"cities", "counties", "jurisdictions", "states", "zipcodes"} {
+		geo := geo
+		t.Run(geo, func(t *testing.T) {
+			result := runCLI(t, "schema", geo, "coverage")
+			if result.ExitCode != 0 {
+				t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+			}
+
+			out := parseSchema(t, result.Stdout)
+
+			want := geo + " coverage"
+			if out.Command != want {
+				t.Errorf("expected command %q, got %q", want, out.Command)
+			}
+
+			for _, field := range []string{"field", "tier", "fill_pct", "permits_total"} {
+				if _, ok := out.ResponseFields[field]; !ok {
+					t.Errorf("%s: response_fields missing %q", want, field)
+				}
+			}
+
+			// tier enum must surface missing/partial/reliable.
+			raw, ok := out.ResponseFields["tier"]
+			if !ok {
+				t.Fatalf("%s: response_fields missing tier", want)
+			}
+			m, ok := raw.(map[string]any)
+			if !ok {
+				t.Fatalf("%s: tier field is not an object", want)
+			}
+			enum, _ := m["enum"].(string)
+			for _, val := range []string{"missing", "partial", "reliable"} {
+				if !strings.Contains(enum, val) {
+					t.Errorf("%s: tier enum should contain %q, got %q", want, val, enum)
+				}
+			}
+
+			// No meta.* field index entries (non-paginated, credit-exempt).
+			for _, f := range out.FieldIndex {
+				if strings.HasPrefix(f, "meta.") {
+					t.Errorf("%s: field_index should have no meta.* entries, got %q", want, f)
+				}
+			}
+
+			// Filters: GEO_ID + coverage dates, no --include-count.
+			for _, filter := range []string{"GEO_ID", "--coverage-from", "--coverage-to"} {
+				if _, ok := out.Filters[filter]; !ok {
+					t.Errorf("%s: filters missing %q", want, filter)
+				}
+			}
+			if _, ok := out.Filters["--include-count"]; ok {
+				t.Errorf("%s: filters should not include --include-count", want)
+			}
+		})
+	}
+}
+
+// TestSchemaCoverageViaFlag verifies the `--schema` flag on a coverage
+// subcommand resolves without a GEO_ID positional arg or auth.
+func TestSchemaCoverageViaFlag(t *testing.T) {
+	env := withIsolatedConfigNoAuth(t)
+	result := runCLIWithEnv(t, env, "zipcodes", "coverage", "--schema")
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0 without arg/auth, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	out := parseSchema(t, result.Stdout)
+	if out.Command != "zipcodes coverage" {
+		t.Errorf("expected schema for zipcodes coverage, got %q", out.Command)
+	}
+}
+
 // fieldDescription extracts the description string from a response field.
 func fieldDescription(t *testing.T, out schemaOutput, field string) string {
 	t.Helper()

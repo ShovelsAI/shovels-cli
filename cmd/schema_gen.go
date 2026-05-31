@@ -81,13 +81,18 @@ var allCommands = []commandDef{
 	{"addresses residents", "ResidentsRead", "/addresses/{geo_id}/residents", "none"},
 	{"zipcodes search", "Zipcodes", "/zipcodes/search", "geo_search"},
 	{"states search", "States", "/states/search", "geo_search"},
+	{"cities coverage", "CoverageItem", "/meta/coverage", "coverage"},
+	{"counties coverage", "CoverageItem", "/meta/coverage", "coverage"},
+	{"jurisdictions coverage", "CoverageItem", "/meta/coverage", "coverage"},
+	{"states coverage", "CoverageItem", "/meta/coverage", "coverage"},
+	{"zipcodes coverage", "CoverageItem", "/meta/coverage", "coverage"},
 	{"tags list", "Tags", "/list/tags", "none"},
 }
 
 func main() {
-	spec, err := fetchOpenAPI(openAPIURL)
+	spec, err := loadSpec()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to fetch OpenAPI spec: %v\n", err)
+		fmt.Fprintf(os.Stderr, "failed to load OpenAPI spec: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -100,11 +105,15 @@ func main() {
 	schemas := make(map[string]commandSchemaData)
 	for _, def := range allCommands {
 		fields := extractFields(spec, def.ResponseSchema)
+		if err := checkSchemaResolved(def, fields); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 		if cmdOverride, ok := overrides[def.Command]; ok {
 			mergeFields(fields, cmdOverride.Fields)
 		}
 		filters := buildFilters(def)
-		fieldIndex := buildFieldIndex(fields)
+		fieldIndex := buildFieldIndex(fields, def)
 
 		schemas[def.Command] = commandSchemaData{
 			ResponseFields: fields,
@@ -125,6 +134,40 @@ type commandSchemaData struct {
 	ResponseFields map[string]schemaField
 	FieldIndex     []string
 	Filters        map[string]schemaField
+}
+
+// checkSchemaResolved enforces the loud-fail guard: a command whose named
+// response schema resolves to zero fields (typo, renamed, or removed schema)
+// must fail generation rather than silently emit an empty schema. The error
+// names both the command and the schema so the mismatch is actionable.
+func checkSchemaResolved(def commandDef, fields map[string]schemaField) error {
+	if len(fields) == 0 {
+		return fmt.Errorf("command %q response schema %q resolved to zero fields", def.Command, def.ResponseSchema)
+	}
+	return nil
+}
+
+// loadSpec returns the OpenAPI spec. By default it fetches the live spec over
+// HTTP; if SCHEMA_GEN_SPEC_FILE is set it reads a local JSON file instead,
+// allowing offline, deterministic generator tests.
+func loadSpec() (map[string]any, error) {
+	if path := os.Getenv("SCHEMA_GEN_SPEC_FILE"); path != "" {
+		return readOpenAPIFile(path)
+	}
+	return fetchOpenAPI(openAPIURL)
+}
+
+// readOpenAPIFile parses an OpenAPI JSON spec from a local file.
+func readOpenAPIFile(path string) (map[string]any, error) {
+	body, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read %s: %w", path, err)
+	}
+	var spec map[string]any
+	if err := json.Unmarshal(body, &spec); err != nil {
+		return nil, fmt.Errorf("failed to parse %s: %w", path, err)
+	}
+	return spec, nil
 }
 
 // fetchOpenAPI downloads and parses the OpenAPI JSON spec.
@@ -344,16 +387,19 @@ func mergeFields(base map[string]schemaField, overrides map[string]overrideField
 	}
 }
 
-// buildFieldIndex creates the jq-style field path index for a command.
-func buildFieldIndex(fields map[string]schemaField) []string {
+// buildFieldIndex creates the jq-style field path index for a command. The
+// standard pagination/credit meta fields are appended for every command except
+// coverage, which is non-paginated and credit-exempt (empty meta envelope).
+func buildFieldIndex(fields map[string]schemaField, def commandDef) []string {
 	var index []string
 	for name := range fields {
 		index = append(index, "data[]."+name)
 	}
 	sort.Strings(index)
 
-	// Add standard meta fields.
-	index = append(index, "meta.count", "meta.has_more", "meta.credits_used", "meta.credits_remaining")
+	if def.FiltersFrom != "coverage" {
+		index = append(index, "meta.count", "meta.has_more", "meta.credits_used", "meta.credits_remaining")
+	}
 	return index
 }
 
@@ -440,6 +486,10 @@ func buildFilters(def commandDef) map[string]schemaField {
 		filters["--property-type"] = schemaField{Type: "string", Description: "Property type: residential, commercial, industrial, agricultural, vacant land, exempt, miscellaneous, office, recreational"}
 		filters["--metric-from"] = schemaField{Type: "date", Description: "Start date in YYYY-MM-DD format"}
 		filters["--metric-to"] = schemaField{Type: "date", Description: "End date in YYYY-MM-DD format"}
+	case "coverage":
+		filters["GEO_ID"] = schemaField{Type: "string", Description: "Geographic ID as positional argument"}
+		filters["--coverage-from"] = schemaField{Type: "date", Description: "Start date in YYYY-MM-DD format"}
+		filters["--coverage-to"] = schemaField{Type: "date", Description: "End date in YYYY-MM-DD format"}
 	case "none":
 		// No filters beyond pagination globals.
 	}

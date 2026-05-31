@@ -156,6 +156,27 @@ func init() {
 				"--query": {Type: "string", Description: "Search query string"},
 			},
 		},
+		"cities coverage": {
+			SchemaVersion: 1,
+			Command:       "cities coverage",
+			ResponseFields: map[string]SchemaField{
+				"field":         {Type: "string", Description: "Permit field name whose data coverage is being reported (e.g., fees, job_value)"},
+				"fill_pct":      {Type: "number", Description: "Fraction of permits with this field populated, 0.0-1.0", Range: "0.0-1.0"},
+				"permits_total": {Type: "integer", Description: "Total permits in the geography and date window used to compute fill_pct"},
+				"tier":          {Type: "string", Description: "Coverage tier for the field over the date window: missing (<10% filled), partial (10-80%). Reliable fields (>=80%) are omitted from the response", Enum: "missing, partial, reliable"},
+			},
+			FieldIndex: []string{
+				"data[].field",
+				"data[].fill_pct",
+				"data[].permits_total",
+				"data[].tier",
+			},
+			Filters: map[string]SchemaField{
+				"--coverage-from": {Type: "date", Description: "Start date in YYYY-MM-DD format"},
+				"--coverage-to":   {Type: "date", Description: "End date in YYYY-MM-DD format"},
+				"GEO_ID":          {Type: "string", Description: "Geographic ID as positional argument"},
+			},
+		},
 		"cities metrics current": {
 			SchemaVersion: 1,
 			Command:       "cities metrics current",
@@ -623,6 +644,27 @@ func init() {
 				"--tags":                               {Type: "string[]", Description: "Permit tags, AND logic, prefix with - to exclude"},
 			},
 		},
+		"counties coverage": {
+			SchemaVersion: 1,
+			Command:       "counties coverage",
+			ResponseFields: map[string]SchemaField{
+				"field":         {Type: "string", Description: "Permit field name whose data coverage is being reported (e.g., fees, job_value)"},
+				"fill_pct":      {Type: "number", Description: "Fraction of permits with this field populated, 0.0-1.0", Range: "0.0-1.0"},
+				"permits_total": {Type: "integer", Description: "Total permits in the geography and date window used to compute fill_pct"},
+				"tier":          {Type: "string", Description: "Coverage tier for the field over the date window: missing (<10% filled), partial (10-80%). Reliable fields (>=80%) are omitted from the response", Enum: "missing, partial, reliable"},
+			},
+			FieldIndex: []string{
+				"data[].field",
+				"data[].fill_pct",
+				"data[].permits_total",
+				"data[].tier",
+			},
+			Filters: map[string]SchemaField{
+				"--coverage-from": {Type: "date", Description: "Start date in YYYY-MM-DD format"},
+				"--coverage-to":   {Type: "date", Description: "End date in YYYY-MM-DD format"},
+				"GEO_ID":          {Type: "string", Description: "Geographic ID as positional argument"},
+			},
+		},
 		"counties metrics current": {
 			SchemaVersion: 1,
 			Command:       "counties metrics current",
@@ -722,6 +764,27 @@ func init() {
 			},
 			Filters: map[string]SchemaField{
 				"--query": {Type: "string", Description: "Search query string"},
+			},
+		},
+		"jurisdictions coverage": {
+			SchemaVersion: 1,
+			Command:       "jurisdictions coverage",
+			ResponseFields: map[string]SchemaField{
+				"field":         {Type: "string", Description: "Permit field name whose data coverage is being reported (e.g., fees, job_value)"},
+				"fill_pct":      {Type: "number", Description: "Fraction of permits with this field populated, 0.0-1.0", Range: "0.0-1.0"},
+				"permits_total": {Type: "integer", Description: "Total permits in the geography and date window used to compute fill_pct"},
+				"tier":          {Type: "string", Description: "Coverage tier for the field over the date window: missing (<10% filled), partial (10-80%). Reliable fields (>=80%) are omitted from the response", Enum: "missing, partial, reliable"},
+			},
+			FieldIndex: []string{
+				"data[].field",
+				"data[].fill_pct",
+				"data[].permits_total",
+				"data[].tier",
+			},
+			Filters: map[string]SchemaField{
+				"--coverage-from": {Type: "date", Description: "Start date in YYYY-MM-DD format"},
+				"--coverage-to":   {Type: "date", Description: "End date in YYYY-MM-DD format"},
+				"GEO_ID":          {Type: "string", Description: "Geographic ID as positional argument"},
 			},
 		},
 		"jurisdictions metrics current": {
@@ -1016,6 +1079,27 @@ func init() {
 				"--tags":                               {Type: "string[]", Description: "Permit tags, AND logic, prefix with - to exclude"},
 			},
 		},
+		"states coverage": {
+			SchemaVersion: 1,
+			Command:       "states coverage",
+			ResponseFields: map[string]SchemaField{
+				"field":         {Type: "string", Description: "Permit field name whose data coverage is being reported (e.g., fees, job_value)"},
+				"fill_pct":      {Type: "number", Description: "Fraction of permits with this field populated, 0.0-1.0", Range: "0.0-1.0"},
+				"permits_total": {Type: "integer", Description: "Total permits in the geography and date window used to compute fill_pct"},
+				"tier":          {Type: "string", Description: "Coverage tier for the field over the date window: missing (<10% filled), partial (10-80%). Reliable fields (>=80%) are omitted from the response", Enum: "missing, partial, reliable"},
+			},
+			FieldIndex: []string{
+				"data[].field",
+				"data[].fill_pct",
+				"data[].permits_total",
+				"data[].tier",
+			},
+			Filters: map[string]SchemaField{
+				"--coverage-from": {Type: "date", Description: "Start date in YYYY-MM-DD format"},
+				"--coverage-to":   {Type: "date", Description: "End date in YYYY-MM-DD format"},
+				"GEO_ID":          {Type: "string", Description: "Geographic ID as positional argument"},
+			},
+		},
 		"states search": {
 			SchemaVersion: 1,
 			Command:       "states search",
@@ -1051,6 +1135,27 @@ func init() {
 				"meta.credits_remaining",
 			},
 			Filters: map[string]SchemaField{},
+		},
+		"zipcodes coverage": {
+			SchemaVersion: 1,
+			Command:       "zipcodes coverage",
+			ResponseFields: map[string]SchemaField{
+				"field":         {Type: "string", Description: "Permit field name whose data coverage is being reported (e.g., fees, job_value)"},
+				"fill_pct":      {Type: "number", Description: "Fraction of permits with this field populated, 0.0-1.0", Range: "0.0-1.0"},
+				"permits_total": {Type: "integer", Description: "Total permits in the geography and date window used to compute fill_pct"},
+				"tier":          {Type: "string", Description: "Coverage tier for the field over the date window: missing (<10% filled), partial (10-80%). Reliable fields (>=80%) are omitted from the response", Enum: "missing, partial, reliable"},
+			},
+			FieldIndex: []string{
+				"data[].field",
+				"data[].fill_pct",
+				"data[].permits_total",
+				"data[].tier",
+			},
+			Filters: map[string]SchemaField{
+				"--coverage-from": {Type: "date", Description: "Start date in YYYY-MM-DD format"},
+				"--coverage-to":   {Type: "date", Description: "End date in YYYY-MM-DD format"},
+				"GEO_ID":          {Type: "string", Description: "Geographic ID as positional argument"},
+			},
 		},
 		"zipcodes search": {
 			SchemaVersion: 1,
