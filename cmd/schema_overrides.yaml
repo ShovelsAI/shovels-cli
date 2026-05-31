@@ -573,6 +573,71 @@ states search:
     name:
       description: "Full state name"
 
+cities coverage:
+  fields:
+    field:
+      description: "Permit field name whose data coverage is being reported (e.g., fees, job_value)"
+    tier:
+      description: "Coverage tier for the field over the date window: missing (<10% filled), partial (10-80%). Reliable fields (>=80%) are omitted from the response"
+      enum: "missing, partial, reliable"
+    fill_pct:
+      description: "Fraction of permits with this field populated, 0.0-1.0"
+      range: "0.0-1.0"
+    permits_total:
+      description: "Total permits in the geography and date window used to compute fill_pct"
+
+counties coverage:
+  fields:
+    field:
+      description: "Permit field name whose data coverage is being reported (e.g., fees, job_value)"
+    tier:
+      description: "Coverage tier for the field over the date window: missing (<10% filled), partial (10-80%). Reliable fields (>=80%) are omitted from the response"
+      enum: "missing, partial, reliable"
+    fill_pct:
+      description: "Fraction of permits with this field populated, 0.0-1.0"
+      range: "0.0-1.0"
+    permits_total:
+      description: "Total permits in the geography and date window used to compute fill_pct"
+
+jurisdictions coverage:
+  fields:
+    field:
+      description: "Permit field name whose data coverage is being reported (e.g., fees, job_value)"
+    tier:
+      description: "Coverage tier for the field over the date window: missing (<10% filled), partial (10-80%). Reliable fields (>=80%) are omitted from the response"
+      enum: "missing, partial, reliable"
+    fill_pct:
+      description: "Fraction of permits with this field populated, 0.0-1.0"
+      range: "0.0-1.0"
+    permits_total:
+      description: "Total permits in the geography and date window used to compute fill_pct"
+
+states coverage:
+  fields:
+    field:
+      description: "Permit field name whose data coverage is being reported (e.g., fees, job_value)"
+    tier:
+      description: "Coverage tier for the field over the date window: missing (<10% filled), partial (10-80%). Reliable fields (>=80%) are omitted from the response"
+      enum: "missing, partial, reliable"
+    fill_pct:
+      description: "Fraction of permits with this field populated, 0.0-1.0"
+      range: "0.0-1.0"
+    permits_total:
+      description: "Total permits in the geography and date window used to compute fill_pct"
+
+zipcodes coverage:
+  fields:
+    field:
+      description: "Permit field name whose data coverage is being reported (e.g., fees, job_value)"
+    tier:
+      description: "Coverage tier for the field over the date window: missing (<10% filled), partial (10-80%). Reliable fields (>=80%) are omitted from the response"
+      enum: "missing, partial, reliable"
+    fill_pct:
+      description: "Fraction of permits with this field populated, 0.0-1.0"
+      range: "0.0-1.0"
+    permits_total:
+      description: "Total permits in the geography and date window used to compute fill_pct"
+
 tags list:
   fields:
     id:

@@ -34,6 +34,11 @@ func TestGeneratedSchemaCoversAllDataCommands(t *testing.T) {
 		"addresses residents",
 		"zipcodes search",
 		"states search",
+		"cities coverage",
+		"counties coverage",
+		"jurisdictions coverage",
+		"states coverage",
+		"zipcodes coverage",
 		"tags list",
 	}
 
@@ -96,12 +101,17 @@ func TestSchemaHasFieldIndex(t *testing.T) {
 	}
 }
 
-// TestSchemaFieldIndexContainsMetaFields verifies every schema's field index
-// includes the standard meta fields used for pagination and credit tracking.
+// TestSchemaFieldIndexContainsMetaFields verifies every paginated schema's
+// field index includes the standard meta fields used for pagination and credit
+// tracking. Coverage commands are non-paginated and credit-exempt, so they
+// carry an empty meta envelope and are exempt from this assertion.
 func TestSchemaFieldIndexContainsMetaFields(t *testing.T) {
 	metaFields := []string{"meta.count", "meta.has_more", "meta.credits_used", "meta.credits_remaining"}
 
 	for _, cmd := range SchemaCommands() {
+		if strings.HasSuffix(cmd, " coverage") {
+			continue
+		}
 		s := LookupSchema(cmd)
 		indexSet := make(map[string]bool, len(s.FieldIndex))
 		for _, f := range s.FieldIndex {
@@ -110,6 +120,62 @@ func TestSchemaFieldIndexContainsMetaFields(t *testing.T) {
 		for _, mf := range metaFields {
 			if !indexSet[mf] {
 				t.Errorf("schema for %q missing meta field %q in field_index", cmd, mf)
+			}
+		}
+	}
+}
+
+// TestCoverageSchemaHasNoMetaFields verifies coverage schemas do NOT include
+// the pagination/credit meta fields, since coverage is non-paginated and
+// credit-exempt.
+func TestCoverageSchemaHasNoMetaFields(t *testing.T) {
+	coverageCmds := []string{
+		"cities coverage",
+		"counties coverage",
+		"jurisdictions coverage",
+		"states coverage",
+		"zipcodes coverage",
+	}
+	for _, cmd := range coverageCmds {
+		s := LookupSchema(cmd)
+		if s == nil {
+			t.Fatalf("schema for %q not found", cmd)
+		}
+		for _, f := range s.FieldIndex {
+			if strings.HasPrefix(f, "meta.") {
+				t.Errorf("coverage schema %q should have no meta.* field index entries, got %q", cmd, f)
+			}
+		}
+		if _, ok := s.Filters["--include-count"]; ok {
+			t.Errorf("coverage schema %q should not have --include-count filter", cmd)
+		}
+	}
+}
+
+// TestCoverageSchemaTierEnum verifies coverage schemas surface the tier enum
+// (missing/partial/reliable) and the expected response field set.
+func TestCoverageSchemaTierEnum(t *testing.T) {
+	coverageCmds := []string{
+		"cities coverage",
+		"counties coverage",
+		"jurisdictions coverage",
+		"states coverage",
+		"zipcodes coverage",
+	}
+	for _, cmd := range coverageCmds {
+		s := LookupSchema(cmd)
+		if s == nil {
+			t.Fatalf("schema for %q not found", cmd)
+		}
+		for _, field := range []string{"field", "tier", "fill_pct", "permits_total"} {
+			if _, ok := s.ResponseFields[field]; !ok {
+				t.Errorf("coverage schema %q missing response field %q", cmd, field)
+			}
+		}
+		tier := s.ResponseFields["tier"]
+		for _, val := range []string{"missing", "partial", "reliable"} {
+			if !strings.Contains(tier.Enum, val) {
+				t.Errorf("coverage schema %q tier enum should contain %q, got %q", cmd, val, tier.Enum)
 			}
 		}
 	}
