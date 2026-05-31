@@ -135,7 +135,10 @@ Available subcommands:
 
 Resolve a county geo_id first:
   GEO=$(shovels counties search -q "Los Angeles" | jq -r '.data[0].geo_id')
-  shovels counties metrics current "$GEO" --tag solar --property-type residential`,
+  shovels counties metrics current "$GEO" --tag solar --property-type residential
+
+` + metricsCoverageTip + `
+    shovels counties coverage "$GEO" --coverage-from 2024-01-01 --coverage-to 2024-12-31`,
 }
 
 var countiesMetricsCurrentCmd = &cobra.Command{

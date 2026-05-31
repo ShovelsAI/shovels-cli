@@ -450,6 +450,91 @@ func TestJurisdictionsMetricsHelpListsAllPropertyTypes(t *testing.T) {
 	}
 }
 
+// TestRootHelpRecommendsCoverageInWorkflow verifies that `shovels --help`
+// includes a recommended-workflow block naming coverage as the credit-exempt
+// step to run before search or metrics.
+func TestRootHelpRecommendsCoverageInWorkflow(t *testing.T) {
+	result := runCLI(t, "--help")
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	out := result.Stdout
+
+	if !strings.Contains(out, "Recommended workflow") {
+		t.Error("root --help should include a Recommended workflow block")
+	}
+	if !strings.Contains(out, "coverage") {
+		t.Error("root --help workflow should name the coverage command")
+	}
+	if !strings.Contains(out, "credit-exempt") {
+		t.Error("root --help workflow should frame coverage as credit-exempt")
+	}
+}
+
+// TestPermitsSearchHelpShowsCoverageTip verifies that
+// `shovels permits search --help` includes a tip pointing to the
+// credit-exempt coverage command as a pre-flight check.
+func TestPermitsSearchHelpShowsCoverageTip(t *testing.T) {
+	result := runCLI(t, "permits", "search", "--help")
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	out := result.Stdout
+
+	if !strings.Contains(out, "coverage GEO_ID") {
+		t.Error("permits search --help should point to `<geo> coverage GEO_ID`")
+	}
+	if !strings.Contains(out, "credit-exempt") {
+		t.Error("permits search --help coverage tip should mention credit-exempt")
+	}
+}
+
+// TestContractorsSearchHelpShowsCoverageTip verifies that
+// `shovels contractors search --help` includes a tip pointing to the
+// credit-exempt coverage command as a pre-flight check.
+func TestContractorsSearchHelpShowsCoverageTip(t *testing.T) {
+	result := runCLI(t, "contractors", "search", "--help")
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	out := result.Stdout
+
+	if !strings.Contains(out, "coverage GEO_ID") {
+		t.Error("contractors search --help should point to `<geo> coverage GEO_ID`")
+	}
+	if !strings.Contains(out, "credit-exempt") {
+		t.Error("contractors search --help coverage tip should mention credit-exempt")
+	}
+}
+
+// TestMetricsHelpShowsCoverageTip verifies that the metrics command help on
+// cities, counties, and jurisdictions points to the credit-exempt coverage
+// command.
+func TestMetricsHelpShowsCoverageTip(t *testing.T) {
+	for _, geo := range []string{"cities", "counties", "jurisdictions"} {
+		t.Run(geo, func(t *testing.T) {
+			result := runCLI(t, geo, "metrics", "--help")
+			if result.ExitCode != 0 {
+				t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+			}
+
+			out := result.Stdout
+			if !strings.Contains(out, geo+" coverage") {
+				t.Errorf("%s metrics --help should point to %q", geo, geo+" coverage")
+			}
+			if !strings.Contains(out, "credit-exempt") {
+				t.Errorf("%s metrics --help coverage tip should mention credit-exempt", geo)
+			}
+		})
+	}
+}
+
 // TestAddressesSearchHelpShowsRequiredFlag verifies that
 // `shovels addresses search --help` marks the --query flag as required
 // and includes usage examples.

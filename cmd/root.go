@@ -72,6 +72,14 @@ Available resources:
   config          Read and write persistent settings (API key, base URL)
   version         Print CLI version, git commit, build date, and API data freshness
 
+Recommended workflow:
+  1. Resolve a geo_id (cities/counties/jurisdictions search); zip codes and states work directly.
+  2. Check coverage FIRST (credit-exempt): shovels <geo> coverage GEO_ID --coverage-from D --coverage-to D
+     Coverage works on city, county, jurisdiction, state, and zipcode geo_ids. It flags permit
+     fields that are NOT reliably populated for that geography and date window (with each field's
+     fill level and permit volume), so you don't spend credits on queries the data can't support.
+  3. Run permits/contractors search or metrics with confidence.
+
 Inspect response fields before querying:
   Add --schema to any search or get command to see field names, types, and units without making an API call.
 

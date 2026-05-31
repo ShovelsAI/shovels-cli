@@ -135,7 +135,10 @@ Available subcommands:
 
 Resolve a city geo_id first:
   GEO=$(shovels cities search -q "Miami" | jq -r '.data[0].geo_id')
-  shovels cities metrics current "$GEO" --tag solar --property-type residential`,
+  shovels cities metrics current "$GEO" --tag solar --property-type residential
+
+` + metricsCoverageTip + `
+    shovels cities coverage "$GEO" --coverage-from 2024-01-01 --coverage-to 2024-12-31`,
 }
 
 var citiesMetricsCurrentCmd = &cobra.Command{

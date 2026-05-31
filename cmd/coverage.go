@@ -16,6 +16,12 @@ import (
 // URL already carries the /v2 prefix, so this resolves to /v2/meta/coverage.
 const coverageEndpoint = "/meta/coverage"
 
+// metricsCoverageTip is the shared two-line tip prepended to the coverage
+// example in each per-resource metrics help. Resource-specific files append a
+// third line with their own `shovels <geo> coverage` invocation.
+const metricsCoverageTip = `Tip: before aggregating on a specific field, check coverage first — it is credit-exempt
+  and flags permit fields that are NOT reliably populated:`
+
 // coverageResponse wraps the bare {"items":[...]} body returned by the
 // coverage endpoint. Only the items array is forwarded to the envelope.
 type coverageResponse struct {
