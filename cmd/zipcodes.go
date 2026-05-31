@@ -18,6 +18,7 @@ var zipcodesCmd = &cobra.Command{
 
 Available subcommands:
   search    Search zip codes by prefix or full code
+  coverage  Check which permit fields are reliably populated for a zip code
 
 Zip code geo_ids are used directly as 5-digit codes with --geo-id on other
 commands like permits search and contractors search. No resolution step needed
@@ -26,6 +27,24 @@ partial prefix.
 
 Every response is a JSON envelope: {"data": [...], "meta": {...}}`,
 }
+
+var zipcodesCoverageCmd = newCoverageCmd("zipcode",
+	"Check which permit fields are reliably populated for a zip code",
+	`Check per-field data coverage for a zip code before running permit queries.
+Returns one item per tracked permit field that is NOT reliably populated:
+tier "missing" (<10% of permits have it) or "partial" (10-80%). Fields that
+are reliable (>=80%) are omitted, so an empty data array means full coverage.
+
+GEO_ID is positional and is the 5-digit zip code used directly (no resolution):
+  shovels zipcodes coverage 92024 --coverage-from 2024-01-01 --coverage-to 2024-12-31
+
+Required flags:
+  --coverage-from DATE   Start date in YYYY-MM-DD format (required)
+  --coverage-to DATE     End date in YYYY-MM-DD format (required)
+
+This endpoint is credit-exempt and not paginated.
+
+Response: {"data": [{"field": "fees", "tier": "missing", "fill_pct": 0.02, "permits_total": 12034}, ...], "meta": {}}`)
 
 var zipcodesSearchCmd = &cobra.Command{
 	Use:   "search",
@@ -106,5 +125,6 @@ func init() {
 	registerSchemaFlag(zipcodesSearchCmd)
 
 	zipcodesCmd.AddCommand(zipcodesSearchCmd)
+	zipcodesCmd.AddCommand(zipcodesCoverageCmd)
 	rootCmd.AddCommand(zipcodesCmd)
 }

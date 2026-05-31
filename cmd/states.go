@@ -18,6 +18,7 @@ var statesCmd = &cobra.Command{
 
 Available subcommands:
   search    Search states by name or abbreviation
+  coverage  Check which permit fields are reliably populated for a state
 
 State geo_ids are 2-letter abbreviations (CA, TX, NY) used directly with --geo-id
 on other commands like permits search and contractors search. This command helps
@@ -25,6 +26,24 @@ discover the correct abbreviation from a full or partial state name.
 
 Every response is a JSON envelope: {"data": [...], "meta": {...}}`,
 }
+
+var statesCoverageCmd = newCoverageCmd("state",
+	"Check which permit fields are reliably populated for a state",
+	`Check per-field data coverage for a US state before running permit queries.
+Returns one item per tracked permit field that is NOT reliably populated:
+tier "missing" (<10% of permits have it) or "partial" (10-80%). Fields that
+are reliable (>=80%) are omitted, so an empty data array means full coverage.
+
+GEO_ID is positional and is the 2-letter state abbreviation (CA, TX, NY):
+  shovels states coverage CA --coverage-from 2024-01-01 --coverage-to 2024-12-31
+
+Required flags:
+  --coverage-from DATE   Start date in YYYY-MM-DD format (required)
+  --coverage-to DATE     End date in YYYY-MM-DD format (required)
+
+This endpoint is credit-exempt and not paginated.
+
+Response: {"data": [{"field": "fees", "tier": "missing", "fill_pct": 0.02, "permits_total": 12034}, ...], "meta": {}}`)
 
 var statesSearchCmd = &cobra.Command{
 	Use:   "search",
@@ -106,5 +125,6 @@ func init() {
 	registerSchemaFlag(statesSearchCmd)
 
 	statesCmd.AddCommand(statesSearchCmd)
+	statesCmd.AddCommand(statesCoverageCmd)
 	rootCmd.AddCommand(statesCmd)
 }

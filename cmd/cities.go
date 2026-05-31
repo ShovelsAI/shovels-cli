@@ -25,9 +25,29 @@ and retrieve permit activity metrics for cities.
 Available subcommands:
   search    Search cities by name to get their geo_id for use in --geo-id
   metrics   View permit activity metrics for a city (current snapshot or monthly)
+  coverage  Check which permit fields are reliably populated for a city
 
 Every response is a JSON envelope: {"data": [...], "meta": {...}}`,
 }
+
+var citiesCoverageCmd = newCoverageCmd("city",
+	"Check which permit fields are reliably populated for a city",
+	`Check per-field data coverage for a city before running permit queries.
+Returns one item per tracked permit field that is NOT reliably populated:
+tier "missing" (<10% of permits have it) or "partial" (10-80%). Fields that
+are reliable (>=80%) are omitted, so an empty data array means full coverage.
+
+GEO_ID is positional. Resolve a city geo_id first with "cities search":
+  GEO=$(shovels cities search -q "Miami" | jq -r '.data[0].geo_id')
+  shovels cities coverage "$GEO" --coverage-from 2024-01-01 --coverage-to 2024-12-31
+
+Required flags:
+  --coverage-from DATE   Start date in YYYY-MM-DD format (required)
+  --coverage-to DATE     End date in YYYY-MM-DD format (required)
+
+This endpoint is credit-exempt and not paginated.
+
+Response: {"data": [{"field": "fees", "tier": "missing", "fill_pct": 0.02, "permits_total": 12034}, ...], "meta": {}}`)
 
 var citiesSearchCmd = &cobra.Command{
 	Use:   "search",
@@ -206,5 +226,6 @@ func init() {
 
 	citiesCmd.AddCommand(citiesSearchCmd)
 	citiesCmd.AddCommand(citiesMetricsCmd)
+	citiesCmd.AddCommand(citiesCoverageCmd)
 	rootCmd.AddCommand(citiesCmd)
 }
