@@ -557,6 +557,55 @@ func TestMetricsHelpShowsCoverageTip(t *testing.T) {
 	}
 }
 
+// TestCoverageHelpExplainsBothCauses verifies that `<geo> coverage --help`
+// explains both reasons a permit field can be unreliable: permits_total == 0
+// (no data for the window — jurisdiction not covered or no permits filed) and
+// permits_total > 0 with a low fill_pct (the source jurisdiction does not
+// populate the field). It also states that an absent field is reliable.
+func TestCoverageHelpExplainsBothCauses(t *testing.T) {
+	for _, geo := range []string{"cities", "counties", "jurisdictions", "states", "zipcodes"} {
+		t.Run(geo, func(t *testing.T) {
+			result := runCLI(t, geo, "coverage", "--help")
+			if result.ExitCode != 0 {
+				t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+			}
+
+			out := result.Stdout
+
+			// Cause 1: permits_total == 0 means no data for the window, and
+			// the help must say the two sub-causes are not distinguishable.
+			if !strings.Contains(out, "permits_total == 0") {
+				t.Error("coverage --help should explain the permits_total == 0 cause")
+			}
+			if !strings.Contains(out, "no permits") {
+				t.Error("coverage --help should note permits_total == 0 may mean no permits were filed")
+			}
+			// The ambiguity itself: permits_total == 0 cannot tell "not
+			// covered" apart from "no permits filed in the window".
+			if !strings.Contains(out, "does NOT distinguish") {
+				t.Error("coverage --help should state permits_total == 0 does NOT distinguish the two sub-causes")
+			}
+			if !strings.Contains(out, "the two are indistinguishable") {
+				t.Error("coverage --help should state the two sub-causes are indistinguishable")
+			}
+
+			// Cause 2: permits_total > 0 with low fill_pct means the source
+			// jurisdiction does not populate the field.
+			if !strings.Contains(out, "permits_total > 0") {
+				t.Error("coverage --help should explain the permits_total > 0 / field-not-sourced cause")
+			}
+			if !strings.Contains(out, "do not populate that field") {
+				t.Error("coverage --help should say the source jurisdiction does not populate the field")
+			}
+
+			// Absent field is reliable.
+			if !strings.Contains(out, "absent from the data array is reliable") {
+				t.Error("coverage --help should state an absent field is reliable")
+			}
+		})
+	}
+}
+
 // TestAddressesSearchHelpShowsRequiredFlag verifies that
 // `shovels addresses search --help` marks the --query flag as required
 // and includes usage examples.

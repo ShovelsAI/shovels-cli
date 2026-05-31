@@ -161,9 +161,9 @@ func init() {
 			Command:       "cities coverage",
 			ResponseFields: map[string]SchemaField{
 				"field":         {Type: "string", Description: "Permit field name whose data coverage is being reported (e.g., fees, job_value)"},
-				"fill_pct":      {Type: "number", Description: "Fraction of permits with this field populated, 0.0-1.0", Range: "0.0-1.0"},
-				"permits_total": {Type: "integer", Description: "Total permits in the geography and date window used to compute fill_pct"},
-				"tier":          {Type: "string", Description: "Coverage tier for the field over the date window: missing (<10% filled), partial (10-80%). Reliable fields (>=80%) are omitted from the response", Enum: "missing, partial, reliable"},
+				"fill_pct":      {Type: "number", Description: "Fraction of permits with this field populated, 0.0-1.0. Near 0 alongside permits_total > 0 means the location is covered but the source jurisdiction does not populate this field", Range: "0.0-1.0"},
+				"permits_total": {Type: "integer", Description: "Total permits in the geography and date window used to compute fill_pct. 0 means no permit data in this window — either this area is not covered or no permits were filed in the period (not distinguishable from the response)"},
+				"tier":          {Type: "string", Description: "Coverage tier of this field over the date window: missing (<10% filled), partial (10-80%). Reliable fields (>=80%) are omitted from the response, so an absent field is reliable", Enum: "missing, partial, reliable"},
 			},
 			FieldIndex: []string{
 				"data[].field",
@@ -649,9 +649,9 @@ func init() {
 			Command:       "counties coverage",
 			ResponseFields: map[string]SchemaField{
 				"field":         {Type: "string", Description: "Permit field name whose data coverage is being reported (e.g., fees, job_value)"},
-				"fill_pct":      {Type: "number", Description: "Fraction of permits with this field populated, 0.0-1.0", Range: "0.0-1.0"},
-				"permits_total": {Type: "integer", Description: "Total permits in the geography and date window used to compute fill_pct"},
-				"tier":          {Type: "string", Description: "Coverage tier for the field over the date window: missing (<10% filled), partial (10-80%). Reliable fields (>=80%) are omitted from the response", Enum: "missing, partial, reliable"},
+				"fill_pct":      {Type: "number", Description: "Fraction of permits with this field populated, 0.0-1.0. Near 0 alongside permits_total > 0 means the location is covered but the source jurisdiction does not populate this field", Range: "0.0-1.0"},
+				"permits_total": {Type: "integer", Description: "Total permits in the geography and date window used to compute fill_pct. 0 means no permit data in this window — either this area is not covered or no permits were filed in the period (not distinguishable from the response)"},
+				"tier":          {Type: "string", Description: "Coverage tier of this field over the date window: missing (<10% filled), partial (10-80%). Reliable fields (>=80%) are omitted from the response, so an absent field is reliable", Enum: "missing, partial, reliable"},
 			},
 			FieldIndex: []string{
 				"data[].field",
@@ -771,9 +771,9 @@ func init() {
 			Command:       "jurisdictions coverage",
 			ResponseFields: map[string]SchemaField{
 				"field":         {Type: "string", Description: "Permit field name whose data coverage is being reported (e.g., fees, job_value)"},
-				"fill_pct":      {Type: "number", Description: "Fraction of permits with this field populated, 0.0-1.0", Range: "0.0-1.0"},
-				"permits_total": {Type: "integer", Description: "Total permits in the geography and date window used to compute fill_pct"},
-				"tier":          {Type: "string", Description: "Coverage tier for the field over the date window: missing (<10% filled), partial (10-80%). Reliable fields (>=80%) are omitted from the response", Enum: "missing, partial, reliable"},
+				"fill_pct":      {Type: "number", Description: "Fraction of permits with this field populated, 0.0-1.0. Near 0 alongside permits_total > 0 means the location is covered but the source jurisdiction does not populate this field", Range: "0.0-1.0"},
+				"permits_total": {Type: "integer", Description: "Total permits in the geography and date window used to compute fill_pct. 0 means no permit data in this window — either this area is not covered or no permits were filed in the period (not distinguishable from the response)"},
+				"tier":          {Type: "string", Description: "Coverage tier of this field over the date window: missing (<10% filled), partial (10-80%). Reliable fields (>=80%) are omitted from the response, so an absent field is reliable", Enum: "missing, partial, reliable"},
 			},
 			FieldIndex: []string{
 				"data[].field",
@@ -1084,9 +1084,9 @@ func init() {
 			Command:       "states coverage",
 			ResponseFields: map[string]SchemaField{
 				"field":         {Type: "string", Description: "Permit field name whose data coverage is being reported (e.g., fees, job_value)"},
-				"fill_pct":      {Type: "number", Description: "Fraction of permits with this field populated, 0.0-1.0", Range: "0.0-1.0"},
-				"permits_total": {Type: "integer", Description: "Total permits in the geography and date window used to compute fill_pct"},
-				"tier":          {Type: "string", Description: "Coverage tier for the field over the date window: missing (<10% filled), partial (10-80%). Reliable fields (>=80%) are omitted from the response", Enum: "missing, partial, reliable"},
+				"fill_pct":      {Type: "number", Description: "Fraction of permits with this field populated, 0.0-1.0. Near 0 alongside permits_total > 0 means the location is covered but the source jurisdiction does not populate this field", Range: "0.0-1.0"},
+				"permits_total": {Type: "integer", Description: "Total permits in the geography and date window used to compute fill_pct. 0 means no permit data in this window — either this area is not covered or no permits were filed in the period (not distinguishable from the response)"},
+				"tier":          {Type: "string", Description: "Coverage tier of this field over the date window: missing (<10% filled), partial (10-80%). Reliable fields (>=80%) are omitted from the response, so an absent field is reliable", Enum: "missing, partial, reliable"},
 			},
 			FieldIndex: []string{
 				"data[].field",
@@ -1141,9 +1141,9 @@ func init() {
 			Command:       "zipcodes coverage",
 			ResponseFields: map[string]SchemaField{
 				"field":         {Type: "string", Description: "Permit field name whose data coverage is being reported (e.g., fees, job_value)"},
-				"fill_pct":      {Type: "number", Description: "Fraction of permits with this field populated, 0.0-1.0", Range: "0.0-1.0"},
-				"permits_total": {Type: "integer", Description: "Total permits in the geography and date window used to compute fill_pct"},
-				"tier":          {Type: "string", Description: "Coverage tier for the field over the date window: missing (<10% filled), partial (10-80%). Reliable fields (>=80%) are omitted from the response", Enum: "missing, partial, reliable"},
+				"fill_pct":      {Type: "number", Description: "Fraction of permits with this field populated, 0.0-1.0. Near 0 alongside permits_total > 0 means the location is covered but the source jurisdiction does not populate this field", Range: "0.0-1.0"},
+				"permits_total": {Type: "integer", Description: "Total permits in the geography and date window used to compute fill_pct. 0 means no permit data in this window — either this area is not covered or no permits were filed in the period (not distinguishable from the response)"},
+				"tier":          {Type: "string", Description: "Coverage tier of this field over the date window: missing (<10% filled), partial (10-80%). Reliable fields (>=80%) are omitted from the response, so an absent field is reliable", Enum: "missing, partial, reliable"},
 			},
 			FieldIndex: []string{
 				"data[].field",

@@ -510,6 +510,29 @@ func TestSchemaCoveragePathsResolve(t *testing.T) {
 			if _, ok := out.Filters["--include-count"]; ok {
 				t.Errorf("%s: filters should not include --include-count", want)
 			}
+
+			// Enriched descriptions must convey the two gap-causes so an
+			// agent can infer WHY a field is unreliable from --schema alone.
+			permitsTotalDesc := fieldDescription(t, out, "permits_total")
+			if !strings.Contains(permitsTotalDesc, "0 means no permit data") {
+				t.Errorf("%s: permits_total description should explain 0 => no data, got %q", want, permitsTotalDesc)
+			}
+			if !strings.Contains(permitsTotalDesc, "not distinguishable") {
+				t.Errorf("%s: permits_total description should note the two sub-causes are not distinguishable, got %q", want, permitsTotalDesc)
+			}
+
+			fillPctDesc := fieldDescription(t, out, "fill_pct")
+			if !strings.Contains(fillPctDesc, "permits_total > 0") {
+				t.Errorf("%s: fill_pct description should explain the field-not-sourced cause, got %q", want, fillPctDesc)
+			}
+			if !strings.Contains(fillPctDesc, "does not populate") {
+				t.Errorf("%s: fill_pct description should say the source jurisdiction does not populate the field, got %q", want, fillPctDesc)
+			}
+
+			tierDesc := fieldDescription(t, out, "tier")
+			if !strings.Contains(tierDesc, "absent field is reliable") {
+				t.Errorf("%s: tier description should state an absent field is reliable, got %q", want, tierDesc)
+			}
 		})
 	}
 }

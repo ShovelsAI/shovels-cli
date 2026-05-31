@@ -578,65 +578,65 @@ cities coverage:
     field:
       description: "Permit field name whose data coverage is being reported (e.g., fees, job_value)"
     tier:
-      description: "Coverage tier for the field over the date window: missing (<10% filled), partial (10-80%). Reliable fields (>=80%) are omitted from the response"
+      description: "Coverage tier of this field over the date window: missing (<10% filled), partial (10-80%). Reliable fields (>=80%) are omitted from the response, so an absent field is reliable"
       enum: "missing, partial, reliable"
     fill_pct:
-      description: "Fraction of permits with this field populated, 0.0-1.0"
+      description: "Fraction of permits with this field populated, 0.0-1.0. Near 0 alongside permits_total > 0 means the location is covered but the source jurisdiction does not populate this field"
       range: "0.0-1.0"
     permits_total:
-      description: "Total permits in the geography and date window used to compute fill_pct"
+      description: "Total permits in the geography and date window used to compute fill_pct. 0 means no permit data in this window — either this area is not covered or no permits were filed in the period (not distinguishable from the response)"
 
 counties coverage:
   fields:
     field:
       description: "Permit field name whose data coverage is being reported (e.g., fees, job_value)"
     tier:
-      description: "Coverage tier for the field over the date window: missing (<10% filled), partial (10-80%). Reliable fields (>=80%) are omitted from the response"
+      description: "Coverage tier of this field over the date window: missing (<10% filled), partial (10-80%). Reliable fields (>=80%) are omitted from the response, so an absent field is reliable"
       enum: "missing, partial, reliable"
     fill_pct:
-      description: "Fraction of permits with this field populated, 0.0-1.0"
+      description: "Fraction of permits with this field populated, 0.0-1.0. Near 0 alongside permits_total > 0 means the location is covered but the source jurisdiction does not populate this field"
       range: "0.0-1.0"
     permits_total:
-      description: "Total permits in the geography and date window used to compute fill_pct"
+      description: "Total permits in the geography and date window used to compute fill_pct. 0 means no permit data in this window — either this area is not covered or no permits were filed in the period (not distinguishable from the response)"
 
 jurisdictions coverage:
   fields:
     field:
       description: "Permit field name whose data coverage is being reported (e.g., fees, job_value)"
     tier:
-      description: "Coverage tier for the field over the date window: missing (<10% filled), partial (10-80%). Reliable fields (>=80%) are omitted from the response"
+      description: "Coverage tier of this field over the date window: missing (<10% filled), partial (10-80%). Reliable fields (>=80%) are omitted from the response, so an absent field is reliable"
       enum: "missing, partial, reliable"
     fill_pct:
-      description: "Fraction of permits with this field populated, 0.0-1.0"
+      description: "Fraction of permits with this field populated, 0.0-1.0. Near 0 alongside permits_total > 0 means the location is covered but the source jurisdiction does not populate this field"
       range: "0.0-1.0"
     permits_total:
-      description: "Total permits in the geography and date window used to compute fill_pct"
+      description: "Total permits in the geography and date window used to compute fill_pct. 0 means no permit data in this window — either this area is not covered or no permits were filed in the period (not distinguishable from the response)"
 
 states coverage:
   fields:
     field:
       description: "Permit field name whose data coverage is being reported (e.g., fees, job_value)"
     tier:
-      description: "Coverage tier for the field over the date window: missing (<10% filled), partial (10-80%). Reliable fields (>=80%) are omitted from the response"
+      description: "Coverage tier of this field over the date window: missing (<10% filled), partial (10-80%). Reliable fields (>=80%) are omitted from the response, so an absent field is reliable"
       enum: "missing, partial, reliable"
     fill_pct:
-      description: "Fraction of permits with this field populated, 0.0-1.0"
+      description: "Fraction of permits with this field populated, 0.0-1.0. Near 0 alongside permits_total > 0 means the location is covered but the source jurisdiction does not populate this field"
       range: "0.0-1.0"
     permits_total:
-      description: "Total permits in the geography and date window used to compute fill_pct"
+      description: "Total permits in the geography and date window used to compute fill_pct. 0 means no permit data in this window — either this area is not covered or no permits were filed in the period (not distinguishable from the response)"
 
 zipcodes coverage:
   fields:
     field:
       description: "Permit field name whose data coverage is being reported (e.g., fees, job_value)"
     tier:
-      description: "Coverage tier for the field over the date window: missing (<10% filled), partial (10-80%). Reliable fields (>=80%) are omitted from the response"
+      description: "Coverage tier of this field over the date window: missing (<10% filled), partial (10-80%). Reliable fields (>=80%) are omitted from the response, so an absent field is reliable"
       enum: "missing, partial, reliable"
     fill_pct:
-      description: "Fraction of permits with this field populated, 0.0-1.0"
+      description: "Fraction of permits with this field populated, 0.0-1.0. Near 0 alongside permits_total > 0 means the location is covered but the source jurisdiction does not populate this field"
       range: "0.0-1.0"
     permits_total:
-      description: "Total permits in the geography and date window used to compute fill_pct"
+      description: "Total permits in the geography and date window used to compute fill_pct. 0 means no permit data in this window — either this area is not covered or no permits were filed in the period (not distinguishable from the response)"
 
 tags list:
   fields:
