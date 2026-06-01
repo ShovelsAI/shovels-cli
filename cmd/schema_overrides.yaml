@@ -90,6 +90,24 @@ permits get:
     tags:
       description: "Permit classification tags (e.g., solar, roofing, electrical)"
 
+decisions search:
+  fields:
+    project_value:
+      description: "Declared project value for the decision, in cents (divide by 100 for dollars)"
+      unit: "cents"
+    lot_size:
+      description: "Lot size for the decision, in square feet"
+      unit: "square feet"
+
+decisions get:
+  fields:
+    project_value:
+      description: "Declared project value for the decision, in cents (divide by 100 for dollars)"
+      unit: "cents"
+    lot_size:
+      description: "Lot size for the decision, in square feet"
+      unit: "square feet"
+
 contractors search:
   fields:
     id:
