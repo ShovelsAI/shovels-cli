@@ -77,6 +77,10 @@ Examples:
 }
 
 func runDecisionsSearch(cmd *cobra.Command, args []string) error {
+	if handled, err := handleSchemaFlag(cmd, commandPathFromCobra(cmd)); handled {
+		return err
+	}
+
 	if err := validateDecisionsSearchFlags(cmd); err != nil {
 		return err
 	}
@@ -137,6 +141,10 @@ IDs not found in the database appear in meta.missing.`,
 }
 
 func runDecisionsGet(cmd *cobra.Command, args []string) error {
+	if handled, err := handleSchemaFlag(cmd, commandPathFromCobra(cmd)); handled {
+		return err
+	}
+
 	if len(args) == 0 {
 		output.PrintErrorTyped(os.Stderr, "at least one decision ID required", 1, client.ErrorTypeValidation)
 		return &exitError{code: 1}
@@ -347,6 +355,8 @@ func isZipGeoID(geoID string) bool {
 
 func init() {
 	registerDecisionsSearchFlags(decisionsSearchCmd)
+	registerSchemaFlag(decisionsSearchCmd)
+	registerSchemaFlag(decisionsGetCmd)
 	setGroupedUsage(decisionsSearchCmd, decisionsSearchFlagGroups())
 
 	decisionsCmd.AddCommand(decisionsSearchCmd)
