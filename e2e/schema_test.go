@@ -449,6 +449,26 @@ func TestSchemaContractorsGetVsSearchScopeDiffers(t *testing.T) {
 }
 
 // =======================================================================
+// Batch-get meta convention
+// =======================================================================
+
+// TestSchemaBatchGetMetaConvention verifies every batch-get --schema documents
+// the batch envelope its runtime output emits: count, missing, and credits,
+// with no has_more. Batch-get responses look up IDs and are never paginated.
+func TestSchemaBatchGetMetaConvention(t *testing.T) {
+	for _, resource := range []string{"permits", "decisions", "contractors"} {
+		resource := resource
+		t.Run(resource, func(t *testing.T) {
+			result := runCLI(t, "schema", resource, "get")
+			if result.ExitCode != 0 {
+				t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+			}
+			assertBatchGetMeta(t, parseSchema(t, result.Stdout))
+		})
+	}
+}
+
+// =======================================================================
 // Coverage schema
 // =======================================================================
 
@@ -569,4 +589,97 @@ func fieldDescription(t *testing.T, out schemaOutput, field string) string {
 		t.Fatalf("field %q has no description string", field)
 	}
 	return desc
+}
+
+// fieldUnit extracts the unit string from a response field.
+func fieldUnit(t *testing.T, out schemaOutput, field string) string {
+	t.Helper()
+	raw, ok := out.ResponseFields[field]
+	if !ok {
+		t.Fatalf("response_fields missing %q", field)
+	}
+	m, ok := raw.(map[string]any)
+	if !ok {
+		t.Fatalf("field %q is not an object", field)
+	}
+	unit, _ := m["unit"].(string)
+	return unit
+}
+
+// filterUnit extracts the unit string from a filter entry.
+func filterUnit(t *testing.T, out schemaOutput, filter string) string {
+	t.Helper()
+	raw, ok := out.Filters[filter]
+	if !ok {
+		t.Fatalf("filters missing %q", filter)
+	}
+	m, ok := raw.(map[string]any)
+	if !ok {
+		t.Fatalf("filter %q is not an object", filter)
+	}
+	unit, _ := m["unit"].(string)
+	return unit
+}
+
+// mustSchema runs `<args> --schema` and returns stdout, failing on non-zero exit.
+func mustSchema(t *testing.T, env []string, args ...string) string {
+	t.Helper()
+	result := runCLIWithEnv(t, env, append(args, "--schema")...)
+	if result.ExitCode != 0 {
+		t.Fatalf("schema for %v failed: exit %d; stderr: %s", args, result.ExitCode, result.Stderr)
+	}
+	return result.Stdout
+}
+
+// fieldIndexSet returns the field_index entries as a lookup set.
+func fieldIndexSet(out schemaOutput) map[string]bool {
+	index := make(map[string]bool, len(out.FieldIndex))
+	for _, f := range out.FieldIndex {
+		index[f] = true
+	}
+	return index
+}
+
+// assertDataFieldIndex verifies the field_index advertises each given response
+// field under the data[]. prefix that the runtime envelope nests items under.
+func assertDataFieldIndex(t *testing.T, out schemaOutput, fields ...string) {
+	t.Helper()
+	index := fieldIndexSet(out)
+	for _, f := range fields {
+		entry := "data[]." + f
+		if !index[entry] {
+			t.Errorf("%s --schema field_index missing %q", out.Command, entry)
+		}
+	}
+}
+
+// assertSearchMeta verifies a paginated search --schema field index documents
+// the search envelope: count, has_more, and credits. Search responses page
+// through cursors, so has_more is part of the convention.
+func assertSearchMeta(t *testing.T, out schemaOutput) {
+	t.Helper()
+	index := fieldIndexSet(out)
+	for _, mf := range []string{"meta.count", "meta.has_more", "meta.credits_used", "meta.credits_remaining"} {
+		if !index[mf] {
+			t.Errorf("%s --schema field_index missing %q", out.Command, mf)
+		}
+	}
+	if index["meta.missing"] {
+		t.Errorf("%s --schema field_index should not advertise meta.missing (search is not a batch lookup)", out.Command)
+	}
+}
+
+// assertBatchGetMeta verifies a batch-get --schema field index documents the
+// batch envelope: count, missing, and credits present, has_more absent.
+func assertBatchGetMeta(t *testing.T, out schemaOutput) {
+	t.Helper()
+	index := fieldIndexSet(out)
+	for _, mf := range []string{"meta.count", "meta.missing", "meta.credits_used", "meta.credits_remaining"} {
+		if !index[mf] {
+			t.Errorf("%s --schema field_index missing %q", out.Command, mf)
+		}
+	}
+	if index["meta.has_more"] {
+		t.Errorf("%s --schema field_index should not advertise meta.has_more", out.Command)
+	}
 }

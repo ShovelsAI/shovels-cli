@@ -82,7 +82,7 @@ Recommended workflow:
   3. Run permits/contractors search or metrics with confidence.
 
 Inspect response fields before querying:
-  Add --schema to a search or get command (except decisions search/get) to see field names, types, and units — no API call.
+  Add --schema to any search or get command to see field names, types, and units without making an API call.
 
 Authentication (checked in this order):
   1. SHOVELS_API_KEY environment variable

@@ -1265,3 +1265,127 @@ func TestDecisionsGetExactly50IDs(t *testing.T) {
 		t.Errorf("expected 50 id params forwarded, got %d", len(*captured))
 	}
 }
+
+// =======================================================================
+// Schema (offline, no API, no auth)
+// =======================================================================
+
+// decisionsReadFields lists every DecisionsRead response field that both
+// `decisions search --schema` and `decisions get --schema` must surface.
+var decisionsReadFields = []string{
+	"id", "title", "decision_date", "description", "source_url",
+	"asset_class", "category", "subcategory", "property_type",
+	"why_it_matters", "applicant_name", "owner_name",
+	"representative_name", "developer_name", "zoning_previous",
+	"zoning_new", "allowed_uses", "project_value", "lot_size",
+	"street", "city", "state", "latitude", "longitude",
+	"address_id", "city_id", "county_id", "jurisdiction_id",
+}
+
+// TestDecisionsSearchSchemaOffline verifies `decisions search --schema` prints
+// all DecisionsRead response fields and the decisions filter set offline, with
+// no API key and no --base-url (any network call would fail the test).
+func TestDecisionsSearchSchemaOffline(t *testing.T) {
+	env := withIsolatedConfigNoAuth(t)
+	result := runCLIWithEnv(t, env, "decisions", "search", "--schema")
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0 without auth/network, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	out := parseSchema(t, result.Stdout)
+	if out.Command != "decisions search" {
+		t.Errorf("expected command %q, got %q", "decisions search", out.Command)
+	}
+
+	for _, field := range decisionsReadFields {
+		if _, ok := out.ResponseFields[field]; !ok {
+			t.Errorf("decisions search --schema missing response field %q", field)
+		}
+	}
+
+	filters := []string{
+		"--geo-id", "--decision-from", "--decision-to",
+		"--asset-class", "--category", "--subcategory", "--property-type",
+		"--min-project-value", "--max-project-value", "--query",
+		"--include-count",
+	}
+	for _, f := range filters {
+		if _, ok := out.Filters[f]; !ok {
+			t.Errorf("decisions search --schema missing filter %q", f)
+		}
+	}
+
+	// field_index must list every response field under the data[]. prefix the
+	// runtime envelope nests items under, so an agent can jq the items array.
+	assertDataFieldIndex(t, out, decisionsReadFields...)
+
+	// Meta must document the paginated search envelope (count, has_more,
+	// credits) that the runtime PrintPaginated output emits, consistent with
+	// sibling search commands.
+	assertSearchMeta(t, out)
+}
+
+// TestDecisionsGetSchemaOffline verifies `decisions get --schema` prints the
+// DecisionsRead response fields and an ID positional filter offline, following
+// the permits get convention (no --has_more meta divergence).
+func TestDecisionsGetSchemaOffline(t *testing.T) {
+	env := withIsolatedConfigNoAuth(t)
+	result := runCLIWithEnv(t, env, "decisions", "get", "--schema")
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0 without auth/network, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	out := parseSchema(t, result.Stdout)
+	if out.Command != "decisions get" {
+		t.Errorf("expected command %q, got %q", "decisions get", out.Command)
+	}
+
+	for _, field := range decisionsReadFields {
+		if _, ok := out.ResponseFields[field]; !ok {
+			t.Errorf("decisions get --schema missing response field %q", field)
+		}
+	}
+
+	if _, ok := out.Filters["ID"]; !ok {
+		t.Error("decisions get --schema should expose an ID positional filter")
+	}
+	// get should not advertise search-only filters.
+	if _, ok := out.Filters["--geo-id"]; ok {
+		t.Error("decisions get --schema should not have a --geo-id filter")
+	}
+
+	// field_index must list every response field under the data[]. prefix the
+	// runtime envelope nests items under, so an agent can jq the items array.
+	assertDataFieldIndex(t, out, decisionsReadFields...)
+
+	// Meta must document the batch envelope (count, missing, credits) that
+	// the runtime PrintBatch output emits, and must not advertise has_more
+	// since batch-get responses are never paginated.
+	assertBatchGetMeta(t, out)
+}
+
+// TestDecisionsSchemaUnits verifies project_value/lot_size response fields and
+// the project-value filters carry the expected units in both subcommands.
+func TestDecisionsSchemaUnits(t *testing.T) {
+	env := withIsolatedConfigNoAuth(t)
+
+	searchOut := parseSchema(t, mustSchema(t, env, "decisions", "search"))
+	getOut := parseSchema(t, mustSchema(t, env, "decisions", "get"))
+
+	for _, out := range []schemaOutput{searchOut, getOut} {
+		if u := fieldUnit(t, out, "project_value"); u != "cents" {
+			t.Errorf("%s project_value unit: expected %q, got %q", out.Command, "cents", u)
+		}
+		if u := fieldUnit(t, out, "lot_size"); u != "square feet" {
+			t.Errorf("%s lot_size unit: expected %q, got %q", out.Command, "square feet", u)
+		}
+	}
+
+	for _, f := range []string{"--min-project-value", "--max-project-value"} {
+		if u := filterUnit(t, searchOut, f); u != "cents" {
+			t.Errorf("decisions search filter %s unit: expected %q, got %q", f, "cents", u)
+		}
+	}
+}
