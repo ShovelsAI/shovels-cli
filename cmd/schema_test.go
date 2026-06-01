@@ -14,6 +14,8 @@ func TestGeneratedSchemaCoversAllDataCommands(t *testing.T) {
 	expected := []string{
 		"permits search",
 		"permits get",
+		"decisions search",
+		"decisions get",
 		"contractors search",
 		"contractors get",
 		"contractors permits",
@@ -102,14 +104,14 @@ func TestSchemaHasFieldIndex(t *testing.T) {
 }
 
 // TestSchemaFieldIndexContainsMetaFields verifies every paginated schema's
-// field index includes the standard meta fields used for pagination and credit
-// tracking. Coverage commands are non-paginated and credit-exempt, so they
-// carry an empty meta envelope and are exempt from this assertion.
+// field index includes the standard pagination/credit meta fields. Coverage
+// commands carry an empty meta envelope, and batch-get commands carry a batch
+// envelope; both are exempt here and asserted separately.
 func TestSchemaFieldIndexContainsMetaFields(t *testing.T) {
 	metaFields := []string{"meta.count", "meta.has_more", "meta.credits_used", "meta.credits_remaining"}
 
 	for _, cmd := range SchemaCommands() {
-		if strings.HasSuffix(cmd, " coverage") {
+		if strings.HasSuffix(cmd, " coverage") || strings.HasSuffix(cmd, " get") {
 			continue
 		}
 		s := LookupSchema(cmd)
@@ -121,6 +123,34 @@ func TestSchemaFieldIndexContainsMetaFields(t *testing.T) {
 			if !indexSet[mf] {
 				t.Errorf("schema for %q missing meta field %q in field_index", cmd, mf)
 			}
+		}
+	}
+}
+
+// TestBatchGetSchemaMetaFields verifies batch-get schemas document the batch
+// envelope their runtime output emits: count, missing, and credits, with no
+// has_more. The missing list surfaces requested IDs not found, and batch-get
+// responses are never paginated.
+func TestBatchGetSchemaMetaFields(t *testing.T) {
+	getCmds := []string{"permits get", "decisions get", "contractors get"}
+	want := []string{"meta.count", "meta.missing", "meta.credits_used", "meta.credits_remaining"}
+
+	for _, cmd := range getCmds {
+		s := LookupSchema(cmd)
+		if s == nil {
+			t.Fatalf("schema for %q not found", cmd)
+		}
+		indexSet := make(map[string]bool, len(s.FieldIndex))
+		for _, f := range s.FieldIndex {
+			indexSet[f] = true
+		}
+		for _, mf := range want {
+			if !indexSet[mf] {
+				t.Errorf("batch-get schema %q missing meta field %q in field_index", cmd, mf)
+			}
+		}
+		if indexSet["meta.has_more"] {
+			t.Errorf("batch-get schema %q should not advertise meta.has_more", cmd)
 		}
 	}
 }

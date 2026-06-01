@@ -61,6 +61,8 @@ type commandDef struct {
 var allCommands = []commandDef{
 	{"permits search", "PermitsRead", "/permits/search", "permits_search"},
 	{"permits get", "PermitsRead", "/permits", "get"},
+	{"decisions search", "DecisionsRead", "/decisions/search", "decisions_search"},
+	{"decisions get", "DecisionsRead", "/decisions", "get"},
 	{"contractors search", "ContractorsRead", "/contractors/search", "contractors_search"},
 	{"contractors get", "ContractorsRead", "/contractors", "get"},
 	{"contractors permits", "PermitsRead", "/contractors/{id}/permits", "none"},
@@ -388,8 +390,12 @@ func mergeFields(base map[string]schemaField, overrides map[string]overrideField
 }
 
 // buildFieldIndex creates the jq-style field path index for a command. The
-// standard pagination/credit meta fields are appended for every command except
-// coverage, which is non-paginated and credit-exempt (empty meta envelope).
+// meta fields appended depend on the command's response shape:
+//   - coverage commands are non-paginated and credit-exempt (empty meta
+//     envelope), so no meta fields are added.
+//   - batch-get commands return a non-paginated batch envelope with count,
+//     credits, and a missing list of unresolved IDs, and never has_more.
+//   - all other commands are paginated, with count, has_more, and credits.
 func buildFieldIndex(fields map[string]schemaField, def commandDef) []string {
 	var index []string
 	for name := range fields {
@@ -397,7 +403,12 @@ func buildFieldIndex(fields map[string]schemaField, def commandDef) []string {
 	}
 	sort.Strings(index)
 
-	if def.FiltersFrom != "coverage" {
+	switch def.FiltersFrom {
+	case "coverage":
+		// Non-paginated, credit-exempt: empty meta envelope.
+	case "get":
+		index = append(index, "meta.count", "meta.missing", "meta.credits_used", "meta.credits_remaining")
+	default:
 		index = append(index, "meta.count", "meta.has_more", "meta.credits_used", "meta.credits_remaining")
 	}
 	return index
@@ -454,6 +465,23 @@ func buildFilters(def commandDef) map[string]schemaField {
 	case "contractors_search":
 		addSearchFilters(filters)
 		filters["--no-tallies"] = schemaField{Type: "boolean", Description: "Omit tag_tally and status_tally arrays for faster response. Warning: tallies are the only contractor search fields filtered by your date/geo/tag query — all other permit counts (permit_count, etc.) are lifetime global totals"}
+	case "decisions_search":
+		// Required filters
+		filters["--geo-id"] = schemaField{Type: "string", Description: "Geographic area: 2-letter state code or a resolved Shovels geo_id. ZIP codes are not supported for decisions"}
+		filters["--decision-from"] = schemaField{Type: "date", Description: "Start date in YYYY-MM-DD format"}
+		filters["--decision-to"] = schemaField{Type: "date", Description: "End date in YYYY-MM-DD format"}
+
+		// Decision filters
+		filters["--asset-class"] = schemaField{Type: "string[]", Description: "Asset class, repeat or comma-separate for multiple (e.g. Residential, Commercial)"}
+		filters["--category"] = schemaField{Type: "string[]", Description: "Decision category, repeat or comma-separate for multiple (e.g. Rezoning, Variance)"}
+		filters["--subcategory"] = schemaField{Type: "string[]", Description: "Decision subcategory, repeat or comma-separate for multiple"}
+		filters["--property-type"] = schemaField{Type: "string[]", Description: "Property type, repeat or comma-separate for multiple"}
+		filters["--min-project-value"] = schemaField{Type: "integer", Description: "Minimum project value in cents (100000000 = $1,000,000)", Unit: "cents"}
+		filters["--max-project-value"] = schemaField{Type: "integer", Description: "Maximum project value in cents (100000000 = $1,000,000)", Unit: "cents"}
+		filters["--query"] = schemaField{Type: "string", Description: "Substring search in decision text, case-insensitive, max 100 characters"}
+
+		// Response options
+		filters["--include-count"] = schemaField{Type: "boolean", Description: "Request total result count in meta.total_count"}
 	case "get":
 		filters["ID"] = schemaField{Type: "string", Description: "One or more IDs as positional arguments (max 50)"}
 	case "geo_search":
