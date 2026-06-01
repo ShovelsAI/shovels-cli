@@ -459,3 +459,12 @@ func setBoolFlag(cmd *cobra.Command, flag, param string, q url.Values) {
 		q.Set(param, fmt.Sprintf("%t", v))
 	}
 }
+
+// addStringSliceParam adds each value of a StringSlice flag as a repeated
+// query parameter.
+func addStringSliceParam(cmd *cobra.Command, flag, param string, q url.Values) {
+	values, _ := cmd.Flags().GetStringSlice(flag)
+	for _, v := range values {
+		q.Add(param, v)
+	}
+}
