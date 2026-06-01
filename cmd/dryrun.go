@@ -63,6 +63,9 @@ var arrayParams = map[string]bool{
 	"permit_status":                     true,
 	"contractor_classification_derived": true,
 	"id":                                true,
+	"asset_class":                       true,
+	"category":                          true,
+	"subcategory":                       true,
 }
 
 // valuesToMap converts url.Values into a map suitable for JSON output.

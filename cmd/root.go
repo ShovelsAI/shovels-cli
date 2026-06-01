@@ -59,6 +59,7 @@ Pipe output to jq, parse it programmatically, or feed it to another AI agent.
 
 Available resources:
   permits         Search and retrieve building permits by location, date, type, and contractor
+  decisions       Search zoning and land-use decisions by location, date, category, and project value
   contractors     Search contractors, retrieve details, list their permits/employees/metrics
   addresses       Search addresses by street, city, state, or zip code
   cities          Search cities to resolve geo_ids for city-level queries
@@ -81,7 +82,7 @@ Recommended workflow:
   3. Run permits/contractors search or metrics with confidence.
 
 Inspect response fields before querying:
-  Add --schema to any search or get command to see field names, types, and units without making an API call.
+  Add --schema to a search or get command (except decisions search/get) to see field names, types, and units — no API call.
 
 Authentication (checked in this order):
   1. SHOVELS_API_KEY environment variable
