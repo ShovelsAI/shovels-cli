@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
@@ -18,6 +19,9 @@ import (
 // measured in runes to match the API's character-based max_length.
 const maxDecisionQueryRunes = 100
 
+// maxDecisionsGetIDs is the maximum number of decision IDs accepted per request.
+const maxDecisionsGetIDs = 50
+
 // zipPlusFourPattern matches ZIP+4 codes (e.g. 92024-1234).
 var zipPlusFourPattern = regexp.MustCompile(`^\d{5}-\d{4}$`)
 
@@ -28,6 +32,7 @@ var decisionsCmd = &cobra.Command{
 
 Available subcommands:
   search   Search decisions by geographic area, date range, category, and project value
+  get      Retrieve one or more decisions by their exact decision ID
 
 Every response is a JSON envelope: {"data": [...], "meta": {...}}`,
 }
@@ -103,6 +108,77 @@ func runDecisionsSearch(cmd *cobra.Command, args []string) error {
 	}
 
 	output.PrintPaginated(cmd.OutOrStdout(), result)
+	return nil
+}
+
+var decisionsGetCmd = &cobra.Command{
+	Use:   "get ID [ID...]",
+	Short: "Retrieve one or more zoning and land-use decisions by their exact decision ID",
+	Long: `Fetch specific zoning and land-use decisions by ID. Accepts 1 to 50
+decision IDs as positional arguments.
+
+Note: ID is a positional argument, not a flag.
+  Correct:   shovels decisions get d_abc
+  Incorrect: shovels decisions get --id d_abc
+
+Examples:
+  Single decision:
+    shovels decisions get d_abc
+
+  Multiple decisions in one request:
+    shovels decisions get d_abc d_def d_ghi
+
+Response: {"data": [...], "meta": {"count": N, "missing": ["UNKNOWN_ID"], ...}}
+IDs not found in the database appear in meta.missing.`,
+	Annotations: map[string]string{
+		AnnotationRequiresAuth: "true",
+	},
+	RunE: runDecisionsGet,
+}
+
+func runDecisionsGet(cmd *cobra.Command, args []string) error {
+	if len(args) == 0 {
+		output.PrintErrorTyped(os.Stderr, "at least one decision ID required", 1, client.ErrorTypeValidation)
+		return &exitError{code: 1}
+	}
+	if len(args) > maxDecisionsGetIDs {
+		output.PrintErrorTyped(os.Stderr, fmt.Sprintf("maximum %d IDs per request", maxDecisionsGetIDs), 1, client.ErrorTypeValidation)
+		return &exitError{code: 1}
+	}
+
+	q := url.Values{}
+	for _, id := range args {
+		q.Add("id", id)
+	}
+
+	if _, err := validateTimeout(cmd); err != nil {
+		return err
+	}
+
+	if isDryRun(cmd) {
+		return printDryRun(cmd, "/decisions", q)
+	}
+
+	cl, err := newClientFromFlags(cmd)
+	if err != nil {
+		return err
+	}
+
+	resp, err := cl.Get(cmd.Context(), "/decisions", q)
+	if err != nil {
+		return handleAPIError(err)
+	}
+
+	var page struct {
+		Items []json.RawMessage `json:"items"`
+	}
+	if err := json.Unmarshal(resp.Body, &page); err != nil {
+		output.PrintErrorTyped(os.Stderr, "failed to parse API response", 1, client.ErrorTypeClient)
+		return &exitError{code: 1}
+	}
+
+	missing := findMissingIDs(args, page.Items)
+	output.PrintBatch(cmd.OutOrStdout(), page.Items, missing, resp.Credits)
 	return nil
 }
 
@@ -274,5 +350,6 @@ func init() {
 	setGroupedUsage(decisionsSearchCmd, decisionsSearchFlagGroups())
 
 	decisionsCmd.AddCommand(decisionsSearchCmd)
+	decisionsCmd.AddCommand(decisionsGetCmd)
 	rootCmd.AddCommand(decisionsCmd)
 }
