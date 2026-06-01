@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -327,6 +328,75 @@ func TestValidateDecisionsSearchFlags_ZipRejected(t *testing.T) {
 	if err := validateDecisionsSearchFlags(cmd); err == nil {
 		t.Fatal("expected bare ZIP geo_id to be rejected")
 	}
+}
+
+// --- decisions get: ID-count bounds ---
+
+func TestRunDecisionsGet_NoIDsRejected(t *testing.T) {
+	cmd := newDecisionsGetTestCmd(t)
+	err := runDecisionsGet(cmd, nil)
+	if err == nil {
+		t.Fatal("expected error when no decision IDs are passed")
+	}
+	if ee, ok := err.(*exitError); !ok || ee.code != 1 {
+		t.Errorf("expected exitError code 1, got %v", err)
+	}
+}
+
+func TestRunDecisionsGet_TooManyIDsRejected(t *testing.T) {
+	cmd := newDecisionsGetTestCmd(t)
+	ids := make([]string, maxDecisionsGetIDs+1)
+	for i := range ids {
+		ids[i] = "d_x"
+	}
+	err := runDecisionsGet(cmd, ids)
+	if err == nil {
+		t.Fatalf("expected error when more than %d IDs are passed", maxDecisionsGetIDs)
+	}
+	if ee, ok := err.(*exitError); !ok || ee.code != 1 {
+		t.Errorf("expected exitError code 1, got %v", err)
+	}
+}
+
+// --- findMissingIDs (missing-ID logic for decisions get) ---
+
+func TestFindMissingIDs_AllFound(t *testing.T) {
+	items := []json.RawMessage{
+		json.RawMessage(`{"id":"d_abc"}`),
+		json.RawMessage(`{"id":"d_def"}`),
+	}
+	missing := findMissingIDs([]string{"d_abc", "d_def"}, items)
+	if len(missing) != 0 {
+		t.Errorf("expected no missing IDs, got %v", missing)
+	}
+}
+
+func TestFindMissingIDs_SomeMissingPreserveOrder(t *testing.T) {
+	items := []json.RawMessage{
+		json.RawMessage(`{"id":"d_abc"}`),
+	}
+	missing := findMissingIDs([]string{"d_abc", "d_missing", "d_gone"}, items)
+	if len(missing) != 2 || missing[0] != "d_missing" || missing[1] != "d_gone" {
+		t.Errorf("expected [d_missing d_gone] in request order, got %v", missing)
+	}
+}
+
+func TestFindMissingIDs_DuplicateUnknownAppearsTwice(t *testing.T) {
+	missing := findMissingIDs([]string{"d_missing", "d_missing"}, []json.RawMessage{})
+	if len(missing) != 2 {
+		t.Errorf("expected duplicated unknown ID to appear twice, got %v", missing)
+	}
+}
+
+// newDecisionsGetTestCmd builds a fresh decisions get command isolated from the
+// global tree so the run function can be exercised directly.
+func newDecisionsGetTestCmd(t *testing.T, args ...string) *cobra.Command {
+	t.Helper()
+	cmd := &cobra.Command{Use: "get"}
+	if err := cmd.ParseFlags(args); err != nil {
+		t.Fatalf("failed to parse flags: %v", err)
+	}
+	return cmd
 }
 
 // newDecisionsSearchTestCmd builds a fresh decisions search command with its

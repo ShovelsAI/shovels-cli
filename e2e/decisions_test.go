@@ -887,3 +887,381 @@ func TestDecisionsSearchMinProjectValueZeroAccepted(t *testing.T) {
 		t.Errorf("expected min_project_value=0 forwarded, got %v", q["min_project_value"])
 	}
 }
+
+// =======================================================================
+// decisions get
+// =======================================================================
+
+// makeDecisionsGetHandler returns an HTTP handler that serves batch decision
+// responses. It rejects any request that is not GET /decisions, so a wrong
+// verb or path fails the test. knownIDs defines which IDs exist; unknown IDs
+// are omitted from the response (the caller detects them as missing).
+func makeDecisionsGetHandler(knownIDs map[string]bool, creditsUsed, creditsRemaining int) (http.Handler, *[]string) {
+	captured := &[]string{}
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/decisions" {
+			w.WriteHeader(404)
+			w.Write([]byte(`{"detail":"unexpected method or path"}`))
+			return
+		}
+
+		ids := r.URL.Query()["id"]
+		*captured = append(*captured, ids...)
+
+		var items []json.RawMessage
+		for _, id := range ids {
+			if knownIDs[id] {
+				items = append(items, json.RawMessage(fmt.Sprintf(
+					`{"id":%q,"decision_date":"2024-06-12","category":"Rezoning","zoning_new":"R3"}`, id,
+				)))
+			}
+		}
+		if items == nil {
+			items = []json.RawMessage{}
+		}
+
+		w.Header().Set("X-Credits-Request", strconv.Itoa(creditsUsed))
+		w.Header().Set("X-Credits-Remaining", strconv.Itoa(creditsRemaining))
+
+		resp := struct {
+			Items []json.RawMessage `json:"items"`
+		}{Items: items}
+		json.NewEncoder(w).Encode(resp)
+	})
+	return handler, captured
+}
+
+// --- decisions get: Happy paths ---
+
+func TestDecisionsGetMultipleIDs(t *testing.T) {
+	known := map[string]bool{"d_abc": true, "d_def": true}
+	handler, captured := makeDecisionsGetHandler(known, 2, 9998)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--base-url", srv.URL,
+		"decisions", "get", "d_abc", "d_def",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	parsed := parseEnvelope(t, result.Stdout)
+
+	var data []json.RawMessage
+	if err := json.Unmarshal(parsed.Data, &data); err != nil {
+		t.Fatalf("expected data array: %v", err)
+	}
+	if len(data) != 2 {
+		t.Errorf("expected 2 items, got %d", len(data))
+	}
+
+	if int(parsed.Meta["count"].(float64)) != 2 {
+		t.Errorf("expected count=2, got %v", parsed.Meta["count"])
+	}
+
+	// meta.missing should be absent when all IDs found.
+	if _, ok := parsed.Meta["missing"]; ok {
+		t.Error("expected missing to be absent when all IDs found")
+	}
+
+	// PrintBatch convention: no has_more for non-paginated batch responses.
+	if _, ok := parsed.Meta["has_more"]; ok {
+		t.Error("batch response should not have has_more in meta")
+	}
+
+	if int(parsed.Meta["credits_used"].(float64)) != 2 {
+		t.Errorf("expected credits_used=2, got %v", parsed.Meta["credits_used"])
+	}
+	if int(parsed.Meta["credits_remaining"].(float64)) != 9998 {
+		t.Errorf("expected credits_remaining=9998, got %v", parsed.Meta["credits_remaining"])
+	}
+
+	// Both IDs must have been forwarded as repeated id params.
+	if len(*captured) != 2 || (*captured)[0] != "d_abc" || (*captured)[1] != "d_def" {
+		t.Errorf("expected id params [d_abc d_def] forwarded, got %v", *captured)
+	}
+}
+
+func TestDecisionsGetSomeMissing(t *testing.T) {
+	known := map[string]bool{"d_abc": true}
+	handler, _ := makeDecisionsGetHandler(known, 1, 9999)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--base-url", srv.URL,
+		"decisions", "get", "d_abc", "d_missing", "d_gone",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	parsed := parseEnvelope(t, result.Stdout)
+
+	var data []json.RawMessage
+	if err := json.Unmarshal(parsed.Data, &data); err != nil {
+		t.Fatalf("expected data array: %v", err)
+	}
+	if len(data) != 1 {
+		t.Errorf("expected 1 item (only d_abc found), got %d", len(data))
+	}
+
+	if int(parsed.Meta["count"].(float64)) != 1 {
+		t.Errorf("expected count=1, got %v", parsed.Meta["count"])
+	}
+
+	missingVal, ok := parsed.Meta["missing"]
+	if !ok {
+		t.Fatal("expected missing in meta when some IDs not found")
+	}
+	missingArr, ok := missingVal.([]any)
+	if !ok {
+		t.Fatalf("expected missing to be array, got %T", missingVal)
+	}
+	if len(missingArr) != 2 {
+		t.Fatalf("expected 2 missing IDs, got %d", len(missingArr))
+	}
+	if missingArr[0].(string) != "d_missing" {
+		t.Errorf("expected first missing ID d_missing, got %q", missingArr[0])
+	}
+	if missingArr[1].(string) != "d_gone" {
+		t.Errorf("expected second missing ID d_gone, got %q", missingArr[1])
+	}
+}
+
+func TestDecisionsGetDryRun(t *testing.T) {
+	// --dry-run must work without an API key and without calling the API.
+	env := withIsolatedConfigNoAuth(t)
+	result := runCLIWithEnv(t, env,
+		"decisions", "get", "d_abc", "d_def",
+		"--dry-run",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	out := parseDryRun(t, result.Stdout)
+	if out.Method != "GET" {
+		t.Errorf("expected method GET, got %q", out.Method)
+	}
+	if !strings.HasSuffix(out.URL, "/decisions") {
+		t.Errorf("expected URL ending with /decisions, got %q", out.URL)
+	}
+	ids, ok := out.Params["id"].([]any)
+	if !ok || len(ids) != 2 || ids[0] != "d_abc" || ids[1] != "d_def" {
+		t.Errorf("expected id=[d_abc d_def], got %v", out.Params["id"])
+	}
+}
+
+// --- decisions get: Edge cases ---
+
+func TestDecisionsGetSingleID(t *testing.T) {
+	known := map[string]bool{"d_abc": true}
+	handler, _ := makeDecisionsGetHandler(known, 1, 9999)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--base-url", srv.URL,
+		"decisions", "get", "d_abc",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	parsed := parseEnvelope(t, result.Stdout)
+	var data []json.RawMessage
+	if err := json.Unmarshal(parsed.Data, &data); err != nil {
+		t.Fatalf("expected data array: %v", err)
+	}
+	if len(data) != 1 {
+		t.Errorf("expected 1 item, got %d", len(data))
+	}
+	if int(parsed.Meta["count"].(float64)) != 1 {
+		t.Errorf("expected count=1, got %v", parsed.Meta["count"])
+	}
+	if _, ok := parsed.Meta["missing"]; ok {
+		t.Error("expected missing to be absent when all IDs found")
+	}
+}
+
+func TestDecisionsGetDuplicateUnknownIDs(t *testing.T) {
+	// Duplicate IDs pass through as-is; a duplicated unknown ID may appear
+	// more than once in meta.missing (matches findMissingIDs/permits behavior).
+	handler, captured := makeDecisionsGetHandler(map[string]bool{}, 1, 9999)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--base-url", srv.URL,
+		"decisions", "get", "d_missing", "d_missing",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	// Both duplicates must reach the API unchanged.
+	if len(*captured) != 2 || (*captured)[0] != "d_missing" || (*captured)[1] != "d_missing" {
+		t.Errorf("expected both duplicate ids forwarded, got %v", *captured)
+	}
+
+	parsed := parseEnvelope(t, result.Stdout)
+	missingArr, ok := parsed.Meta["missing"].([]any)
+	if !ok {
+		t.Fatalf("expected missing array, got %T", parsed.Meta["missing"])
+	}
+	if len(missingArr) != 2 {
+		t.Errorf("expected duplicated unknown ID to appear twice in missing, got %v", missingArr)
+	}
+}
+
+// --- decisions get: Error conditions ---
+
+func TestDecisionsGetNoIDs(t *testing.T) {
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"decisions", "get",
+	)
+
+	if result.ExitCode != 1 {
+		t.Fatalf("expected exit 1, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	p := parseStderrError(t, result.Stderr)
+	if p.ErrorType != "validation_error" {
+		t.Errorf("expected error_type validation_error, got %q", p.ErrorType)
+	}
+	if p.Error != "at least one decision ID required" {
+		t.Errorf("expected error %q, got %q", "at least one decision ID required", p.Error)
+	}
+}
+
+func TestDecisionsGetTooManyIDs(t *testing.T) {
+	env := withIsolatedConfig(t)
+
+	args := []string{"decisions", "get"}
+	for i := range 51 {
+		args = append(args, fmt.Sprintf("d_%05d", i))
+	}
+
+	result := runCLIWithEnv(t, env, args...)
+
+	if result.ExitCode != 1 {
+		t.Fatalf("expected exit 1, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	p := parseStderrError(t, result.Stderr)
+	if p.ErrorType != "validation_error" {
+		t.Errorf("expected error_type validation_error, got %q", p.ErrorType)
+	}
+	if p.Error != "maximum 50 IDs per request" {
+		t.Errorf("expected error %q, got %q", "maximum 50 IDs per request", p.Error)
+	}
+}
+
+func TestDecisionsGetIDAsFlagRejected(t *testing.T) {
+	// An ID passed as --id flag yields cobra's unknown-flag error (exit 1);
+	// help text steers users to positional usage.
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"decisions", "get", "--id", "d_abc",
+	)
+
+	if result.ExitCode == 0 {
+		t.Fatalf("expected non-zero exit for unknown --id flag, got 0; stdout: %s", result.Stdout)
+	}
+	if !strings.Contains(result.Stderr, "unknown flag") {
+		t.Errorf("expected unknown-flag error, got: %s", result.Stderr)
+	}
+}
+
+func TestDecisionsGetAPIErrorExitCodeMapping(t *testing.T) {
+	// API error responses must map to project exit codes via shared
+	// client.APIError handling: auth=2, rate-limit=3, credit-exhausted=4,
+	// server=5.
+	cases := []struct {
+		status   int
+		exitCode int
+		errType  string
+	}{
+		{401, 2, "auth_error"},
+		{429, 3, "rate_limited"},
+		{402, 4, "credit_exhausted"},
+		{500, 5, "server_error"},
+		{503, 5, "server_error"},
+	}
+	for _, tc := range cases {
+		t.Run(http.StatusText(tc.status), func(t *testing.T) {
+			srv := httptest.NewServer(makeStatusHandler(tc.status))
+			defer srv.Close()
+
+			env := withIsolatedConfig(t)
+			result := runCLIWithEnv(t, env,
+				"--base-url", srv.URL,
+				"--no-retry",
+				"decisions", "get", "d_abc",
+			)
+			if result.ExitCode != tc.exitCode {
+				t.Fatalf("status %d: expected exit %d, got %d; stderr: %s", tc.status, tc.exitCode, result.ExitCode, result.Stderr)
+			}
+			p := parseStderrError(t, result.Stderr)
+			if p.ErrorType != tc.errType {
+				t.Errorf("status %d: expected error_type %q, got %q", tc.status, tc.errType, p.ErrorType)
+			}
+		})
+	}
+}
+
+// --- decisions get: Boundary conditions ---
+
+func TestDecisionsGetExactly50IDs(t *testing.T) {
+	known := make(map[string]bool, 50)
+	for i := range 50 {
+		known[fmt.Sprintf("d_%05d", i)] = true
+	}
+
+	handler, captured := makeDecisionsGetHandler(known, 50, 9950)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	args := []string{"--base-url", srv.URL, "decisions", "get"}
+	for i := range 50 {
+		args = append(args, fmt.Sprintf("d_%05d", i))
+	}
+
+	result := runCLIWithEnv(t, env, args...)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0 for exactly 50 IDs, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	parsed := parseEnvelope(t, result.Stdout)
+	var data []json.RawMessage
+	if err := json.Unmarshal(parsed.Data, &data); err != nil {
+		t.Fatalf("expected data array: %v", err)
+	}
+	if len(data) != 50 {
+		t.Errorf("expected 50 items, got %d", len(data))
+	}
+	if int(parsed.Meta["count"].(float64)) != 50 {
+		t.Errorf("expected count=50, got %v", parsed.Meta["count"])
+	}
+	if _, ok := parsed.Meta["missing"]; ok {
+		t.Error("expected missing to be absent when all 50 IDs found")
+	}
+	if len(*captured) != 50 {
+		t.Errorf("expected 50 id params forwarded, got %d", len(*captured))
+	}
+}
