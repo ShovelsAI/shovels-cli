@@ -114,6 +114,19 @@ var scenarios = []Scenario{
 		},
 	},
 	{
+		Name:             "ZoningDecisions",
+		Task:             `Find rezoning / zoning decisions in California in 2024.`,
+		EnforceUsability: true,
+		MinResults:       0,
+		ValidateOutput: func(t *testing.T, report AgentReport) {
+			t.Helper()
+			parsed := requireParsedJSON(t, report.FinalOutput)
+			requireFieldPresent(t, parsed, "data")
+			requireDecisionsData(t, parsed)
+			requireDecisionsSearchUsed(t, report)
+		},
+	},
+	{
 		Name:             "JqMonthlyBreakdown",
 		Task:             `How many permits were filed per month in 2024 for solar in zip 92024?`,
 		EnforceUsability: true,
@@ -250,6 +263,65 @@ func requireMetricsFields(t *testing.T, obj map[string]any) {
 	}
 
 	t.Errorf("final_output missing metrics-specific fields; expected at least one of %v", metricsFields)
+}
+
+// requireDecisionsData verifies the output's data value is a JSON array and,
+// when non-empty, that at least one item carries a decisions-distinctive field.
+// An empty data array is acceptable: decisions data is sparse, so usability —
+// not data volume — is the gate (MinResults: 0).
+func requireDecisionsData(t *testing.T, obj map[string]any) {
+	t.Helper()
+
+	data, ok := obj["data"].([]any)
+	if !ok {
+		t.Errorf("final_output 'data' is not a JSON array")
+		return
+	}
+	if len(data) == 0 {
+		return // sparse decisions data is acceptable
+	}
+
+	distinctiveFields := []string{"decision_date", "zoning_new"}
+	for _, item := range data {
+		m, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		for _, field := range distinctiveFields {
+			if _, ok := m[field]; ok {
+				return
+			}
+		}
+	}
+
+	t.Errorf("final_output 'data' items missing decisions-distinctive fields; expected at least one of %v", distinctiveFields)
+}
+
+// requireDecisionsSearchUsed verifies the agent actually discovered and ran
+// the decisions search command. Without this, an empty data array from any
+// unrelated command would satisfy the data-shape checks. The invocation may
+// land in FinalCommand or in any earlier step — an agent that ends on a
+// "... | jq ..." pipe records the jq pipe as FinalCommand while the real
+// search lives in Steps — so both are scanned.
+func requireDecisionsSearchUsed(t *testing.T, report AgentReport) {
+	t.Helper()
+
+	const marker = "decisions search"
+	if strings.Contains(report.FinalCommand, marker) {
+		return
+	}
+	for _, step := range report.Steps {
+		if strings.Contains(step.Command, marker) {
+			return
+		}
+	}
+
+	var stepCommands []string
+	for _, step := range report.Steps {
+		stepCommands = append(stepCommands, step.Command)
+	}
+	t.Errorf("expected the agent to run %q; FinalCommand=%q, steps=%v",
+		marker, report.FinalCommand, stepCommands)
 }
 
 // requireJSONArrayAtMost verifies the output contains a JSON array with at
