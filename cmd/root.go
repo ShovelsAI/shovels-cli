@@ -229,11 +229,11 @@ func waitForUpdate() {
 
 func init() {
 	flags := rootCmd.PersistentFlags()
-	flags.String("limit", "50", `Maximum records to return: integer 1-100000 or "all" (default "50")`)
-	flags.Int("max-records", 10000, "Upper bound when --limit=all, range 1-100000 (default 10000)")
-	flags.String("base-url", "https://api.shovels.ai/v2", "API base URL (default https://api.shovels.ai/v2)")
+	flags.String("limit", "50", `Maximum records to return: integer 1-100000 or "all"`)
+	flags.Int("max-records", 10000, "Upper bound when --limit=all, range 1-100000")
+	flags.String("base-url", "https://api.shovels.ai/v2", "API base URL")
 	flags.Bool("no-retry", false, "Disable automatic retry on HTTP 429 rate-limit responses")
-	flags.String("timeout", "30s", "Per-request timeout as a Go duration, e.g. 10s, 1m, 2m30s (default 30s)")
+	flags.String("timeout", "30s", "Per-request timeout as a Go duration, e.g. 10s, 1m, 2m30s")
 	flags.Bool("dry-run", false, "Print the resolved HTTP request as JSON without calling the API or consuming credits")
 
 	// Emit JSON to stderr on flag-parsing errors instead of cobra's plain text.
