@@ -769,3 +769,134 @@ func TestPaginateTotalCountNilWhenNotPresent(t *testing.T) {
 		t.Errorf("expected TotalCount to be nil, got %+v", result.TotalCount)
 	}
 }
+
+// --- trust_summary passthrough tests ---
+
+// trustSummaryPageServer serves the given raw JSON page bodies in request
+// order, chaining them so the paginator walks every one.
+func trustSummaryPageServer(t *testing.T, bodies []string) *httptest.Server {
+	t.Helper()
+	var served int
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if served >= len(bodies) {
+			t.Errorf("paginator requested page %d but only %d were provided", served+1, len(bodies))
+			w.WriteHeader(500)
+			return
+		}
+		body := bodies[served]
+		served++
+		w.Write([]byte(body))
+	}))
+}
+
+func TestPaginateCollectsTrustSummaryPerPage(t *testing.T) {
+	srv := trustSummaryPageServer(t, []string{
+		`{"items":[{"id":1}],"next_cursor":"c1","trust_summary":{"rows_flagged":2,"expected_miss_rate":0.031}}`,
+		`{"items":[{"id":2}],"next_cursor":null,"trust_summary":{"rows_flagged":5,"expected_miss_rate":0.044}}`,
+	})
+	defer srv.Close()
+
+	c := New(Options{APIKey: "test-key", BaseURL: srv.URL, Timeout: 5 * time.Second})
+
+	result, err := c.Paginate(context.Background(), "/test", nil, LimitConfig{Limit: 10})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result.TrustSummaries) != 2 {
+		t.Fatalf("expected 2 trust summaries, got %d: %v", len(result.TrustSummaries), result.TrustSummaries)
+	}
+	wantOrder := []string{`"rows_flagged":2`, `"rows_flagged":5`}
+	for i, want := range wantOrder {
+		if !strings.Contains(string(result.TrustSummaries[i]), want) {
+			t.Errorf("trust summary %d should contain %s, got %s", i, want, result.TrustSummaries[i])
+		}
+	}
+}
+
+func TestPaginateSkipsNullAndAbsentTrustSummaries(t *testing.T) {
+	srv := trustSummaryPageServer(t, []string{
+		`{"items":[{"id":1}],"next_cursor":"c1","trust_summary":null}`,
+		`{"items":[{"id":2}],"next_cursor":"c2","trust_summary":{"rows_flagged":7}}`,
+		`{"items":[{"id":3}],"next_cursor":null}`,
+	})
+	defer srv.Close()
+
+	c := New(Options{APIKey: "test-key", BaseURL: srv.URL, Timeout: 5 * time.Second})
+
+	result, err := c.Paginate(context.Background(), "/test", nil, LimitConfig{Limit: 10})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result.TrustSummaries) != 1 {
+		t.Fatalf("expected only the non-null summary to be collected, got %v", result.TrustSummaries)
+	}
+	if !strings.Contains(string(result.TrustSummaries[0]), `"rows_flagged":7`) {
+		t.Errorf("expected the second page's summary, got %s", result.TrustSummaries[0])
+	}
+}
+
+func TestPaginateTrustSummariesNilWhenNoPageCarriesOne(t *testing.T) {
+	srv := trustSummaryPageServer(t, []string{
+		`{"items":[{"id":1}],"next_cursor":null}`,
+	})
+	defer srv.Close()
+
+	c := New(Options{APIKey: "test-key", BaseURL: srv.URL, Timeout: 5 * time.Second})
+
+	result, err := c.Paginate(context.Background(), "/test", nil, LimitConfig{Limit: 10})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result.TrustSummaries) != 0 {
+		t.Errorf("expected no trust summaries, got %v", result.TrustSummaries)
+	}
+}
+
+func TestPaginateTrustSummaryValuePreserved(t *testing.T) {
+	const summary = `{"rows_flagged":0,"row_weighted_unresolved_rate":0.0714,"expected_miss_rate":0.0310,"suppressed_scopes":0}`
+	srv := trustSummaryPageServer(t, []string{
+		`{"items":[{"id":1}],"next_cursor":null,"trust_summary":` + summary + `}`,
+	})
+	defer srv.Close()
+
+	c := New(Options{APIKey: "test-key", BaseURL: srv.URL, Timeout: 5 * time.Second})
+
+	result, err := c.Paginate(context.Background(), "/test", nil, LimitConfig{Limit: 10})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result.TrustSummaries) != 1 {
+		t.Fatalf("expected 1 trust summary, got %d", len(result.TrustSummaries))
+	}
+	if got := string(result.TrustSummaries[0]); got != summary {
+		t.Errorf("trust summary altered in transit:\n want %s\n got  %s", summary, got)
+	}
+}
+
+func TestPaginateTruncatedItemsStillReportEveryFetchedPageSummary(t *testing.T) {
+	// The item list is truncated to the effective limit, but every page the
+	// paginator actually fetched contributed its summary.
+	srv := trustSummaryPageServer(t, []string{
+		`{"items":[{"id":1},{"id":2}],"next_cursor":"c1","trust_summary":{"rows_flagged":1}}`,
+		`{"items":[{"id":3},{"id":4}],"next_cursor":"c2","trust_summary":{"rows_flagged":2}}`,
+	})
+	defer srv.Close()
+
+	c := New(Options{APIKey: "test-key", BaseURL: srv.URL, Timeout: 5 * time.Second})
+
+	result, err := c.Paginate(context.Background(), "/test", nil, LimitConfig{Limit: 3})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result.Items) != 3 {
+		t.Fatalf("expected 3 items after truncation, got %d", len(result.Items))
+	}
+	if len(result.TrustSummaries) != 2 {
+		t.Errorf("expected both fetched pages to contribute a summary, got %v", result.TrustSummaries)
+	}
+}

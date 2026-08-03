@@ -10,6 +10,11 @@ import (
 // PrintPaginated writes a JSON envelope for a paginated result. The data
 // field contains the items array, and meta includes count, has_more, and
 // credit information aggregated across all pages in the pagination sequence.
+// meta.trust_summaries carries the per-page trust summaries unread and
+// unaggregated: each is emitted as the same JSON value the API returned --
+// keys, values, numbers, strings, arrays and nulls all survive -- though the
+// encoder may change its byte-level formatting. The key is omitted entirely
+// when no fetched page carried a summary.
 func PrintPaginated(w io.Writer, result *client.PaginatedResult) {
 	meta := map[string]any{
 		"count":    len(result.Items),
@@ -23,6 +28,9 @@ func PrintPaginated(w io.Writer, result *client.PaginatedResult) {
 	}
 	if result.TotalCount != nil {
 		meta["total_count"] = result.TotalCount
+	}
+	if len(result.TrustSummaries) > 0 {
+		meta["trust_summaries"] = result.TrustSummaries
 	}
 
 	env := Envelope{

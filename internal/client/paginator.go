@@ -1,6 +1,7 @@
 package client
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -99,9 +100,10 @@ type TotalCount struct {
 
 // pageResponse is the expected shape of a paginated API response.
 type pageResponse struct {
-	Items      []json.RawMessage `json:"items"`
-	NextCursor *string           `json:"next_cursor"`
-	TotalCount *TotalCount       `json:"total_count"`
+	Items        []json.RawMessage `json:"items"`
+	NextCursor   *string           `json:"next_cursor"`
+	TotalCount   *TotalCount       `json:"total_count"`
+	TrustSummary json.RawMessage   `json:"trust_summary"`
 }
 
 // PaginatedResult holds the assembled output from paginating through an API
@@ -116,6 +118,13 @@ type PaginatedResult struct {
 	CreditsUsed      *int
 	CreditsRemaining *int
 	TotalCount       *TotalCount
+
+	// TrustSummaries holds the raw trust_summary value of every fetched
+	// page that carried a non-null one, in fetch order. Pages without one
+	// contribute no entry, so an index is not a page number. The bytes are
+	// carried verbatim: pagination detects presence and never reads inside
+	// the value.
+	TrustSummaries []json.RawMessage
 }
 
 // creditsUsedPtr returns a pointer to total if any page reported credits,
@@ -125,6 +134,14 @@ func creditsUsedPtr(has bool, total int) *int {
 		return nil
 	}
 	return &total
+}
+
+// isNonNullJSON reports whether raw holds a JSON value other than null. An
+// absent field unmarshals to a nil RawMessage; an explicit null unmarshals
+// to the literal bytes "null".
+func isNonNullJSON(raw json.RawMessage) bool {
+	trimmed := bytes.TrimSpace(raw)
+	return len(trimmed) > 0 && !bytes.Equal(trimmed, []byte("null"))
 }
 
 // Paginate fetches records from a paginated API endpoint, following cursors
@@ -147,7 +164,21 @@ func (c *Client) Paginate(ctx context.Context, path string, query url.Values, lc
 	var hasCreditsUsed bool
 	var lastCreditsRemaining *int
 	var totalCount *TotalCount
+	var trustSummaries []json.RawMessage
 	firstPage := true
+
+	// finish assembles the result from the values accumulated so far, so
+	// every exit path reports the same cross-page state.
+	finish := func(items []json.RawMessage, hasMore bool) *PaginatedResult {
+		return &PaginatedResult{
+			Items:            items,
+			HasMore:          hasMore,
+			CreditsUsed:      creditsUsedPtr(hasCreditsUsed, totalCreditsUsed),
+			CreditsRemaining: lastCreditsRemaining,
+			TotalCount:       totalCount,
+			TrustSummaries:   trustSummaries,
+		}
+	}
 
 	for {
 		remaining := effective - len(collected)
@@ -184,6 +215,10 @@ func (c *Client) Paginate(ctx context.Context, path string, query url.Values, lc
 			firstPage = false
 		}
 
+		if isNonNullJSON(page.TrustSummary) {
+			trustSummaries = append(trustSummaries, page.TrustSummary)
+		}
+
 		collected = append(collected, page.Items...)
 
 		// No more pages available from the API. Truncate to the
@@ -194,24 +229,12 @@ func (c *Client) Paginate(ctx context.Context, path string, query url.Values, lc
 			if hasMore {
 				collected = collected[:effective]
 			}
-			return &PaginatedResult{
-				Items:            collected,
-				HasMore:          hasMore,
-				CreditsUsed:      creditsUsedPtr(hasCreditsUsed, totalCreditsUsed),
-				CreditsRemaining: lastCreditsRemaining,
-				TotalCount:       totalCount,
-			}, nil
+			return finish(collected, hasMore), nil
 		}
 
 		// Reached the requested limit with more pages available.
 		if len(collected) >= effective {
-			return &PaginatedResult{
-				Items:            collected[:effective],
-				HasMore:          true,
-				CreditsUsed:      creditsUsedPtr(hasCreditsUsed, totalCreditsUsed),
-				CreditsRemaining: lastCreditsRemaining,
-				TotalCount:       totalCount,
-			}, nil
+			return finish(collected[:effective], true), nil
 		}
 
 		q.Set("cursor", *page.NextCursor)
@@ -219,11 +242,5 @@ func (c *Client) Paginate(ctx context.Context, path string, query url.Values, lc
 
 	// This branch handles the case where effective was already 0 or
 	// we broke out of the loop after collecting enough items.
-	return &PaginatedResult{
-		Items:            collected,
-		HasMore:          len(collected) >= effective && effective > 0,
-		CreditsUsed:      creditsUsedPtr(hasCreditsUsed, totalCreditsUsed),
-		CreditsRemaining: lastCreditsRemaining,
-		TotalCount:       totalCount,
-	}, nil
+	return finish(collected, len(collected) >= effective && effective > 0), nil
 }

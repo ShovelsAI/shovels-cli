@@ -3,12 +3,28 @@ package output
 import (
 	"bytes"
 	"encoding/json"
+	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/shovels-ai/shovels-cli/internal/client"
 )
 
 func intPtr(n int) *int { return &n }
+
+// decodeJSONValue parses raw JSON with UseNumber so numeric literals keep
+// their exact textual form and a float64 round-trip cannot mask a
+// representation change.
+func decodeJSONValue(t *testing.T, raw string) any {
+	t.Helper()
+	dec := json.NewDecoder(strings.NewReader(raw))
+	dec.UseNumber()
+	var v any
+	if err := dec.Decode(&v); err != nil {
+		t.Fatalf("invalid JSON %q: %v", raw, err)
+	}
+	return v
+}
 
 func TestPrintPaginatedEnvelopeShape(t *testing.T) {
 	var buf bytes.Buffer
@@ -335,5 +351,61 @@ func TestPrintPaginatedNilTotalCountOmitted(t *testing.T) {
 
 	if _, ok := env.Meta["total_count"]; ok {
 		t.Error("expected total_count to be absent when nil")
+	}
+}
+
+func TestPrintPaginatedTrustSummariesEmitted(t *testing.T) {
+	// Spaced input and a trailing-zero literal make the guarantee testable:
+	// the encoder compacts RawMessage, so the emitted bytes differ from the
+	// input while the JSON value -- including numeric representation -- must
+	// not.
+	summaries := []json.RawMessage{
+		json.RawMessage(`{"rows_flagged": 1, "expected_miss_rate": 0.031, "suppressed_scopes": []}`),
+		json.RawMessage(`{"rows_flagged": 4, "expected_miss_rate": 0.0440, "suppressed_scopes": null}`),
+	}
+
+	var buf bytes.Buffer
+	PrintPaginated(&buf, &client.PaginatedResult{
+		Items:          []json.RawMessage{json.RawMessage(`{"id":"a_1"}`)},
+		TrustSummaries: summaries,
+	})
+
+	var env struct {
+		Meta struct {
+			TrustSummaries []json.RawMessage `json:"trust_summaries"`
+		} `json:"meta"`
+	}
+	if err := json.Unmarshal(buf.Bytes(), &env); err != nil {
+		t.Fatalf("invalid JSON: %v\nraw: %s", err, buf.String())
+	}
+
+	if len(env.Meta.TrustSummaries) != len(summaries) {
+		t.Fatalf("expected %d trust summaries, got %d", len(summaries), len(env.Meta.TrustSummaries))
+	}
+	// The summaries are relocated, never re-derived: each parses to the same
+	// JSON value it was given.
+	for i, want := range summaries {
+		got := string(env.Meta.TrustSummaries[i])
+		if !reflect.DeepEqual(decodeJSONValue(t, string(want)), decodeJSONValue(t, got)) {
+			t.Errorf("trust summary %d changed:\n want %s\n got  %s", i, want, got)
+		}
+	}
+}
+
+func TestPrintPaginatedTrustSummariesOmittedWhenNone(t *testing.T) {
+	var buf bytes.Buffer
+	PrintPaginated(&buf, &client.PaginatedResult{
+		Items: []json.RawMessage{json.RawMessage(`{"id":"a_1"}`)},
+	})
+
+	var env struct {
+		Meta map[string]any `json:"meta"`
+	}
+	if err := json.Unmarshal(buf.Bytes(), &env); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	if _, ok := env.Meta["trust_summaries"]; ok {
+		t.Errorf("expected trust_summaries to be omitted, got %v", env.Meta["trust_summaries"])
 	}
 }
