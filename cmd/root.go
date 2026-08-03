@@ -59,6 +59,7 @@ Pipe output to jq, parse it programmatically, or feed it to another AI agent.
 
 Available resources:
   permits         Search and retrieve building permits by location, date, type, and contractor
+  properties      Search properties by location or owner, with permit history rolled up (Beta)
   decisions       Search zoning and land-use decisions by location, date, category, and project value
   contractors     Search contractors, retrieve details, list their permits/employees/metrics
   addresses       Search addresses by street, city, state, or zip code

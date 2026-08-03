@@ -63,6 +63,7 @@ var arrayParams = map[string]bool{
 	"permit_status":                     true,
 	"contractor_classification_derived": true,
 	"id":                                true,
+	"legal_owner":                       true,
 	"asset_class":                       true,
 	"category":                          true,
 	"subcategory":                       true,

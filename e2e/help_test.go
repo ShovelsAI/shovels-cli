@@ -46,7 +46,7 @@ func TestRootHelpShowsDescriptionCommandsAndGlobalFlags(t *testing.T) {
 	}
 
 	// All resource commands must be listed.
-	commands := []string{"permits", "contractors", "addresses", "cities", "counties", "jurisdictions", "zipcodes", "states", "tags", "usage", "config", "version"}
+	commands := []string{"permits", "properties", "contractors", "addresses", "cities", "counties", "jurisdictions", "zipcodes", "states", "tags", "usage", "config", "version"}
 	for _, cmd := range commands {
 		if !strings.Contains(out, cmd) {
 			t.Errorf("root --help should list the %q command", cmd)
@@ -710,5 +710,78 @@ func TestGeoIDFlagShowsAllResolutionCommands(t *testing.T) {
 	}
 	if !strings.Contains(out, "CA") {
 		t.Error("--geo-id should show state code example like CA")
+	}
+}
+
+// TestPropertiesSearchHelp verifies that `shovels properties search --help`
+// carries everything a blind agent needs before its first call: the Beta
+// instability warning, the ZIP scopes properties accepts where decisions does
+// not, the absence-tag syntax and its trust metadata, the nationwide
+// owner-portfolio path, the geo_id resolution commands plus the jurisdiction
+// caveat, the absence of a --permit-to flag, the grouped-flag layout, and the
+// timed-out total_count caveat.
+func TestPropertiesSearchHelp(t *testing.T) {
+	result := runCLI(t, "properties", "search", "--help")
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+	out := result.Stdout
+
+	cases := []struct {
+		name    string
+		wants   []string
+		purpose string
+	}{
+		{
+			name:    "BetaWarning",
+			wants:   []string{"Beta", "unstable"},
+			purpose: "label the endpoint Beta and warn the response shape is unstable",
+		},
+		{
+			name:    "ZipScopes",
+			wants:   []string{"92024", "92024-1234"},
+			purpose: "show that bare ZIP and ZIP+4 scopes work directly",
+		},
+		{
+			name:    "AbsenceTagSyntax",
+			wants:   []string{`--permit-tags "-solar"`, "trust"},
+			purpose: "teach the -prefixed absence syntax and the trust metadata it returns",
+		},
+		{
+			name:    "OwnerPortfolio",
+			wants:   []string{"--legal-owner", "nationwide"},
+			purpose: "show that --legal-owner alone searches an owner nationwide",
+		},
+		{
+			name:    "GeoResolutionCommands",
+			wants:   []string{"cities search", "counties search", "addresses search", "Jurisdiction"},
+			purpose: "point at the geo_id resolution commands and flag the jurisdiction rejection",
+		},
+		{
+			name:    "DateWindowRedirect",
+			wants:   []string{"no --permit-to", "shovels permits search"},
+			purpose: "state that no --permit-to flag exists and redirect date windows to permits search",
+		},
+		{
+			name:    "GroupedFlags",
+			wants:   []string{"Required Scope", "Permit Filters:", "Response Options:"},
+			purpose: "render the grouped-flag layout so scope flags are distinguishable from filters",
+		},
+		{
+			name:    "TimedOutCount",
+			wants:   []string{"total_count", "times out"},
+			purpose: "warn that an omitted total_count can mean the count query timed out, not zero results",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, want := range tc.wants {
+				if !strings.Contains(out, want) {
+					t.Errorf("properties search --help should %s (missing %q)", tc.purpose, want)
+				}
+			}
+		})
 	}
 }
