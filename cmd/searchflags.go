@@ -425,6 +425,15 @@ func setStringFlag(cmd *cobra.Command, flag, param string, q url.Values) {
 	}
 }
 
+// setNonEmptyStringFlag adds a query parameter only when the flag holds a
+// non-empty value, so an explicitly blank flag never reaches the API as an
+// empty filter.
+func setNonEmptyStringFlag(cmd *cobra.Command, flag, param string, q url.Values) {
+	if v, _ := cmd.Flags().GetString(flag); v != "" {
+		q.Set(param, v)
+	}
+}
+
 // setIntFlag adds a query parameter (as a string) only when the flag was
 // explicitly set.
 func setIntFlag(cmd *cobra.Command, flag, param string, q url.Values) {
@@ -464,6 +473,16 @@ func setBoolFlag(cmd *cobra.Command, flag, param string, q url.Values) {
 // query parameter.
 func addStringSliceParam(cmd *cobra.Command, flag, param string, q url.Values) {
 	values, _ := cmd.Flags().GetStringSlice(flag)
+	for _, v := range values {
+		q.Add(param, v)
+	}
+}
+
+// addStringArrayParam adds each value of a StringArray flag as a repeated
+// query parameter. StringArray keeps commas inside a value, so one flag
+// occurrence always yields exactly one parameter.
+func addStringArrayParam(cmd *cobra.Command, flag, param string, q url.Values) {
+	values, _ := cmd.Flags().GetStringArray(flag)
 	for _, v := range values {
 		q.Add(param, v)
 	}
