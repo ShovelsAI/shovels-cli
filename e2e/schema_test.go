@@ -4,7 +4,10 @@ package e2e
 
 import (
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -13,6 +16,7 @@ type schemaOutput struct {
 	SchemaVersion  int            `json:"schema_version"`
 	Command        string         `json:"command"`
 	ResponseFields map[string]any `json:"response_fields"`
+	MetaFields     map[string]any `json:"meta_fields"`
 	FieldIndex     []string       `json:"field_index"`
 	Filters        map[string]any `json:"filters"`
 }
@@ -91,7 +95,7 @@ func TestSchemaNoArgsListsPaths(t *testing.T) {
 	}
 
 	// Verify some expected paths are present.
-	expected := []string{"permits search", "permits get", "contractors search", "tags list", "cities metrics current"}
+	expected := []string{"permits search", "permits get", "properties search", "properties get", "contractors search", "tags list", "cities metrics current"}
 	pathSet := make(map[string]bool, len(paths))
 	for _, p := range paths {
 		pathSet[p] = true
@@ -456,7 +460,7 @@ func TestSchemaContractorsGetVsSearchScopeDiffers(t *testing.T) {
 // the batch envelope its runtime output emits: count, missing, and credits,
 // with no has_more. Batch-get responses look up IDs and are never paginated.
 func TestSchemaBatchGetMetaConvention(t *testing.T) {
-	for _, resource := range []string{"permits", "decisions", "contractors"} {
+	for _, resource := range []string{"permits", "properties", "decisions", "contractors"} {
 		resource := resource
 		t.Run(resource, func(t *testing.T) {
 			result := runCLI(t, "schema", resource, "get")
@@ -682,4 +686,406 @@ func assertBatchGetMeta(t *testing.T, out schemaOutput) {
 	if index["meta.has_more"] {
 		t.Errorf("%s --schema field_index should not advertise meta.has_more", out.Command)
 	}
+}
+
+// =======================================================================
+// Properties schema: nested trust expansion and meta fields
+// =======================================================================
+
+// propertiesTrustChildren are the eight direct PropertyTrust children, which
+// both properties commands document as nested paths under trust.
+var propertiesTrustChildren = []string{
+	"trust.unresolved_rate",
+	"trust.coverage_tier",
+	"trust.data_horizon",
+	"trust.horizon_basis",
+	"trust.trust_jurisdiction_basis",
+	"trust.trust_jurisdiction_error_bar",
+	"trust.footprint_basis",
+	"trust.flags",
+}
+
+// propertiesTrustSummaryFields are the four TrustSummary children, which the
+// search command documents under meta_fields.
+var propertiesTrustSummaryFields = []string{
+	"trust_summaries[].rows_flagged",
+	"trust_summaries[].row_weighted_unresolved_rate",
+	"trust_summaries[].expected_miss_rate",
+	"trust_summaries[].suppressed_scopes",
+}
+
+// TestSchemaPropertiesOfflineWithoutAuth verifies both properties commands
+// answer --schema with no API key configured, no positional arguments, and
+// without touching the API. The server answers 500 so that a request slipping
+// through fails the command as well as the hit count.
+func TestSchemaPropertiesOfflineWithoutAuth(t *testing.T) {
+	for _, sub := range []string{"search", "get"} {
+		sub := sub
+		t.Run(sub, func(t *testing.T) {
+			var hits atomic.Int32
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				hits.Add(1)
+				w.WriteHeader(500)
+				w.Write([]byte(`{"detail":"schema output must not reach the API"}`))
+			}))
+			defer srv.Close()
+
+			env := withIsolatedConfigNoAuth(t)
+
+			result := runCLIWithEnv(t, env, "--base-url", srv.URL, "properties", sub, "--schema")
+			if result.ExitCode != 0 {
+				t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+			}
+
+			out := parseSchema(t, result.Stdout)
+			want := "properties " + sub
+			if out.Command != want {
+				t.Errorf("expected command %q, got %q", want, out.Command)
+			}
+			if out.SchemaVersion != 1 {
+				t.Errorf("expected schema_version 1, got %d", out.SchemaVersion)
+			}
+			if len(out.ResponseFields) == 0 {
+				t.Error("expected non-empty response_fields")
+			}
+			if got := hits.Load(); got != 0 {
+				t.Errorf("expected zero API requests, got %d", got)
+			}
+		})
+	}
+}
+
+// TestSchemaPropertiesTrustFieldsExpanded verifies both properties commands
+// document every direct PropertyTrust child as a typed, described nested path
+// indexed under data[], alongside the retained parent trust object.
+func TestSchemaPropertiesTrustFieldsExpanded(t *testing.T) {
+	for _, sub := range []string{"search", "get"} {
+		sub := sub
+		t.Run(sub, func(t *testing.T) {
+			out := parseSchema(t, mustSchema(t, nil, "properties", sub))
+
+			parent, ok := out.ResponseFields["trust"].(map[string]any)
+			if !ok {
+				t.Fatalf("response_fields missing the parent trust object, got %v", out.ResponseFields["trust"])
+			}
+			if got, _ := parent["type"].(string); got != "object" {
+				t.Errorf("parent trust has type %q, want object", got)
+			}
+
+			for _, child := range propertiesTrustChildren {
+				field, ok := out.ResponseFields[child].(map[string]any)
+				if !ok {
+					t.Errorf("response_fields missing nested field %q", child)
+					continue
+				}
+				if got, _ := field["type"].(string); got == "" {
+					t.Errorf("nested field %q has no type", child)
+				}
+				if got, _ := field["description"].(string); got == "" {
+					t.Errorf("nested field %q has no description", child)
+				}
+			}
+
+			assertDataFieldIndex(t, out, append([]string{"trust"}, propertiesTrustChildren...)...)
+		})
+	}
+}
+
+// TestSchemaPropertiesTrustExpansionStopsAtDepthOne verifies the expansion
+// documents the direct children of trust and nothing deeper: a grandchild
+// path would mean the generator recursed into a child's own references, and a
+// trust path outside the eight would mean it documented something the
+// PropertyTrust schema does not carry.
+func TestSchemaPropertiesTrustExpansionStopsAtDepthOne(t *testing.T) {
+	wantChildren := make(map[string]bool, len(propertiesTrustChildren))
+	for _, child := range propertiesTrustChildren {
+		wantChildren[child] = true
+	}
+
+	for _, sub := range []string{"search", "get"} {
+		sub := sub
+		t.Run(sub, func(t *testing.T) {
+			out := parseSchema(t, mustSchema(t, nil, "properties", sub))
+
+			for name := range out.ResponseFields {
+				if depth := strings.Count(name, "."); depth > 1 {
+					t.Errorf("response field %q nests %d levels; expansion documents direct children only", name, depth+1)
+				}
+				if strings.HasPrefix(name, "trust.") && !wantChildren[name] {
+					t.Errorf("response field %q is not a PropertyTrust child", name)
+				}
+			}
+
+			for _, entry := range out.FieldIndex {
+				path := strings.TrimPrefix(strings.TrimPrefix(entry, "data[]."), "meta.")
+				if depth := strings.Count(path, "."); depth > 1 {
+					t.Errorf("field_index entry %q nests %d levels; expansion documents direct children only", entry, depth+1)
+				}
+			}
+
+			for name := range out.MetaFields {
+				if depth := strings.Count(name, "."); depth > 1 {
+					t.Errorf("meta field %q nests %d levels; expansion documents direct children only", name, depth+1)
+				}
+			}
+		})
+	}
+}
+
+// TestSchemaPropertiesSearchMetaFieldsDocumentTrustSummaries verifies the
+// search schema documents every TrustSummary child under the trust_summaries[]
+// naming and indexes each one under meta, and documents nothing else there.
+func TestSchemaPropertiesSearchMetaFieldsDocumentTrustSummaries(t *testing.T) {
+	out := parseSchema(t, mustSchema(t, nil, "properties", "search"))
+
+	index := fieldIndexSet(out)
+	for _, name := range propertiesTrustSummaryFields {
+		field, ok := out.MetaFields[name].(map[string]any)
+		if !ok {
+			t.Errorf("meta_fields missing %q", name)
+			continue
+		}
+		if got, _ := field["type"].(string); got == "" {
+			t.Errorf("meta field %q has no type", name)
+		}
+		if got, _ := field["description"].(string); got == "" {
+			t.Errorf("meta field %q has no description", name)
+		}
+		if entry := "meta." + name; !index[entry] {
+			t.Errorf("field_index missing %q", entry)
+		}
+	}
+
+	if len(out.MetaFields) != len(propertiesTrustSummaryFields) {
+		t.Errorf("meta_fields has %d entries, want the %d TrustSummary children: %v",
+			len(out.MetaFields), len(propertiesTrustSummaryFields), out.MetaFields)
+	}
+}
+
+// TestSchemaMetaFieldsOmittedWhenCommandAddsNone verifies meta_fields is
+// additive: a command whose meta carries nothing beyond the standard envelope
+// omits the key entirely rather than emitting an empty map. properties get is
+// included because it returns no trust_summary to collect.
+func TestSchemaMetaFieldsOmittedWhenCommandAddsNone(t *testing.T) {
+	commands := [][]string{
+		{"properties", "get"},
+		{"permits", "search"},
+		{"permits", "get"},
+		{"decisions", "search"},
+		{"contractors", "get"},
+		{"cities", "coverage"},
+		{"tags", "list"},
+	}
+
+	for _, args := range commands {
+		args := args
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			var raw map[string]any
+			stdout := mustSchema(t, nil, args...)
+			if err := json.Unmarshal([]byte(stdout), &raw); err != nil {
+				t.Fatalf("stdout is not valid JSON: %v\nstdout: %s", err, stdout)
+			}
+			if _, ok := raw["meta_fields"]; ok {
+				t.Errorf("schema output should omit meta_fields entirely, got %v", raw["meta_fields"])
+			}
+		})
+	}
+}
+
+// TestSchemaPropertiesGetSharesSearchResponseFields verifies both properties
+// commands describe the same row shape: one OpenAPI schema serves both
+// endpoints, so an agent can read either schema for the field set.
+func TestSchemaPropertiesGetSharesSearchResponseFields(t *testing.T) {
+	search := parseSchema(t, mustSchema(t, nil, "properties", "search"))
+	get := parseSchema(t, mustSchema(t, nil, "properties", "get"))
+
+	for name := range search.ResponseFields {
+		if _, ok := get.ResponseFields[name]; !ok {
+			t.Errorf("properties get missing response field %q present on search", name)
+		}
+	}
+	for name := range get.ResponseFields {
+		if _, ok := search.ResponseFields[name]; !ok {
+			t.Errorf("properties search missing response field %q present on get", name)
+		}
+	}
+}
+
+// TestSchemaPropertiesGetTrustFieldsMarkedSearchOnly verifies every trust path
+// on the batch command states where trust is actually populated. The fields
+// stay in the schema so the shape is discoverable from either command, which
+// makes saying "not here" load-bearing.
+func TestSchemaPropertiesGetTrustFieldsMarkedSearchOnly(t *testing.T) {
+	const note = "search absence queries only — never returned by properties get"
+
+	out := parseSchema(t, mustSchema(t, nil, "properties", "get"))
+
+	for _, path := range append([]string{"trust"}, propertiesTrustChildren...) {
+		desc := fieldDescription(t, out, path)
+		if !strings.Contains(desc, note) {
+			t.Errorf("properties get field %q should state %q, got: %s", path, note, desc)
+		}
+	}
+
+	// The same paths on search must not carry the get-only disclaimer, which
+	// would tell an agent absence data is unavailable where it is the point.
+	searchOut := parseSchema(t, mustSchema(t, nil, "properties", "search"))
+	for _, path := range append([]string{"trust"}, propertiesTrustChildren...) {
+		if desc := fieldDescription(t, searchOut, path); strings.Contains(desc, note) {
+			t.Errorf("properties search field %q should not carry the get-only note, got: %s", path, desc)
+		}
+	}
+}
+
+// TestSchemaPropertiesMoneyFieldsUseCents verifies the integer-cents fields
+// and the market-value filters carry the unit, since a bare integer market
+// value reads as dollars otherwise.
+func TestSchemaPropertiesMoneyFieldsUseCents(t *testing.T) {
+	for _, sub := range []string{"search", "get"} {
+		sub := sub
+		t.Run(sub, func(t *testing.T) {
+			out := parseSchema(t, mustSchema(t, nil, "properties", sub))
+			for _, field := range []string{"total_job_value", "assess_market_value"} {
+				if unit := fieldUnit(t, out, field); unit != "cents" {
+					t.Errorf("field %q has unit %q, want cents", field, unit)
+				}
+			}
+		})
+	}
+
+	search := parseSchema(t, mustSchema(t, nil, "properties", "search"))
+	for _, filter := range []string{"--property-min-market-value", "--property-max-market-value"} {
+		if unit := filterUnit(t, search, filter); unit != "cents" {
+			t.Errorf("filter %q has unit %q, want cents", filter, unit)
+		}
+	}
+}
+
+// TestSchemaNestedExpansionIsOptIn verifies nested expansion and meta_fields
+// reach only the commands that ask for them: every other command's --schema
+// prints a flat response_fields map, no meta_fields, and a field index whose
+// entries stay one level under data[].
+func TestSchemaNestedExpansionIsOptIn(t *testing.T) {
+	expanded := map[string]bool{"properties search": true, "properties get": true}
+
+	for _, path := range registeredSchemaCommands(t) {
+		if expanded[path] {
+			continue
+		}
+		path := path
+		t.Run(path, func(t *testing.T) {
+			stdout := mustSchema(t, nil, strings.Split(path, " ")...)
+
+			var raw map[string]any
+			if err := json.Unmarshal([]byte(stdout), &raw); err != nil {
+				t.Fatalf("stdout is not valid JSON: %v", err)
+			}
+			if _, ok := raw["meta_fields"]; ok {
+				t.Errorf("meta_fields appeared on %q, which never opted in", path)
+			}
+
+			out := parseSchema(t, stdout)
+			for name := range out.ResponseFields {
+				if strings.Contains(name, ".") {
+					t.Errorf("nested field %q appeared on %q, which never opted in", name, path)
+				}
+			}
+			for _, entry := range out.FieldIndex {
+				if strings.Count(entry, ".") > 1 {
+					t.Errorf("nested field_index entry %q appeared on %q, which never opted in", entry, path)
+				}
+			}
+		})
+	}
+}
+
+// TestSchemaNestedObjectRefsOutsidePropertiesStayNamed pins the specific
+// fields that would flatten if expansion ever became global: a permit's
+// address and geo_ids, and a contractor's address are object references just
+// like a property's trust.
+func TestSchemaNestedObjectRefsOutsidePropertiesStayNamed(t *testing.T) {
+	cases := []struct {
+		args     []string
+		field    string
+		wantType string
+	}{
+		{[]string{"permits", "search"}, "address", "AddressesRead"},
+		{[]string{"permits", "search"}, "geo_ids", "GeoIdsRead"},
+		{[]string{"permits", "get"}, "address", "AddressesRead"},
+		{[]string{"permits", "get"}, "geo_ids", "GeoIdsRead"},
+		{[]string{"contractors", "search"}, "address", "AddressesEmbedded"},
+		{[]string{"contractors", "get"}, "address", "AddressesEmbedded"},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(strings.Join(tc.args, " ")+" "+tc.field, func(t *testing.T) {
+			out := parseSchema(t, mustSchema(t, nil, tc.args...))
+
+			field, ok := out.ResponseFields[tc.field].(map[string]any)
+			if !ok {
+				t.Fatalf("response_fields missing %q", tc.field)
+			}
+			if got, _ := field["type"].(string); got != tc.wantType {
+				t.Errorf("field %q has type %q, want the unexpanded %q", tc.field, got, tc.wantType)
+			}
+			for name := range out.ResponseFields {
+				if strings.HasPrefix(name, tc.field+".") {
+					t.Errorf("field %q was expanded into %q", tc.field, name)
+				}
+			}
+		})
+	}
+}
+
+// TestSchemaPropertiesSearchAdvertisesEveryFilter verifies the search schema
+// documents exactly the flags the command registers. The names are spelled
+// out here so renaming a flag fails this test rather than moving on both
+// sides at once.
+func TestSchemaPropertiesSearchAdvertisesEveryFilter(t *testing.T) {
+	want := []string{
+		"--geo-id", "--legal-owner",
+		"--permit-tags", "--permit-status", "--permit-from", "--permit-tags-unfinaled",
+		"--property-type",
+		"--property-min-market-value", "--property-max-market-value",
+		"--property-min-lot-size", "--property-max-lot-size",
+		"--property-min-building-area", "--property-max-building-area",
+		"--property-min-unit-count", "--property-max-unit-count",
+		"--property-min-year-built", "--property-max-year-built",
+		"--include-count",
+		// No --permit-to: the API rejects permit_to and points callers at
+		// permits search, so the extra-entry check below must keep it out.
+	}
+
+	out := parseSchema(t, mustSchema(t, nil, "properties", "search"))
+
+	wanted := make(map[string]bool, len(want))
+	for _, filter := range want {
+		wanted[filter] = true
+		if _, ok := out.Filters[filter]; !ok {
+			t.Errorf("filters missing %q", filter)
+		}
+	}
+	for filter := range out.Filters {
+		if !wanted[filter] {
+			t.Errorf("filters carry an undocumented extra entry %q", filter)
+		}
+	}
+}
+
+// TestSchemaPropertiesGetTakesPositionalIDs verifies the batch command's
+// schema describes its positional argument rather than a flag.
+func TestSchemaPropertiesGetTakesPositionalIDs(t *testing.T) {
+	out := parseSchema(t, mustSchema(t, nil, "properties", "get"))
+
+	if _, ok := out.Filters["ID"]; !ok {
+		t.Errorf("properties get filters should document the positional ID, got %v", out.Filters)
+	}
+	assertBatchGetMeta(t, out)
+}
+
+// TestSchemaPropertiesSearchMetaConvention verifies the search schema keeps
+// the paginated envelope convention even with its extra meta fields.
+func TestSchemaPropertiesSearchMetaConvention(t *testing.T) {
+	assertSearchMeta(t, parseSchema(t, mustSchema(t, nil, "properties", "search")))
 }
