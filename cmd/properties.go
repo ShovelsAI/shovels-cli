@@ -15,6 +15,19 @@ import (
 // API accepts on one properties search.
 const maxPropertyLegalOwners = 10
 
+// propertyRangePair names both bounds of one property attribute range filter.
+type propertyRangePair struct{ minFlag, maxFlag string }
+
+// propertyRangePairs drives bound validation, which reads every bound before
+// it judges any pair and so cannot be expressed as per-flag checks.
+var propertyRangePairs = []propertyRangePair{
+	{"property-min-market-value", "property-max-market-value"},
+	{"property-min-lot-size", "property-max-lot-size"},
+	{"property-min-building-area", "property-max-building-area"},
+	{"property-min-unit-count", "property-max-unit-count"},
+	{"property-min-year-built", "property-max-year-built"},
+}
+
 var propertiesCmd = &cobra.Command{
 	Use:   "properties",
 	Short: "Search properties with their permit history rolled up onto the property record (Beta)",
@@ -218,9 +231,10 @@ func propertiesSearchFlagGroups() []flagGroup {
 }
 
 // validatePropertiesSearchFlags checks that a scope was given, that owner
-// values are non-empty and within the API's count limit, and that
-// --permit-from has the YYYY-MM-DD shape. Calendar validity is left to the
-// API. Returns a non-nil error (already printed to stderr) on failure.
+// values are non-empty and within the API's count limit, that --permit-from
+// has the YYYY-MM-DD shape, and that the attribute range bounds are usable.
+// Calendar validity and property-type membership are left to the API.
+// Returns a non-nil error (already printed to stderr) on failure.
 func validatePropertiesSearchFlags(cmd *cobra.Command) error {
 	geoID, _ := cmd.Flags().GetString("geo-id")
 	owners, _ := cmd.Flags().GetStringArray("legal-owner")
@@ -256,6 +270,41 @@ func validatePropertiesSearchFlags(cmd *cobra.Command) error {
 		msg := fmt.Sprintf("invalid date format for --permit-from: %q (expected YYYY-MM-DD)", from)
 		output.PrintErrorTyped(os.Stderr, msg, 1, client.ErrorTypeValidation)
 		return &exitError{code: 1}
+	}
+
+	return validatePropertyRangeFlags(cmd)
+}
+
+// validatePropertyRangeFlags rejects negative bounds and inverted pairs on the
+// property attribute range filters. Every bound is checked for negativity
+// before any pair is checked for inversion, so a pair that is both negative
+// and inverted reports the negative value rather than the ordering.
+func validatePropertyRangeFlags(cmd *cobra.Command) error {
+	for _, pair := range propertyRangePairs {
+		for _, flag := range []string{pair.minFlag, pair.maxFlag} {
+			if !cmd.Flags().Changed(flag) {
+				continue
+			}
+			if v, _ := cmd.Flags().GetInt(flag); v < 0 {
+				msg := fmt.Sprintf("--%s must not be negative, got %d", flag, v)
+				output.PrintErrorTyped(os.Stderr, msg, 1, client.ErrorTypeValidation)
+				return &exitError{code: 1}
+			}
+		}
+	}
+
+	for _, pair := range propertyRangePairs {
+		if !cmd.Flags().Changed(pair.minFlag) || !cmd.Flags().Changed(pair.maxFlag) {
+			continue
+		}
+		lower, _ := cmd.Flags().GetInt(pair.minFlag)
+		upper, _ := cmd.Flags().GetInt(pair.maxFlag)
+		if lower > upper {
+			msg := fmt.Sprintf("--%s (%d) must not exceed --%s (%d)",
+				pair.minFlag, lower, pair.maxFlag, upper)
+			output.PrintErrorTyped(os.Stderr, msg, 1, client.ErrorTypeValidation)
+			return &exitError{code: 1}
+		}
 	}
 
 	return nil

@@ -366,6 +366,90 @@ func TestValidatePropertiesSearchFlags_ZipAndZipPlusFourAccepted(t *testing.T) {
 	}
 }
 
+// --- validatePropertiesSearchFlags (property attribute ranges) ---
+
+func TestValidatePropertiesSearchFlags_NegativeBoundRejected(t *testing.T) {
+	for _, rc := range propertyRangeCases {
+		for _, flag := range []string{rc.minFlag, rc.maxFlag} {
+			cmd := newPropertiesSearchTestCmd(t, "--geo-id", "CA", "--"+flag, "-1")
+			if err := validatePropertiesSearchFlags(cmd); err == nil {
+				t.Errorf("expected --%s -1 to be rejected", flag)
+			}
+		}
+	}
+}
+
+func TestValidatePropertiesSearchFlags_InvertedPairRejected(t *testing.T) {
+	for _, rc := range propertyRangeCases {
+		cmd := newPropertiesSearchTestCmd(t,
+			"--geo-id", "CA",
+			"--"+rc.minFlag, "20",
+			"--"+rc.maxFlag, "10",
+		)
+		if err := validatePropertiesSearchFlags(cmd); err == nil {
+			t.Errorf("expected --%s 20 with --%s 10 to be rejected", rc.minFlag, rc.maxFlag)
+		}
+	}
+}
+
+func TestValidatePropertiesSearchFlags_DoublyInvalidPairRejected(t *testing.T) {
+	// -5 exceeds -10, so this pair is both negative and inverted. Which of the
+	// two messages is emitted is pinned end-to-end; here only the rejection
+	// matters.
+	cmd := newPropertiesSearchTestCmd(t,
+		"--geo-id", "CA",
+		"--property-min-market-value", "-5",
+		"--property-max-market-value", "-10",
+	)
+
+	if err := validatePropertiesSearchFlags(cmd); err == nil {
+		t.Fatal("expected a pair that is both negative and inverted to be rejected")
+	}
+}
+
+func TestValidatePropertiesSearchFlags_EqualBoundsAccepted(t *testing.T) {
+	for _, rc := range propertyRangeCases {
+		cmd := newPropertiesSearchTestCmd(t,
+			"--geo-id", "CA",
+			"--"+rc.minFlag, "12",
+			"--"+rc.maxFlag, "12",
+		)
+		if err := validatePropertiesSearchFlags(cmd); err != nil {
+			t.Errorf("expected --%s == --%s to be an exact-value match, got %v", rc.minFlag, rc.maxFlag, err)
+		}
+	}
+}
+
+func TestValidatePropertiesSearchFlags_LoneBoundNeverInverted(t *testing.T) {
+	// An unset counterpart holds 0, which must not be read as an upper bound.
+	for _, rc := range propertyRangeCases {
+		cmd := newPropertiesSearchTestCmd(t, "--geo-id", "CA", "--"+rc.minFlag, "5000")
+		if err := validatePropertiesSearchFlags(cmd); err != nil {
+			t.Errorf("expected --%s alone to be accepted, got %v", rc.minFlag, err)
+		}
+	}
+}
+
+func TestValidatePropertiesSearchFlags_ZeroBoundsAccepted(t *testing.T) {
+	cmd := newPropertiesSearchTestCmd(t,
+		"--geo-id", "CA",
+		"--property-min-unit-count", "0",
+		"--property-max-unit-count", "0",
+	)
+
+	if err := validatePropertiesSearchFlags(cmd); err != nil {
+		t.Fatalf("expected zero bounds to be accepted, got %v", err)
+	}
+}
+
+func TestValidatePropertiesSearchFlags_UnknownPropertyTypeAccepted(t *testing.T) {
+	cmd := newPropertiesSearchTestCmd(t, "--geo-id", "CA", "--property-type", "castle")
+
+	if err := validatePropertiesSearchFlags(cmd); err != nil {
+		t.Fatalf("expected an unknown property type to be left to the API, got %v", err)
+	}
+}
+
 // --- helpers ---
 
 // ownerArgs builds n distinct --legal-owner flag pairs.

@@ -178,48 +178,49 @@ func metaTrustSummaries(t *testing.T, stdout string) []json.RawMessage {
 }
 
 // propertyRangePairCases is the full inventory of property attribute range
-// pairs: both bound flags, the parameters they map to, and a value in the
-// units each pair expects for the min == max case. The names are spelled out
-// here rather than read from the command's own tables, so a renamed or dropped
-// bound fails a test instead of moving on both sides at once.
-// TestPropertiesSearchAttributeRangesMapped keeps its own copy of the
-// parameter names so the flag-to-parameter mapping has a witness that does not
-// share this table.
+// pairs: both bound flags, the parameters they map to, and values in the units
+// each pair expects — one for the min == max case, and an inverted assignment.
+// The names are spelled out here rather than read from the command's own
+// tables, so a renamed or dropped bound fails a test instead of moving on both
+// sides at once. TestPropertiesSearchAttributeRangesMapped keeps its own copy
+// of the parameter names so the flag-to-parameter mapping has a witness that
+// does not share this table.
 var propertyRangePairCases = []struct {
-	name              string
-	minFlag, minParam string
-	maxFlag, maxParam string
-	exact             string
+	name                     string
+	minFlag, minParam        string
+	maxFlag, maxParam        string
+	exact                    string
+	invertedMin, invertedMax string
 }{
 	{
 		name:    "MarketValue",
 		minFlag: "--property-min-market-value", minParam: "property_min_market_value",
 		maxFlag: "--property-max-market-value", maxParam: "property_max_market_value",
-		exact: "50000000",
+		exact: "50000000", invertedMin: "100000000", invertedMax: "50000000",
 	},
 	{
 		name:    "LotSize",
 		minFlag: "--property-min-lot-size", minParam: "property_min_lot_size",
 		maxFlag: "--property-max-lot-size", maxParam: "property_max_lot_size",
-		exact: "4000",
+		exact: "4000", invertedMin: "12000", invertedMax: "4000",
 	},
 	{
 		name:    "BuildingArea",
 		minFlag: "--property-min-building-area", minParam: "property_min_building_area",
 		maxFlag: "--property-max-building-area", maxParam: "property_max_building_area",
-		exact: "1200",
+		exact: "1200", invertedMin: "3500", invertedMax: "1200",
 	},
 	{
 		name:    "UnitCount",
 		minFlag: "--property-min-unit-count", minParam: "property_min_unit_count",
 		maxFlag: "--property-max-unit-count", maxParam: "property_max_unit_count",
-		exact: "4",
+		exact: "4", invertedMin: "4", invertedMax: "1",
 	},
 	{
 		name:    "YearBuilt",
 		minFlag: "--property-min-year-built", minParam: "property_min_year_built",
 		maxFlag: "--property-max-year-built", maxParam: "property_max_year_built",
-		exact: "1985",
+		exact: "1985", invertedMin: "1990", invertedMax: "1950",
 	},
 }
 
@@ -1182,6 +1183,134 @@ func TestPropertiesSearchInvalidCalendarDateForwarded(t *testing.T) {
 	}
 	if got := (*queries)[0]["permit_from"]; len(got) != 1 || got[0] != "2024-13-01" {
 		t.Errorf("expected permit_from=[2024-13-01] forwarded to the API, got %v", got)
+	}
+}
+
+func TestPropertiesSearchNegativeRangeBoundRejected(t *testing.T) {
+	// The rule holds for any range bound, so every one of the ten is tried.
+	for _, pair := range propertyRangePairCases {
+		for _, flag := range []string{pair.minFlag, pair.maxFlag} {
+			t.Run(flag, func(t *testing.T) {
+				handler, queries := makePropertiesSearchHandler(singlePropertiesPage(1))
+				srv := httptest.NewServer(handler)
+				defer srv.Close()
+
+				env := withIsolatedConfig(t)
+				result := runCLIWithEnv(t, env,
+					"--base-url", srv.URL,
+					"properties", "search",
+					"--geo-id", "CA",
+					flag, "-1",
+				)
+
+				if result.ExitCode != 1 {
+					t.Fatalf("expected exit 1 for %s -1, got %d; stderr: %s", flag, result.ExitCode, result.Stderr)
+				}
+				if len(*queries) != 0 {
+					t.Errorf("expected zero API requests, got %d", len(*queries))
+				}
+				p := parseStderrError(t, result.Stderr)
+				if p.ErrorType != "validation_error" {
+					t.Errorf("expected error_type validation_error, got %q", p.ErrorType)
+				}
+				if !strings.Contains(p.Error, flag) {
+					t.Errorf("expected the message to name %s, got %q", flag, p.Error)
+				}
+			})
+		}
+	}
+}
+
+func TestPropertiesSearchInvertedRangePairRejected(t *testing.T) {
+	// The rule holds within any pair, so every one of the five is tried.
+	for _, pair := range propertyRangePairCases {
+		t.Run(pair.name, func(t *testing.T) {
+			handler, queries := makePropertiesSearchHandler(singlePropertiesPage(1))
+			srv := httptest.NewServer(handler)
+			defer srv.Close()
+
+			env := withIsolatedConfig(t)
+			result := runCLIWithEnv(t, env,
+				"--base-url", srv.URL,
+				"properties", "search",
+				"--geo-id", "CA",
+				pair.minFlag, pair.invertedMin,
+				pair.maxFlag, pair.invertedMax,
+			)
+
+			if result.ExitCode != 1 {
+				t.Fatalf("expected exit 1 for an inverted %s pair, got %d; stderr: %s", pair.name, result.ExitCode, result.Stderr)
+			}
+			if len(*queries) != 0 {
+				t.Errorf("expected zero API requests, got %d", len(*queries))
+			}
+			p := parseStderrError(t, result.Stderr)
+			if p.ErrorType != "validation_error" {
+				t.Errorf("expected error_type validation_error, got %q", p.ErrorType)
+			}
+			if !strings.Contains(p.Error, pair.minFlag) || !strings.Contains(p.Error, pair.maxFlag) {
+				t.Errorf("expected the message to name both bounds of the pair, got %q", p.Error)
+			}
+		})
+	}
+}
+
+func TestPropertiesSearchRangeErrorPrecedence(t *testing.T) {
+	// Negativity is checked across every bound before any pair is checked for
+	// inversion, so a pair violating both rules reports the negative value.
+	// Both branches are pinned: the message that wins, and the message that
+	// surfaces when only inversion applies.
+	cases := []struct {
+		name       string
+		lower      string
+		upper      string
+		wantSubstr string
+		denySubstr string
+	}{
+		{
+			name:       "NegativeAndInverted",
+			lower:      "-5",
+			upper:      "-10",
+			wantSubstr: "must not be negative",
+			denySubstr: "must not exceed",
+		},
+		{
+			name:       "InvertedOnly",
+			lower:      "10",
+			upper:      "5",
+			wantSubstr: "must not exceed",
+			denySubstr: "must not be negative",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			handler, queries := makePropertiesSearchHandler(singlePropertiesPage(1))
+			srv := httptest.NewServer(handler)
+			defer srv.Close()
+
+			env := withIsolatedConfig(t)
+			result := runCLIWithEnv(t, env,
+				"--base-url", srv.URL,
+				"properties", "search",
+				"--geo-id", "CA",
+				"--property-min-market-value", tc.lower,
+				"--property-max-market-value", tc.upper,
+			)
+
+			if result.ExitCode != 1 {
+				t.Fatalf("expected exit 1, got %d; stderr: %s", result.ExitCode, result.Stderr)
+			}
+			if len(*queries) != 0 {
+				t.Errorf("expected zero API requests, got %d", len(*queries))
+			}
+			p := parseStderrError(t, result.Stderr)
+			if !strings.Contains(p.Error, tc.wantSubstr) {
+				t.Errorf("expected the message to contain %q, got %q", tc.wantSubstr, p.Error)
+			}
+			if strings.Contains(p.Error, tc.denySubstr) {
+				t.Errorf("expected the message not to contain %q, got %q", tc.denySubstr, p.Error)
+			}
+		})
 	}
 }
 
