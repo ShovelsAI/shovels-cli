@@ -75,6 +75,19 @@ type commandDef struct {
 	// self-explanatory under their schema name and read better as one entry
 	// than as a dozen flattened ones.
 	ExpandPaths []string
+
+	// MetaArrays names arrays the CLI adds to its own meta envelope, each
+	// documented from the OpenAPI schema of a single element. These have no
+	// property in any endpoint response schema — only the element shape is
+	// the API's.
+	MetaArrays []metaArrayDef
+}
+
+// metaArrayDef ties one meta envelope array to the OpenAPI schema describing
+// one of its elements.
+type metaArrayDef struct {
+	Name   string // meta key, e.g. "trust_summaries"
+	Schema string // OpenAPI schema name of one element
 }
 
 // allCommands defines every data command that needs a schema entry.
@@ -148,6 +161,7 @@ func main() {
 
 type commandSchemaData struct {
 	ResponseFields map[string]schemaField
+	MetaFields     map[string]schemaField
 	FieldIndex     []string
 	Filters        map[string]schemaField
 }
@@ -162,13 +176,18 @@ func buildCommandSchema(components map[string]any, overrides map[string]override
 	if err := expandNested(components, def, fields); err != nil {
 		return commandSchemaData{}, err
 	}
+	metaFields, err := buildMetaFields(components, def)
+	if err != nil {
+		return commandSchemaData{}, err
+	}
 	if cmdOverride, ok := overrides[def.Command]; ok {
 		mergeFields(fields, cmdOverride.Fields)
 	}
 
 	return commandSchemaData{
 		ResponseFields: fields,
-		FieldIndex:     buildFieldIndex(fields, def),
+		MetaFields:     metaFields,
+		FieldIndex:     buildFieldIndex(fields, metaFields, def),
 		Filters:        buildFilters(def),
 	}, nil
 }
@@ -328,6 +347,30 @@ func expandNested(components map[string]any, def commandDef, fields map[string]s
 		fields[path] = parent
 	}
 	return nil
+}
+
+// buildMetaFields documents the elements of each meta envelope array the
+// command adds. Commands that add none get a nil map, which the schema output
+// omits entirely.
+func buildMetaFields(components map[string]any, def commandDef) (map[string]schemaField, error) {
+	if len(def.MetaArrays) == 0 {
+		return nil, nil
+	}
+	meta := make(map[string]schemaField)
+	for _, arr := range def.MetaArrays {
+		elements := schemaProperties(components, arr.Schema)
+		if len(elements) == 0 {
+			return nil, fmt.Errorf("command %q meta array %q schema %q resolved to zero fields", def.Command, arr.Name, arr.Schema)
+		}
+		for name, elemRaw := range elements {
+			elem, ok := elemRaw.(map[string]any)
+			if !ok {
+				continue
+			}
+			meta[arr.Name+"[]."+name] = fieldFromProperty(elem, components)
+		}
+	}
+	return meta, nil
 }
 
 // nestedSchemaRef returns the component schema name a property points at,
@@ -496,7 +539,9 @@ func mergeFields(base map[string]schemaField, overrides map[string]overrideField
 //   - batch-get commands return a non-paginated batch envelope with count,
 //     credits, and a missing list of unresolved IDs, and never has_more.
 //   - all other commands are paginated, with count, has_more, and credits.
-func buildFieldIndex(fields map[string]schemaField, def commandDef) []string {
+//
+// Any meta fields the command adds beyond that standard set follow, sorted.
+func buildFieldIndex(fields, metaFields map[string]schemaField, def commandDef) []string {
 	var index []string
 	for name := range fields {
 		index = append(index, "data[]."+name)
@@ -511,7 +556,13 @@ func buildFieldIndex(fields map[string]schemaField, def commandDef) []string {
 	default:
 		index = append(index, "meta.count", "meta.has_more", "meta.credits_used", "meta.credits_remaining")
 	}
-	return index
+
+	var extra []string
+	for name := range metaFields {
+		extra = append(extra, "meta."+name)
+	}
+	sort.Strings(extra)
+	return append(index, extra...)
 }
 
 // addSearchFilters populates the shared search filters that registerSearchFlags
@@ -647,27 +698,13 @@ func writeSchemaData(path string, schemas map[string]commandSchemaData) error {
 		fmt.Fprintf(&buf, "\t\t\tSchemaVersion: 1,\n")
 		fmt.Fprintf(&buf, "\t\t\tCommand:       %q,\n", name)
 
-		// Response fields
-		fmt.Fprintf(&buf, "\t\t\tResponseFields: map[string]SchemaField{\n")
-		fieldNames := sortedKeys(data.ResponseFields)
-		for _, fn := range fieldNames {
-			field := data.ResponseFields[fn]
-			fmt.Fprintf(&buf, "\t\t\t\t%q: {Type: %q", fn, field.Type)
-			if field.Description != "" {
-				fmt.Fprintf(&buf, ", Description: %q", field.Description)
-			}
-			if field.Unit != "" {
-				fmt.Fprintf(&buf, ", Unit: %q", field.Unit)
-			}
-			if field.Range != "" {
-				fmt.Fprintf(&buf, ", Range: %q", field.Range)
-			}
-			if field.Enum != "" {
-				fmt.Fprintf(&buf, ", Enum: %q", field.Enum)
-			}
-			fmt.Fprintf(&buf, "},\n")
+		writeFieldMap(&buf, "ResponseFields", data.ResponseFields)
+
+		// A command with no meta additions emits no MetaFields entry, which
+		// keeps meta_fields out of its schema output entirely.
+		if len(data.MetaFields) > 0 {
+			writeFieldMap(&buf, "MetaFields", data.MetaFields)
 		}
-		fmt.Fprintf(&buf, "\t\t\t},\n")
 
 		// Field index
 		fmt.Fprintf(&buf, "\t\t\tFieldIndex: []string{\n")
@@ -676,21 +713,7 @@ func writeSchemaData(path string, schemas map[string]commandSchemaData) error {
 		}
 		fmt.Fprintf(&buf, "\t\t\t},\n")
 
-		// Filters
-		fmt.Fprintf(&buf, "\t\t\tFilters: map[string]SchemaField{\n")
-		filterNames := sortedKeys(data.Filters)
-		for _, fn := range filterNames {
-			filter := data.Filters[fn]
-			fmt.Fprintf(&buf, "\t\t\t\t%q: {Type: %q", fn, filter.Type)
-			if filter.Description != "" {
-				fmt.Fprintf(&buf, ", Description: %q", filter.Description)
-			}
-			if filter.Unit != "" {
-				fmt.Fprintf(&buf, ", Unit: %q", filter.Unit)
-			}
-			fmt.Fprintf(&buf, "},\n")
-		}
-		fmt.Fprintf(&buf, "\t\t\t},\n")
+		writeFieldMap(&buf, "Filters", data.Filters)
 
 		fmt.Fprintf(&buf, "\t\t},\n")
 	}
@@ -705,6 +728,30 @@ func writeSchemaData(path string, schemas map[string]commandSchemaData) error {
 	}
 
 	return os.WriteFile(path, formatted, 0644)
+}
+
+// writeFieldMap emits one named map[string]SchemaField literal, keys sorted
+// so regeneration is deterministic.
+func writeFieldMap(buf *bytes.Buffer, name string, fields map[string]schemaField) {
+	fmt.Fprintf(buf, "\t\t\t%s: map[string]SchemaField{\n", name)
+	for _, key := range sortedKeys(fields) {
+		field := fields[key]
+		fmt.Fprintf(buf, "\t\t\t\t%q: {Type: %q", key, field.Type)
+		if field.Description != "" {
+			fmt.Fprintf(buf, ", Description: %q", field.Description)
+		}
+		if field.Unit != "" {
+			fmt.Fprintf(buf, ", Unit: %q", field.Unit)
+		}
+		if field.Range != "" {
+			fmt.Fprintf(buf, ", Range: %q", field.Range)
+		}
+		if field.Enum != "" {
+			fmt.Fprintf(buf, ", Enum: %q", field.Enum)
+		}
+		fmt.Fprintf(buf, "},\n")
+	}
+	fmt.Fprintf(buf, "\t\t\t},\n")
 }
 
 func sortedKeys(m map[string]schemaField) []string {
