@@ -4,6 +4,7 @@ package evals
 
 import (
 	"encoding/json"
+	"fmt"
 	"regexp"
 	"strings"
 	"testing"
@@ -23,9 +24,11 @@ type Scenario struct {
 	// is a hard requirement.
 	EnforceUsability bool
 
-	// ValidateOutput replaces the default data-array validation when set.
-	// Used for scenarios whose output is not a standard CLI envelope
-	// (e.g. schema, dry-run, jq pipeline results).
+	// ValidateOutput replaces the default validation when set — the two are
+	// alternative branches, so a scenario that sets it must leave Domain
+	// empty or the domain check silently never runs. Carries the assertions
+	// for output the default path cannot judge: a non-envelope result
+	// (schema, dry-run, jq pipeline) or a resource it has no domain check for.
 	ValidateOutput func(t *testing.T, report AgentReport)
 }
 
@@ -137,6 +140,85 @@ var scenarios = []Scenario{
 			requireDateLikeContent(t, report.FinalOutput)
 		},
 	},
+	{
+		Name:             "PropertiesNoSolar",
+		Task:             `Which properties in Encinitas have no solar permit?`,
+		EnforceUsability: true,
+		ValidateOutput: func(t *testing.T, report AgentReport) {
+			t.Helper()
+			for _, problem := range checkNoSolarProperties(report.FinalOutput) {
+				t.Error(problem)
+			}
+		},
+	},
+}
+
+// noSolarDisambiguation is the manual command that separates a wrong agent
+// query from upstream data change when the PropertiesNoSolar scenario finds
+// no rows.
+const noSolarDisambiguation = `shovels properties search --geo-id 92024 --permit-tags=-solar --limit 1`
+
+// checkNoSolarProperties reports every requirement of an absence-filtered
+// properties search result that finalOutput fails, and returns nil when it
+// meets them all.
+//
+// The trust checks double as the resource check, which is why the scenario
+// declares no Domain. The properties API attaches a per-row trust object and
+// a meta.trust_summaries array only to searches carrying an absence filter (a
+// "-"-prefixed permit tag): presence-only property searches leave trust null
+// and omit trust_summaries, and permits and contractors rows carry no trust
+// field at all.
+//
+// Only the envelope is read. Encinitas can be scoped by its resolved city
+// geo_id or by ZIP 92024, and neither route is privileged.
+func checkNoSolarProperties(finalOutput string) []string {
+	obj, ok := parseJSONObject(finalOutput)
+	if !ok {
+		return []string{fmt.Sprintf("final_output holds no JSON object:\n%.500s", strings.TrimSpace(finalOutput))}
+	}
+
+	var problems []string
+
+	data, isArray := obj["data"].([]any)
+	if !isArray {
+		problems = append(problems, "final_output has no 'data' array")
+	}
+
+	meta, _ := obj["meta"].(map[string]any)
+
+	switch count, ok := meta["count"].(float64); {
+	case !ok:
+		problems = append(problems, "final_output has no numeric meta.count")
+	case count < 1:
+		problems = append(problems, fmt.Sprintf(
+			"meta.count is %.0f: either the agent's query missed, or the Encinitas absence data changed upstream — run `%s` to tell those apart",
+			count, noSolarDisambiguation))
+	}
+
+	if len(data) > 0 && !anyRowCarriesTrust(data) {
+		problems = append(problems, "no row carries a non-null 'trust' object, so the search ran without an absence filter")
+	}
+
+	if _, ok := meta["trust_summaries"]; !ok {
+		problems = append(problems, "final_output has no meta.trust_summaries, so the search ran without an absence filter")
+	}
+
+	return problems
+}
+
+// anyRowCarriesTrust reports whether any row holds a trust object rather than
+// a null or absent trust field.
+func anyRowCarriesTrust(data []any) bool {
+	for _, item := range data {
+		row, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		if _, ok := row["trust"].(map[string]any); ok {
+			return true
+		}
+	}
+	return false
 }
 
 // requireNonEmptyJSON verifies the output is non-empty and contains valid JSON.
@@ -160,11 +242,23 @@ func requireParsedJSON(t *testing.T, raw string) map[string]any {
 	if trimmed == "" {
 		t.Fatal("final_output is empty")
 	}
+	obj, ok := parseJSONObject(trimmed)
+	if !ok {
+		t.Fatalf("no valid JSON object found in final_output:\n%.500s", trimmed)
+	}
+	return obj
+}
+
+// parseJSONObject returns the first JSON object in raw, reporting false when
+// raw holds none. Agents wrap CLI output in prose often enough that the whole
+// string rarely parses on its own.
+func parseJSONObject(raw string) (map[string]any, bool) {
+	trimmed := strings.TrimSpace(raw)
 
 	// Fast path: entire output is a JSON object.
 	var direct map[string]any
 	if err := json.Unmarshal([]byte(trimmed), &direct); err == nil {
-		return direct
+		return direct, true
 	}
 
 	// Slow path: scan for first valid JSON object.
@@ -175,12 +269,11 @@ func requireParsedJSON(t *testing.T, raw string) map[string]any {
 		dec := json.NewDecoder(strings.NewReader(trimmed[i:]))
 		var obj map[string]any
 		if err := dec.Decode(&obj); err == nil {
-			return obj
+			return obj, true
 		}
 	}
 
-	t.Fatalf("no valid JSON object found in final_output:\n%.500s", trimmed)
-	return nil
+	return nil, false
 }
 
 // requireFieldPresent checks that a top-level key exists in the parsed JSON.

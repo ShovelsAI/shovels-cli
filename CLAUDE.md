@@ -68,7 +68,7 @@ SHOVELS_API_KEY=sk-... go test -tags=eval ./evals/... -v -timeout 30m
 ```
 
 - Builds binary from source (tests current code, not installed version)
-- 11 scenarios: permit and contractor search, geo_id resolution, metrics, schema and dry-run discovery, jq pipelines, zoning decisions
+- 12 scenarios: permit and contractor search, geo_id resolution, metrics, schema and dry-run discovery, jq pipelines, zoning decisions, properties absence search
 - Hard assertions: valid JSON output, correct domain (permits vs contractors), data present
 - Usability rating 1-5 per scenario: advisory by default, a hard failure where `EnforceUsability` is set
 - Requires `claude` CLI in PATH; skips gracefully if missing
@@ -78,6 +78,8 @@ SHOVELS_API_KEY=sk-... go test -tags=eval ./evals/... -v -timeout 30m
 ```bash
 ANTHROPIC_MODEL=sonnet SHOVELS_API_KEY=sk-... go test -tags=eval ./evals/... -v -timeout 30m
 ```
+
+- `evals/scenarios_table_test.go` guards the scenario table and its validators with no API key, no `claude` CLI, and no network, so it still runs when `TestEval` skips
 
 ## Setup
 
