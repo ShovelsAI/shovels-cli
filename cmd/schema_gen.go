@@ -68,42 +68,49 @@ type commandDef struct {
 	ResponseSchema string // OpenAPI $ref schema name for items
 	Endpoint       string // API endpoint path
 	FiltersFrom    string // source for filters: "search", "metrics_prop", "metrics_noprop", "get", "none"
+
+	// ExpandPaths names response fields whose object children are documented
+	// individually as dotted child paths. Expansion is opt-in per command:
+	// most nested references (a permit's address, a contractor's address) are
+	// self-explanatory under their schema name and read better as one entry
+	// than as a dozen flattened ones.
+	ExpandPaths []string
 }
 
 // allCommands defines every data command that needs a schema entry.
 // ResponseSchema values must match schema names in the OpenAPI spec's
 // components/schemas section.
 var allCommands = []commandDef{
-	{"permits search", "PermitsRead", "/permits/search", "permits_search"},
-	{"permits get", "PermitsRead", "/permits", "get"},
-	{"decisions search", "DecisionsRead", "/decisions/search", "decisions_search"},
-	{"decisions get", "DecisionsRead", "/decisions", "get"},
-	{"contractors search", "ContractorsRead", "/contractors/search", "contractors_search"},
-	{"contractors get", "ContractorsRead", "/contractors", "get"},
-	{"contractors permits", "PermitsRead", "/contractors/{id}/permits", "none"},
-	{"contractors employees", "Employees", "/contractors/{id}/employees", "none"},
-	{"contractors metrics", "ContractorsMetricsMonthlyRead", "/contractors/{id}/metrics", "contractor_metrics"},
-	{"cities search", "GeoEntitiesRead", "/cities/search", "geo_search"},
-	{"cities metrics current", "CitiesMetricsCurrentRead", "/cities/{geo_id}/metrics/current", "metrics_prop"},
-	{"cities metrics monthly", "CitiesMetricsMonthlyRead", "/cities/{geo_id}/metrics/monthly", "metrics_prop_monthly"},
-	{"counties search", "GeoEntitiesRead", "/counties/search", "geo_search"},
-	{"counties metrics current", "CountiesMetricsCurrentRead", "/counties/{geo_id}/metrics/current", "metrics_prop"},
-	{"counties metrics monthly", "CountiesMetricsMonthlyRead", "/counties/{geo_id}/metrics/monthly", "metrics_prop_monthly"},
-	{"jurisdictions search", "GeoEntitiesRead", "/jurisdictions/search", "geo_search"},
-	{"jurisdictions metrics current", "JurisdictionsMetricsCurrentRead", "/jurisdictions/{geo_id}/metrics/current", "metrics_prop"},
-	{"jurisdictions metrics monthly", "JurisdictionsMetricsMonthlyRead", "/jurisdictions/{geo_id}/metrics/monthly", "metrics_prop_monthly"},
-	{"addresses search", "api__app__models__geo__AddressesRead", "/addresses/search", "geo_search"},
-	{"addresses metrics current", "AddressesMetricsCurrentRead", "/addresses/{geo_id}/metrics/current", "metrics_noprop"},
-	{"addresses metrics monthly", "AddressesMetricsMonthlyRead", "/addresses/{geo_id}/metrics/monthly", "metrics_noprop_monthly"},
-	{"addresses residents", "ResidentsRead", "/addresses/{geo_id}/residents", "none"},
-	{"zipcodes search", "Zipcodes", "/zipcodes/search", "geo_search"},
-	{"states search", "States", "/states/search", "geo_search"},
-	{"cities coverage", "CoverageItem", "/meta/coverage", "coverage"},
-	{"counties coverage", "CoverageItem", "/meta/coverage", "coverage"},
-	{"jurisdictions coverage", "CoverageItem", "/meta/coverage", "coverage"},
-	{"states coverage", "CoverageItem", "/meta/coverage", "coverage"},
-	{"zipcodes coverage", "CoverageItem", "/meta/coverage", "coverage"},
-	{"tags list", "Tags", "/list/tags", "none"},
+	{Command: "permits search", ResponseSchema: "PermitsRead", Endpoint: "/permits/search", FiltersFrom: "permits_search"},
+	{Command: "permits get", ResponseSchema: "PermitsRead", Endpoint: "/permits", FiltersFrom: "get"},
+	{Command: "decisions search", ResponseSchema: "DecisionsRead", Endpoint: "/decisions/search", FiltersFrom: "decisions_search"},
+	{Command: "decisions get", ResponseSchema: "DecisionsRead", Endpoint: "/decisions", FiltersFrom: "get"},
+	{Command: "contractors search", ResponseSchema: "ContractorsRead", Endpoint: "/contractors/search", FiltersFrom: "contractors_search"},
+	{Command: "contractors get", ResponseSchema: "ContractorsRead", Endpoint: "/contractors", FiltersFrom: "get"},
+	{Command: "contractors permits", ResponseSchema: "PermitsRead", Endpoint: "/contractors/{id}/permits", FiltersFrom: "none"},
+	{Command: "contractors employees", ResponseSchema: "Employees", Endpoint: "/contractors/{id}/employees", FiltersFrom: "none"},
+	{Command: "contractors metrics", ResponseSchema: "ContractorsMetricsMonthlyRead", Endpoint: "/contractors/{id}/metrics", FiltersFrom: "contractor_metrics"},
+	{Command: "cities search", ResponseSchema: "GeoEntitiesRead", Endpoint: "/cities/search", FiltersFrom: "geo_search"},
+	{Command: "cities metrics current", ResponseSchema: "CitiesMetricsCurrentRead", Endpoint: "/cities/{geo_id}/metrics/current", FiltersFrom: "metrics_prop"},
+	{Command: "cities metrics monthly", ResponseSchema: "CitiesMetricsMonthlyRead", Endpoint: "/cities/{geo_id}/metrics/monthly", FiltersFrom: "metrics_prop_monthly"},
+	{Command: "counties search", ResponseSchema: "GeoEntitiesRead", Endpoint: "/counties/search", FiltersFrom: "geo_search"},
+	{Command: "counties metrics current", ResponseSchema: "CountiesMetricsCurrentRead", Endpoint: "/counties/{geo_id}/metrics/current", FiltersFrom: "metrics_prop"},
+	{Command: "counties metrics monthly", ResponseSchema: "CountiesMetricsMonthlyRead", Endpoint: "/counties/{geo_id}/metrics/monthly", FiltersFrom: "metrics_prop_monthly"},
+	{Command: "jurisdictions search", ResponseSchema: "GeoEntitiesRead", Endpoint: "/jurisdictions/search", FiltersFrom: "geo_search"},
+	{Command: "jurisdictions metrics current", ResponseSchema: "JurisdictionsMetricsCurrentRead", Endpoint: "/jurisdictions/{geo_id}/metrics/current", FiltersFrom: "metrics_prop"},
+	{Command: "jurisdictions metrics monthly", ResponseSchema: "JurisdictionsMetricsMonthlyRead", Endpoint: "/jurisdictions/{geo_id}/metrics/monthly", FiltersFrom: "metrics_prop_monthly"},
+	{Command: "addresses search", ResponseSchema: "api__app__models__geo__AddressesRead", Endpoint: "/addresses/search", FiltersFrom: "geo_search"},
+	{Command: "addresses metrics current", ResponseSchema: "AddressesMetricsCurrentRead", Endpoint: "/addresses/{geo_id}/metrics/current", FiltersFrom: "metrics_noprop"},
+	{Command: "addresses metrics monthly", ResponseSchema: "AddressesMetricsMonthlyRead", Endpoint: "/addresses/{geo_id}/metrics/monthly", FiltersFrom: "metrics_noprop_monthly"},
+	{Command: "addresses residents", ResponseSchema: "ResidentsRead", Endpoint: "/addresses/{geo_id}/residents", FiltersFrom: "none"},
+	{Command: "zipcodes search", ResponseSchema: "Zipcodes", Endpoint: "/zipcodes/search", FiltersFrom: "geo_search"},
+	{Command: "states search", ResponseSchema: "States", Endpoint: "/states/search", FiltersFrom: "geo_search"},
+	{Command: "cities coverage", ResponseSchema: "CoverageItem", Endpoint: "/meta/coverage", FiltersFrom: "coverage"},
+	{Command: "counties coverage", ResponseSchema: "CoverageItem", Endpoint: "/meta/coverage", FiltersFrom: "coverage"},
+	{Command: "jurisdictions coverage", ResponseSchema: "CoverageItem", Endpoint: "/meta/coverage", FiltersFrom: "coverage"},
+	{Command: "states coverage", ResponseSchema: "CoverageItem", Endpoint: "/meta/coverage", FiltersFrom: "coverage"},
+	{Command: "zipcodes coverage", ResponseSchema: "CoverageItem", Endpoint: "/meta/coverage", FiltersFrom: "coverage"},
+	{Command: "tags list", ResponseSchema: "Tags", Endpoint: "/list/tags", FiltersFrom: "none"},
 }
 
 func main() {
@@ -119,24 +126,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	components := componentSchemas(spec)
+
 	schemas := make(map[string]commandSchemaData)
 	for _, def := range allCommands {
-		fields := extractFields(spec, def.ResponseSchema)
-		if err := checkSchemaResolved(def, fields); err != nil {
+		data, err := buildCommandSchema(components, overrides, def)
+		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
-		if cmdOverride, ok := overrides[def.Command]; ok {
-			mergeFields(fields, cmdOverride.Fields)
-		}
-		filters := buildFilters(def)
-		fieldIndex := buildFieldIndex(fields, def)
-
-		schemas[def.Command] = commandSchemaData{
-			ResponseFields: fields,
-			FieldIndex:     fieldIndex,
-			Filters:        filters,
-		}
+		schemas[def.Command] = data
 	}
 
 	if err := writeSchemaData("schema_data.go", schemas); err != nil {
@@ -151,6 +150,27 @@ type commandSchemaData struct {
 	ResponseFields map[string]schemaField
 	FieldIndex     []string
 	Filters        map[string]schemaField
+}
+
+// buildCommandSchema assembles one command's schema data from the spec's
+// component schemas and the hand-written overrides.
+func buildCommandSchema(components map[string]any, overrides map[string]overrideCommand, def commandDef) (commandSchemaData, error) {
+	fields := extractFields(components, def.ResponseSchema)
+	if err := checkSchemaResolved(def, fields); err != nil {
+		return commandSchemaData{}, err
+	}
+	if err := expandNested(components, def, fields); err != nil {
+		return commandSchemaData{}, err
+	}
+	if cmdOverride, ok := overrides[def.Command]; ok {
+		mergeFields(fields, cmdOverride.Fields)
+	}
+
+	return commandSchemaData{
+		ResponseFields: fields,
+		FieldIndex:     buildFieldIndex(fields, def),
+		Filters:        buildFilters(def),
+	}, nil
 }
 
 // checkSchemaResolved enforces the loud-fail guard: a command whose named
@@ -228,52 +248,118 @@ func loadOverrides(path string) (map[string]overrideCommand, error) {
 	return overrides, nil
 }
 
+// componentSchemas returns the spec's components/schemas map, which every
+// schema name in this generator resolves against.
+func componentSchemas(spec map[string]any) map[string]any {
+	components, ok := spec["components"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	schemas, _ := components["schemas"].(map[string]any)
+	return schemas
+}
+
+// schemaProperties returns the properties of a named component schema, or nil
+// when the schema is absent or carries no properties.
+func schemaProperties(components map[string]any, schemaName string) map[string]any {
+	schema, ok := components[schemaName].(map[string]any)
+	if !ok {
+		return nil
+	}
+	properties, _ := schema["properties"].(map[string]any)
+	return properties
+}
+
+// fieldFromProperty derives one schema field from an OpenAPI property,
+// preferring the property's description and falling back to its title.
+func fieldFromProperty(prop, components map[string]any) schemaField {
+	f := schemaField{Type: resolveType(prop, components)}
+	if desc, ok := prop["description"].(string); ok {
+		f.Description = desc
+	}
+	if title, ok := prop["title"].(string); ok && f.Description == "" {
+		f.Description = title
+	}
+	return f
+}
+
 // extractFields pulls response field definitions from the OpenAPI spec for a
 // given schema name. It resolves $ref pointers within the components/schemas
 // section and maps JSON Schema types to simpler type strings.
-func extractFields(spec map[string]any, schemaName string) map[string]schemaField {
+func extractFields(components map[string]any, schemaName string) map[string]schemaField {
 	fields := make(map[string]schemaField)
-
-	components, ok := spec["components"].(map[string]any)
-	if !ok {
-		return fields
-	}
-	schemasMap, ok := components["schemas"].(map[string]any)
-	if !ok {
-		return fields
-	}
-
-	schema, ok := schemasMap[schemaName].(map[string]any)
-	if !ok {
-		return fields
-	}
-
-	properties, ok := schema["properties"].(map[string]any)
-	if !ok {
-		return fields
-	}
-
-	for name, propRaw := range properties {
+	for name, propRaw := range schemaProperties(components, schemaName) {
 		prop, ok := propRaw.(map[string]any)
 		if !ok {
 			continue
 		}
-
-		f := schemaField{
-			Type: resolveType(prop, schemasMap),
-		}
-
-		if desc, ok := prop["description"].(string); ok {
-			f.Description = desc
-		}
-		if title, ok := prop["title"].(string); ok && f.Description == "" {
-			f.Description = title
-		}
-
-		fields[name] = f
+		fields[name] = fieldFromProperty(prop, components)
 	}
-
 	return fields
+}
+
+// expandNested documents the direct children of each opted-in response field
+// as dotted child paths, so an agent reading the schema learns the shape of a
+// nested object without a second lookup. Expansion goes exactly one level: a
+// child that is itself a reference keeps its schema name as its type and is
+// not expanded in turn. The parent entry stays, typed "object", since a JSON
+// consumer learns more from the child entries than from the schema name the
+// reference carries.
+func expandNested(components map[string]any, def commandDef, fields map[string]schemaField) error {
+	properties := schemaProperties(components, def.ResponseSchema)
+	for _, path := range def.ExpandPaths {
+		prop, ok := properties[path].(map[string]any)
+		if !ok {
+			return fmt.Errorf("command %q expand path %q is not a field of schema %q", def.Command, path, def.ResponseSchema)
+		}
+		children := schemaProperties(components, nestedSchemaRef(prop))
+		if len(children) == 0 {
+			return fmt.Errorf("command %q expand path %q resolved to zero nested fields", def.Command, path)
+		}
+		for name, childRaw := range children {
+			child, ok := childRaw.(map[string]any)
+			if !ok {
+				continue
+			}
+			fields[path+"."+name] = fieldFromProperty(child, components)
+		}
+		parent := fields[path]
+		parent.Type = "object"
+		fields[path] = parent
+	}
+	return nil
+}
+
+// nestedSchemaRef returns the component schema name a property points at,
+// covering the plain, nullable (anyOf/oneOf), and allOf spellings. Unlike
+// refToName it keeps the full name, which is what indexes components/schemas.
+// It returns "" when the property is not a reference.
+func nestedSchemaRef(prop map[string]any) string {
+	if ref, ok := prop["$ref"].(string); ok {
+		return refBase(ref)
+	}
+	for _, key := range []string{"anyOf", "oneOf", "allOf"} {
+		variants, ok := prop[key].([]any)
+		if !ok {
+			continue
+		}
+		for _, v := range variants {
+			vm, ok := v.(map[string]any)
+			if !ok {
+				continue
+			}
+			if ref, ok := vm["$ref"].(string); ok {
+				return refBase(ref)
+			}
+		}
+	}
+	return ""
+}
+
+// refBase returns the final path segment of a $ref pointer.
+func refBase(ref string) string {
+	parts := strings.Split(ref, "/")
+	return parts[len(parts)-1]
 }
 
 // resolveType determines a human-readable type string from an OpenAPI property.
@@ -370,8 +456,7 @@ func mapType(jsonType string, prop map[string]any) string {
 // schemas (e.g., "api__app__models__permits__AddressesRead") are reduced
 // to their final component (e.g., "AddressesRead").
 func refToName(ref string) string {
-	parts := strings.Split(ref, "/")
-	name := parts[len(parts)-1]
+	name := refBase(ref)
 	// Clean up internal Python-namespaced schema names.
 	if strings.Contains(name, "__") {
 		segments := strings.Split(name, "__")
