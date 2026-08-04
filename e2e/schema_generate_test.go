@@ -4,6 +4,7 @@ package e2e
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"os"
@@ -58,6 +59,99 @@ func TestSchemaRegenerationReproducesCommittedData(t *testing.T) {
 		t.Errorf("regenerating from %s does not reproduce the committed %s\n%s\nrefresh sequence: see the header of cmd/schema_gen.go",
 			pinnedSpecRelPath, generatedSchemaRelPath, firstLineDifference(committed, regenerated))
 	}
+}
+
+// guardedResponseSchema is the response schema both properties commands name,
+// and guardedResponseCommand is the first of those two the generator reaches.
+// Deleting the schema from a spec leaves that command pointing at a name the
+// spec does not define, which is what the guard exists to catch.
+const (
+	guardedResponseSchema  = "PropertiesRead"
+	guardedResponseCommand = "properties search"
+)
+
+// TestSchemaGenerationFailsOnMissingResponseSchema drives `go generate
+// ./cmd/...` over a spec whose PropertiesRead schema has been removed and
+// requires the run to fail loudly. Without the guard the generator would emit
+// a schema with no response fields for both properties commands, and the CLI
+// would ship a `--schema` output that documents nothing while every test that
+// only checks for valid JSON keeps passing.
+//
+// The doctored spec is derived from the pinned copy rather than the live API,
+// so the guard is exercised the same way on every machine and offline.
+func TestSchemaGenerationFailsOnMissingResponseSchema(t *testing.T) {
+	root := moduleRoot()
+
+	pinned := readFile(t, filepath.Join(root, filepath.FromSlash(pinnedSpecRelPath)))
+	specPath := filepath.Join(t.TempDir(), "openapi_without_response_schema.json")
+	if err := os.WriteFile(specPath, specWithoutSchema(t, pinned, guardedResponseSchema), 0o644); err != nil {
+		t.Fatalf("write doctored spec: %v", err)
+	}
+
+	work := t.TempDir()
+	copyModuleTree(t, root, work)
+	generated := filepath.Join(work, filepath.FromSlash(generatedSchemaRelPath))
+	before := readFile(t, generated)
+
+	gen := exec.Command("go", "generate", "./cmd/...")
+	gen.Dir = work
+	gen.Env = append(os.Environ(), "SCHEMA_GEN_SPEC_FILE="+specPath)
+	out, err := gen.CombinedOutput()
+
+	if err == nil {
+		t.Fatalf("go generate ./cmd/... succeeded with %s absent from the spec; output:\n%s",
+			guardedResponseSchema, out)
+	}
+
+	// A bare non-zero exit is not enough: the message has to say which command
+	// and which schema, or the next reader cannot act on it.
+	wants := []string{
+		`"` + guardedResponseCommand + `"`,
+		`"` + guardedResponseSchema + `"`,
+		"resolved to zero fields",
+	}
+	report := string(out)
+	for _, want := range wants {
+		if !strings.Contains(report, want) {
+			t.Errorf("generator failure should name %s, got:\n%s", want, report)
+		}
+	}
+
+	if after := readFile(t, generated); !bytes.Equal(before, after) {
+		t.Errorf("failed generation rewrote %s; an unresolved schema must leave the artifact alone",
+			generatedSchemaRelPath)
+	}
+}
+
+// specWithoutSchema returns the spec with one component schema removed. It
+// fails when the schema is already absent, so a fixture refresh that renames
+// it surfaces as a broken premise instead of a guard that never fired.
+func specWithoutSchema(t *testing.T, spec []byte, name string) []byte {
+	t.Helper()
+
+	var doc map[string]any
+	if err := json.Unmarshal(spec, &doc); err != nil {
+		t.Fatalf("parse %s: %v", pinnedSpecRelPath, err)
+	}
+
+	components, ok := doc["components"].(map[string]any)
+	if !ok {
+		t.Fatalf("%s has no components object", pinnedSpecRelPath)
+	}
+	schemas, ok := components["schemas"].(map[string]any)
+	if !ok {
+		t.Fatalf("%s has no components.schemas object", pinnedSpecRelPath)
+	}
+	if _, ok := schemas[name]; !ok {
+		t.Fatalf("%s defines no %s schema, so removing it cannot exercise the guard", pinnedSpecRelPath, name)
+	}
+	delete(schemas, name)
+
+	doctored, err := json.Marshal(doc)
+	if err != nil {
+		t.Fatalf("marshal doctored spec: %v", err)
+	}
+	return doctored
 }
 
 // readFile reads a whole file, failing the test when it cannot.
