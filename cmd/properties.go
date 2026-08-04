@@ -63,6 +63,14 @@ Date windows:
   There is no --permit-to flag. This endpoint filters from a single date
   (--permit-from) only. For a closed date window, use: shovels permits search
 
+Property attribute filters:
+  Narrow by what the property is rather than what happened to it — type,
+  price, size, and age. Market value is integer cents (50000000 = $500,000);
+  lot size and building area are square feet.
+  Attribute data covers roughly 60-70% of properties, and a property with no
+  value for an attribute never matches a range filter on it, so every
+  attribute filter narrows results to the covered set.
+
 Examples:
   Properties in Encinitas with no solar permit:
     shovels properties search --geo-id 92024 --permit-tags "-solar" --limit 10
@@ -78,7 +86,13 @@ Examples:
 
   Finaled solar work in a county:
     GEO=$(shovels counties search -q "San Diego" | jq -r '.data[0].geo_id')
-    shovels properties search --geo-id "$GEO" --permit-tags solar --permit-status final`,
+    shovels properties search --geo-id "$GEO" --permit-tags solar --permit-status final
+
+  Homes worth $500k-$1M built before 1990, with no solar permit:
+    shovels properties search --geo-id 92024 --permit-tags "-solar" \
+      --property-type residential \
+      --property-min-market-value 50000000 --property-max-market-value 100000000 \
+      --property-max-year-built 1989`,
 	Annotations: map[string]string{
 		AnnotationRequiresAuth: "true",
 	},
@@ -151,6 +165,23 @@ func registerPropertiesSearchFlags(cmd *cobra.Command) {
 	f.String("permit-tags-unfinaled", "",
 		"Keep properties with an UNFINALED permit of each named tag, as one comma-separated value (e.g. \"solar,roofing\")")
 
+	// Property attribute filters. Permits search additionally filters on story
+	// count; the Properties API has no story-count parameter.
+	f.StringSlice("property-type", nil,
+		"Property type. Repeat the flag or comma-separate to match any of several types.\n"+
+			"Valid values: residential, commercial, industrial, agricultural, vacant land,\n"+
+			"exempt, miscellaneous, office, recreational")
+	f.Int("property-min-market-value", 0, "Minimum assessed market value in integer cents (50000000 = $500,000)")
+	f.Int("property-max-market-value", 0, "Maximum assessed market value in integer cents (50000000 = $500,000)")
+	f.Int("property-min-lot-size", 0, "Minimum lot size in square feet")
+	f.Int("property-max-lot-size", 0, "Maximum lot size in square feet")
+	f.Int("property-min-building-area", 0, "Minimum building area in square feet")
+	f.Int("property-max-building-area", 0, "Maximum building area in square feet")
+	f.Int("property-min-unit-count", 0, "Minimum unit count")
+	f.Int("property-max-unit-count", 0, "Maximum unit count")
+	f.Int("property-min-year-built", 0, "Minimum year built (e.g. 1990)")
+	f.Int("property-max-year-built", 0, "Maximum year built (e.g. 1990)")
+
 	// Response options
 	f.Bool("include-count", false,
 		"Request total result count (capped at 10,000). Returned as total_count in meta on the first page;\n"+
@@ -167,6 +198,17 @@ func propertiesSearchFlagGroups() []flagGroup {
 		{
 			Title: "Permit Filters",
 			Names: []string{"permit-tags", "permit-status", "permit-from", "permit-tags-unfinaled"},
+		},
+		{
+			Title: "Property Filters",
+			Names: []string{
+				"property-type",
+				"property-min-market-value", "property-max-market-value",
+				"property-min-lot-size", "property-max-lot-size",
+				"property-min-building-area", "property-max-building-area",
+				"property-min-unit-count", "property-max-unit-count",
+				"property-min-year-built", "property-max-year-built",
+			},
 		},
 		{
 			Title: "Response Options",
@@ -231,6 +273,18 @@ func buildPropertiesSearchQuery(cmd *cobra.Command) url.Values {
 	setNonEmptyStringFlag(cmd, "permit-status", "permit_status", q)
 	setNonEmptyStringFlag(cmd, "permit-from", "permit_from", q)
 	setNonEmptyStringFlag(cmd, "permit-tags-unfinaled", "permit_tags_unfinaled", q)
+
+	addStringSliceParam(cmd, "property-type", "property_type", q)
+	setIntFlag(cmd, "property-min-market-value", "property_min_market_value", q)
+	setIntFlag(cmd, "property-max-market-value", "property_max_market_value", q)
+	setIntFlag(cmd, "property-min-lot-size", "property_min_lot_size", q)
+	setIntFlag(cmd, "property-max-lot-size", "property_max_lot_size", q)
+	setIntFlag(cmd, "property-min-building-area", "property_min_building_area", q)
+	setIntFlag(cmd, "property-max-building-area", "property_max_building_area", q)
+	setIntFlag(cmd, "property-min-unit-count", "property_min_unit_count", q)
+	setIntFlag(cmd, "property-max-unit-count", "property_max_unit_count", q)
+	setIntFlag(cmd, "property-min-year-built", "property_min_year_built", q)
+	setIntFlag(cmd, "property-max-year-built", "property_max_year_built", q)
 
 	setBoolFlag(cmd, "include-count", "include_total_count", q)
 

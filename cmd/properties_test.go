@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -126,6 +127,145 @@ func TestBuildPropertiesSearchQuery_NoPermitToParam(t *testing.T) {
 
 	if _, ok := q["permit_to"]; ok {
 		t.Errorf("expected permit_to never to be sent, got %v", q["permit_to"])
+	}
+}
+
+// --- property attribute filters (flags to params) ---
+
+func TestBuildPropertiesSearchQuery_PropertyTypeRepeatsParam(t *testing.T) {
+	cmd := newPropertiesSearchTestCmd(t,
+		"--geo-id", "CA",
+		"--property-type", "residential,commercial",
+		"--property-type", "vacant land",
+	)
+
+	q := buildPropertiesSearchQuery(cmd)
+
+	vals := q["property_type"]
+	want := []string{"residential", "commercial", "vacant land"}
+	if len(vals) != len(want) {
+		t.Fatalf("expected %d property_type params, got %v", len(want), vals)
+	}
+	for i, v := range want {
+		if vals[i] != v {
+			t.Errorf("property_type[%d]: expected %q, got %q", i, v, vals[i])
+		}
+	}
+}
+
+// propertyRangeCases spells out both bounds of every property attribute range
+// filter and the API parameter each maps to. Nothing here is read back from
+// the command's own tables, so a pair the command stops registering,
+// validating, or sending fails a test instead of vanishing from both sides at
+// once.
+var propertyRangeCases = []struct {
+	minFlag, minParam string
+	maxFlag, maxParam string
+}{
+	{"property-min-market-value", "property_min_market_value", "property-max-market-value", "property_max_market_value"},
+	{"property-min-lot-size", "property_min_lot_size", "property-max-lot-size", "property_max_lot_size"},
+	{"property-min-building-area", "property_min_building_area", "property-max-building-area", "property_max_building_area"},
+	{"property-min-unit-count", "property_min_unit_count", "property-max-unit-count", "property_max_unit_count"},
+	{"property-min-year-built", "property_min_year_built", "property-max-year-built", "property_max_year_built"},
+}
+
+func TestBuildPropertiesSearchQuery_EveryRangeBoundMapped(t *testing.T) {
+	// Every bound carries a distinct value, so a flag wired to a neighbouring
+	// param surfaces as a value mismatch instead of passing silently.
+	args := []string{"--geo-id", "CA"}
+	want := map[string]string{}
+	for i, rc := range propertyRangeCases {
+		lower := fmt.Sprintf("%d", 100*(i+1))
+		upper := fmt.Sprintf("%d", 100*(i+1)+50)
+		args = append(args, "--"+rc.minFlag, lower, "--"+rc.maxFlag, upper)
+		want[rc.minParam] = lower
+		want[rc.maxParam] = upper
+	}
+	cmd := newPropertiesSearchTestCmd(t, args...)
+
+	q := buildPropertiesSearchQuery(cmd)
+
+	for param, value := range want {
+		if got := q[param]; len(got) != 1 || got[0] != value {
+			t.Errorf("expected %s=[%q], got %v", param, value, got)
+		}
+	}
+}
+
+func TestBuildPropertiesSearchQuery_NoStoryCountPair(t *testing.T) {
+	// Permits search filters on story count; the Properties API has no such
+	// parameter, so neither the flags nor the params may exist here.
+	cmd := newPropertiesSearchTestCmd(t, "--geo-id", "CA")
+
+	for _, flag := range []string{"property-min-story-count", "property-max-story-count"} {
+		if cmd.Flags().Lookup(flag) != nil {
+			t.Errorf("expected no --%s flag on properties search", flag)
+		}
+	}
+
+	q := buildPropertiesSearchQuery(cmd)
+	for _, param := range []string{"property_min_story_count", "property_max_story_count"} {
+		if _, ok := q[param]; ok {
+			t.Errorf("expected %s never to be sent, got %v", param, q[param])
+		}
+	}
+}
+
+func TestBuildPropertiesSearchQuery_UnsetAttributeFiltersAbsent(t *testing.T) {
+	cmd := newPropertiesSearchTestCmd(t, "--geo-id", "CA")
+
+	q := buildPropertiesSearchQuery(cmd)
+
+	if _, ok := q["property_type"]; ok {
+		t.Errorf("expected property_type absent when its flag is omitted, got %v", q["property_type"])
+	}
+	for _, rc := range propertyRangeCases {
+		for _, param := range []string{rc.minParam, rc.maxParam} {
+			if _, ok := q[param]; ok {
+				t.Errorf("expected %s absent when its flag is omitted, got %v", param, q[param])
+			}
+		}
+	}
+}
+
+func TestBuildPropertiesSearchQuery_ExplicitZeroBoundSent(t *testing.T) {
+	// 0 is the flag's zero value, so only explicit-set detection distinguishes
+	// "no filter" from "at least zero units".
+	cmd := newPropertiesSearchTestCmd(t, "--geo-id", "CA", "--property-min-unit-count", "0")
+
+	q := buildPropertiesSearchQuery(cmd)
+
+	if got := q["property_min_unit_count"]; len(got) != 1 || got[0] != "0" {
+		t.Errorf("expected property_min_unit_count=[0], got %v", got)
+	}
+}
+
+func TestBuildPropertiesSearchQuery_EqualBoundsBothSent(t *testing.T) {
+	cmd := newPropertiesSearchTestCmd(t,
+		"--geo-id", "CA",
+		"--property-min-year-built", "1985",
+		"--property-max-year-built", "1985",
+	)
+
+	q := buildPropertiesSearchQuery(cmd)
+
+	if got := q.Get("property_min_year_built"); got != "1985" {
+		t.Errorf("expected property_min_year_built=1985, got %q", got)
+	}
+	if got := q.Get("property_max_year_built"); got != "1985" {
+		t.Errorf("expected property_max_year_built=1985, got %q", got)
+	}
+}
+
+func TestBuildPropertiesSearchQuery_UnknownPropertyTypeForwarded(t *testing.T) {
+	// The enum is the API's to police; the CLI forwards so the server's 422
+	// carries the authoritative value list.
+	cmd := newPropertiesSearchTestCmd(t, "--geo-id", "CA", "--property-type", "castle")
+
+	q := buildPropertiesSearchQuery(cmd)
+
+	if got := q["property_type"]; len(got) != 1 || got[0] != "castle" {
+		t.Errorf("expected the unknown type forwarded as property_type=[castle], got %v", got)
 	}
 }
 
