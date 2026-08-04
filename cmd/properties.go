@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
@@ -14,6 +15,10 @@ import (
 // maxPropertyLegalOwners is the maximum number of --legal-owner values the
 // API accepts on one properties search.
 const maxPropertyLegalOwners = 10
+
+// maxPropertiesGetIDs is the maximum number of address IDs accepted per
+// properties get request.
+const maxPropertiesGetIDs = 50
 
 // propertyRangePair names both bounds of one property attribute range filter.
 type propertyRangePair struct{ minFlag, maxFlag string }
@@ -40,6 +45,7 @@ still change. Treat the response shape as unstable.
 
 Available subcommands:
   search   Search properties by geographic scope and/or legal owner
+  get      Retrieve up to 50 properties by their exact address ID
 
 Every response is a JSON envelope: {"data": [...], "meta": {...}}`,
 }
@@ -144,6 +150,92 @@ func runPropertiesSearch(cmd *cobra.Command, args []string) error {
 	}
 
 	output.PrintPaginated(cmd.OutOrStdout(), result)
+	return nil
+}
+
+var propertiesGetCmd = &cobra.Command{
+	Use:   "get ID [ID...]",
+	Short: "Retrieve one or more properties by their exact address ID (Beta)",
+	Long: `Fetch specific properties by ID. Accepts 1 to 50 address IDs as positional
+arguments, all in one request.
+
+Beta: query parameters, response fields, and the absence-trust surface may
+still change. Treat the response shape as unstable.
+
+Note: ID is a positional argument, not a flag.
+  Correct:   shovels properties get a_123
+  Incorrect: shovels properties get --id a_123
+
+IDs are address IDs. Take them from the id field of a properties search row,
+or resolve a street address:
+  shovels addresses search -q "123 Main St, Encinitas CA" | jq -r '.data[0].geo_id'
+City, county, and jurisdiction geo_ids are rejected, and one such ID fails the
+whole request, so pass address IDs only.
+
+Examples:
+  Single property:
+    shovels properties get a_123
+
+  Several properties in one request:
+    shovels properties get a_123 a_456 a_789
+
+Response: {"data": [...], "meta": {"count": N, "missing": ["UNKNOWN_ID"], ...}}
+Address IDs with no property behind them appear in meta.missing, which is
+absent when every requested ID resolved. Trust metadata is a search-only
+surface: rows returned here carry no trust object.`,
+	Annotations: map[string]string{
+		AnnotationRequiresAuth: "true",
+	},
+	RunE: runPropertiesGet,
+}
+
+func runPropertiesGet(cmd *cobra.Command, args []string) error {
+	if len(args) == 0 {
+		output.PrintErrorTyped(os.Stderr, "at least one property ID required", 1, client.ErrorTypeValidation)
+		return &exitError{code: 1}
+	}
+	if len(args) > maxPropertiesGetIDs {
+		msg := fmt.Sprintf("maximum %d IDs per request", maxPropertiesGetIDs)
+		output.PrintErrorTyped(os.Stderr, msg, 1, client.ErrorTypeValidation)
+		return &exitError{code: 1}
+	}
+
+	q := url.Values{}
+	for _, id := range args {
+		q.Add("id", id)
+	}
+
+	if _, err := validateTimeout(cmd); err != nil {
+		return err
+	}
+
+	if isDryRun(cmd) {
+		return printDryRun(cmd, "/properties", q)
+	}
+
+	cl, err := newClientFromFlags(cmd)
+	if err != nil {
+		return err
+	}
+
+	resp, err := cl.Get(cmd.Context(), "/properties", q)
+	if err != nil {
+		return handleAPIError(err)
+	}
+
+	var page struct {
+		Items []json.RawMessage `json:"items"`
+	}
+	if err := json.Unmarshal(resp.Body, &page); err != nil {
+		output.PrintErrorTyped(os.Stderr, "failed to parse API response", 1, client.ErrorTypeClient)
+		return &exitError{code: 1}
+	}
+
+	// The endpoint answers an unresolved address ID by omitting its row rather
+	// than failing, so the requested IDs are the only record of what was asked
+	// for.
+	missing := findMissingIDs(args, page.Items)
+	output.PrintBatch(cmd.OutOrStdout(), page.Items, missing, resp.Credits)
 	return nil
 }
 
@@ -345,5 +437,6 @@ func init() {
 	setGroupedUsage(propertiesSearchCmd, propertiesSearchFlagGroups())
 
 	propertiesCmd.AddCommand(propertiesSearchCmd)
+	propertiesCmd.AddCommand(propertiesGetCmd)
 	rootCmd.AddCommand(propertiesCmd)
 }

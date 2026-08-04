@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -1414,4 +1415,568 @@ func TestPropertiesSearchExplicitZeroRangeBoundSent(t *testing.T) {
 	if _, ok := q["property_max_unit_count"]; ok {
 		t.Errorf("expected the unset counterpart to stay absent, got %v", q["property_max_unit_count"])
 	}
+}
+
+// =======================================================================
+// properties get
+// =======================================================================
+
+// makePropertiesGetHandler serves batch /properties responses and records each
+// request's id parameters, so a test can assert both the order they were sent
+// in and that no request was made at all. Any request that is not
+// GET /properties is refused, so a wrong verb or path fails the test.
+// knownIDs decides which IDs exist: the endpoint answers an address id it
+// cannot resolve by omitting its row rather than failing, and answers a
+// repeated id with a single row, so the handler does both.
+func makePropertiesGetHandler(knownIDs map[string]bool, creditsUsed, creditsRemaining int) (http.Handler, *[][]string) {
+	requests := &[][]string{}
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/properties" {
+			w.WriteHeader(404)
+			w.Write([]byte(`{"detail":"unexpected method or path"}`))
+			return
+		}
+
+		ids := r.URL.Query()["id"]
+		*requests = append(*requests, ids)
+
+		// Each row is shaped like the endpoint's own, trimmed to the fields
+		// these tests read.
+		items := []json.RawMessage{}
+		emitted := map[string]bool{}
+		for _, id := range ids {
+			if knownIDs[id] && !emitted[id] {
+				emitted[id] = true
+				items = append(items, json.RawMessage(fmt.Sprintf(
+					`{"id":%q,"street_no":"3658","street":"LORIMER LN","city":"ENCINITAS","state":"CA","property_type":"residential","year_built":1986}`,
+					id,
+				)))
+			}
+		}
+
+		w.Header().Set("X-Credits-Request", strconv.Itoa(creditsUsed))
+		w.Header().Set("X-Credits-Remaining", strconv.Itoa(creditsRemaining))
+
+		// The endpoint carries paginator fields on this batch response; the
+		// CLI must ignore them rather than surface them as batch meta.
+		resp := struct {
+			Items      []json.RawMessage `json:"items"`
+			Size       int               `json:"size"`
+			NextCursor *string           `json:"next_cursor"`
+			TotalCount *int              `json:"total_count"`
+		}{Items: items, Size: len(items)}
+		json.NewEncoder(w).Encode(resp)
+	})
+
+	return handler, requests
+}
+
+// propertyGetIDs builds n distinct address IDs.
+func propertyGetIDs(n int) []string {
+	ids := make([]string, n)
+	for i := range n {
+		ids[i] = fmt.Sprintf("a_%05d", i)
+	}
+	return ids
+}
+
+// knownPropertyIDs turns an ID list into the handler's existence map.
+func knownPropertyIDs(ids []string) map[string]bool {
+	known := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		known[id] = true
+	}
+	return known
+}
+
+// assertNoHasMore fails if a batch envelope carries has_more, which belongs to
+// paginated responses only.
+func assertNoHasMore(t *testing.T, meta map[string]any) {
+	t.Helper()
+	if v, ok := meta["has_more"]; ok {
+		t.Errorf("batch meta must never carry has_more, got %v", v)
+	}
+}
+
+// assertNoMissing fails if meta.missing is present at all.
+func assertNoMissing(t *testing.T, meta map[string]any) {
+	t.Helper()
+	if v, ok := meta["missing"]; ok {
+		t.Errorf("expected meta.missing to be omitted when every ID resolved, got %v", v)
+	}
+}
+
+// metaMissing returns meta.missing as strings, failing if the key is absent.
+func metaMissing(t *testing.T, meta map[string]any) []string {
+	t.Helper()
+	raw, ok := meta["missing"]
+	if !ok {
+		t.Fatalf("expected meta.missing, got meta: %v", meta)
+	}
+	entries, ok := raw.([]any)
+	if !ok {
+		t.Fatalf("expected meta.missing to be an array, got %T", raw)
+	}
+	ids := make([]string, len(entries))
+	for i, entry := range entries {
+		s, ok := entry.(string)
+		if !ok {
+			t.Fatalf("expected meta.missing[%d] to be a string, got %T", i, entry)
+		}
+		ids[i] = s
+	}
+	return ids
+}
+
+// --- properties get: Happy paths ---
+
+func TestPropertiesGetSingleID(t *testing.T) {
+	handler, requests := makePropertiesGetHandler(knownPropertyIDs([]string{"a_123"}), 1, 9999)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--base-url", srv.URL,
+		"properties", "get", "a_123",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	// The handler refuses anything but GET /properties, so reaching it at all
+	// pins the verb and path.
+	if len(*requests) != 1 {
+		t.Fatalf("expected 1 API request, got %d", len(*requests))
+	}
+	if got := (*requests)[0]; !reflect.DeepEqual(got, []string{"a_123"}) {
+		t.Errorf("expected id=[a_123] forwarded, got %v", got)
+	}
+
+	parsed := parseEnvelope(t, result.Stdout)
+	if got := len(dataRows(t, parsed)); got != 1 {
+		t.Errorf("expected 1 row, got %d", got)
+	}
+	if int(parsed.Meta["count"].(float64)) != 1 {
+		t.Errorf("expected count=1, got %v", parsed.Meta["count"])
+	}
+	if int(parsed.Meta["credits_used"].(float64)) != 1 {
+		t.Errorf("expected credits_used=1, got %v", parsed.Meta["credits_used"])
+	}
+	if int(parsed.Meta["credits_remaining"].(float64)) != 9999 {
+		t.Errorf("expected credits_remaining=9999, got %v", parsed.Meta["credits_remaining"])
+	}
+	assertNoMissing(t, parsed.Meta)
+	assertNoHasMore(t, parsed.Meta)
+}
+
+func TestPropertiesGetMultipleIDsInArgumentOrder(t *testing.T) {
+	// The IDs are deliberately out of sorted order, so a request that sorted
+	// or reordered them would fail the assertion.
+	args := []string{"a_zzz", "a_aaa", "a_mmm"}
+	handler, requests := makePropertiesGetHandler(knownPropertyIDs(args), 3, 9997)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		append([]string{"--base-url", srv.URL, "properties", "get"}, args...)...,
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	if len(*requests) != 1 {
+		t.Fatalf("expected 1 API request, got %d", len(*requests))
+	}
+	if got := (*requests)[0]; !reflect.DeepEqual(got, args) {
+		t.Errorf("expected repeated id params in argument order %v, got %v", args, got)
+	}
+
+	parsed := parseEnvelope(t, result.Stdout)
+	if got := len(dataRows(t, parsed)); got != 3 {
+		t.Errorf("expected 3 rows, got %d", got)
+	}
+	if int(parsed.Meta["count"].(float64)) != 3 {
+		t.Errorf("expected count=3, got %v", parsed.Meta["count"])
+	}
+	assertNoMissing(t, parsed.Meta)
+	assertNoHasMore(t, parsed.Meta)
+}
+
+func TestPropertiesGetDryRun(t *testing.T) {
+	// The server exists only to prove nothing reaches it, and no API key is
+	// configured, so a real call could not succeed either.
+	handler, requests := makePropertiesGetHandler(knownPropertyIDs([]string{"a_123", "a_456"}), 1, 9999)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	env := withIsolatedConfigNoAuth(t)
+	result := runCLIWithEnv(t, env,
+		"--base-url", srv.URL,
+		"properties", "get", "a_123", "a_456",
+		"--dry-run",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+	if len(*requests) != 0 {
+		t.Errorf("expected zero API requests under --dry-run, got %d", len(*requests))
+	}
+
+	out := parseDryRun(t, result.Stdout)
+	if out.Method != "GET" {
+		t.Errorf("expected method GET, got %q", out.Method)
+	}
+	if !strings.HasSuffix(out.URL, "/properties") {
+		t.Errorf("expected URL ending with /properties, got %q", out.URL)
+	}
+	ids, ok := out.Params["id"].([]any)
+	if !ok || len(ids) != 2 || ids[0] != "a_123" || ids[1] != "a_456" {
+		t.Errorf("expected id=[a_123 a_456], got %v", out.Params["id"])
+	}
+}
+
+// --- properties get: Edge cases ---
+
+func TestPropertiesGetUnknownIDAmongKnown(t *testing.T) {
+	handler, requests := makePropertiesGetHandler(knownPropertyIDs([]string{"a_123", "a_789"}), 2, 9998)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--base-url", srv.URL,
+		"properties", "get", "a_123", "a_gone", "a_789",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+	if got := (*requests)[0]; !reflect.DeepEqual(got, []string{"a_123", "a_gone", "a_789"}) {
+		t.Errorf("expected the unresolved id to be sent alongside the others, got %v", got)
+	}
+
+	parsed := parseEnvelope(t, result.Stdout)
+	if got := len(dataRows(t, parsed)); got != 2 {
+		t.Errorf("expected 2 rows, got %d", got)
+	}
+	if int(parsed.Meta["count"].(float64)) != 2 {
+		t.Errorf("expected count=2, got %v", parsed.Meta["count"])
+	}
+	if got := metaMissing(t, parsed.Meta); !reflect.DeepEqual(got, []string{"a_gone"}) {
+		t.Errorf("expected missing=[a_gone], got %v", got)
+	}
+	assertNoHasMore(t, parsed.Meta)
+}
+
+func TestPropertiesGetAllIDsUnknown(t *testing.T) {
+	handler, _ := makePropertiesGetHandler(map[string]bool{}, 1, 9999)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--base-url", srv.URL,
+		"properties", "get", "a_gone", "a_lost", "a_void",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0 when no ID resolves, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	parsed := parseEnvelope(t, result.Stdout)
+	if got := len(dataRows(t, parsed)); got != 0 {
+		t.Errorf("expected an empty data array, got %d rows", got)
+	}
+	if got := strings.TrimSpace(string(parsed.Data)); got != "[]" {
+		t.Errorf("expected data to be [] rather than null, got %s", got)
+	}
+	if int(parsed.Meta["count"].(float64)) != 0 {
+		t.Errorf("expected count=0, got %v", parsed.Meta["count"])
+	}
+	want := []string{"a_gone", "a_lost", "a_void"}
+	if got := metaMissing(t, parsed.Meta); !reflect.DeepEqual(got, want) {
+		t.Errorf("expected every requested id in missing, in request order %v, got %v", want, got)
+	}
+	assertNoHasMore(t, parsed.Meta)
+}
+
+func TestPropertiesGetDuplicateKnownIDForwardedUnchanged(t *testing.T) {
+	handler, requests := makePropertiesGetHandler(knownPropertyIDs([]string{"a_123"}), 1, 9999)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--base-url", srv.URL,
+		"properties", "get", "a_123", "a_123",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	// Duplicates are not collapsed before the call: the CLI sends what it was
+	// given and lets the endpoint decide.
+	if got := (*requests)[0]; !reflect.DeepEqual(got, []string{"a_123", "a_123"}) {
+		t.Errorf("expected both duplicate ids forwarded unchanged, got %v", got)
+	}
+
+	parsed := parseEnvelope(t, result.Stdout)
+	if got := len(dataRows(t, parsed)); got != 1 {
+		t.Errorf("expected the single row the endpoint returns for a repeated id, got %d", got)
+	}
+	assertNoMissing(t, parsed.Meta)
+	assertNoHasMore(t, parsed.Meta)
+}
+
+func TestPropertiesGetDuplicateUnknownIDCountedPerOccurrence(t *testing.T) {
+	handler, requests := makePropertiesGetHandler(knownPropertyIDs([]string{"a_123"}), 1, 9999)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--base-url", srv.URL,
+		"properties", "get", "a_gone", "a_123", "a_gone",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+	if got := (*requests)[0]; !reflect.DeepEqual(got, []string{"a_gone", "a_123", "a_gone"}) {
+		t.Errorf("expected all three ids forwarded unchanged, got %v", got)
+	}
+
+	parsed := parseEnvelope(t, result.Stdout)
+	want := []string{"a_gone", "a_gone"}
+	if got := metaMissing(t, parsed.Meta); !reflect.DeepEqual(got, want) {
+		t.Errorf("expected one missing entry per unmatched occurrence %v, got %v", want, got)
+	}
+	assertNoHasMore(t, parsed.Meta)
+}
+
+func TestPropertiesGetGeolocationIDRejectedByServer(t *testing.T) {
+	// City, county, and jurisdiction ids are opaque, so only the server can
+	// reject them; the CLI must forward the request and surface the API's 422.
+	var requests [][]string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests = append(requests, r.URL.Query()["id"])
+		w.WriteHeader(422)
+		w.Write([]byte(`{"detail":{"loc":["query","id",0],"msg":"Property id 'RMjg6rIIh2k' at position 0 is a city, county, or jurisdiction id, not an ADDRESS id. Pass ADDRESS ids from /addresses/search.","type":"value_error"}}`))
+	}))
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--base-url", srv.URL,
+		"properties", "get", "RMjg6rIIh2k",
+	)
+
+	if result.ExitCode != 1 {
+		t.Fatalf("expected exit 1 for a server-side 422, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+	if len(requests) != 1 {
+		t.Fatalf("expected the opaque id to reach the API, got %d requests", len(requests))
+	}
+	if got := requests[0]; !reflect.DeepEqual(got, []string{"RMjg6rIIh2k"}) {
+		t.Errorf("expected id=[RMjg6rIIh2k] forwarded unchanged, got %v", got)
+	}
+
+	p := parseStderrError(t, result.Stderr)
+	if p.ErrorType != "validation_error" {
+		t.Errorf("expected error_type validation_error, got %q", p.ErrorType)
+	}
+	if !strings.Contains(p.Error, "ADDRESS id") {
+		t.Errorf("expected the API's own message to be surfaced, got %q", p.Error)
+	}
+}
+
+// --- properties get: Error conditions ---
+
+func TestPropertiesGetNoIDs(t *testing.T) {
+	handler, requests := makePropertiesGetHandler(map[string]bool{}, 1, 9999)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--base-url", srv.URL,
+		"properties", "get",
+	)
+
+	if result.ExitCode != 1 {
+		t.Fatalf("expected exit 1, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+	if len(*requests) != 0 {
+		t.Errorf("expected zero API requests, got %d", len(*requests))
+	}
+
+	p := parseStderrError(t, result.Stderr)
+	if p.ErrorType != "validation_error" {
+		t.Errorf("expected error_type validation_error, got %q", p.ErrorType)
+	}
+	if p.Error != "at least one property ID required" {
+		t.Errorf("expected error %q, got %q", "at least one property ID required", p.Error)
+	}
+}
+
+func TestPropertiesGetTooManyIDs(t *testing.T) {
+	handler, requests := makePropertiesGetHandler(map[string]bool{}, 1, 9999)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	args := append([]string{"--base-url", srv.URL, "properties", "get"}, propertyGetIDs(51)...)
+	result := runCLIWithEnv(t, env, args...)
+
+	if result.ExitCode != 1 {
+		t.Fatalf("expected exit 1, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+	if len(*requests) != 0 {
+		t.Errorf("expected zero API requests when the ID count is rejected, got %d", len(*requests))
+	}
+
+	p := parseStderrError(t, result.Stderr)
+	if p.ErrorType != "validation_error" {
+		t.Errorf("expected error_type validation_error, got %q", p.ErrorType)
+	}
+	if p.Error != "maximum 50 IDs per request" {
+		t.Errorf("expected error %q, got %q", "maximum 50 IDs per request", p.Error)
+	}
+}
+
+func TestPropertiesGetRequiresAuth(t *testing.T) {
+	env := withIsolatedConfigNoAuth(t)
+	result := runCLIWithEnv(t, env, "properties", "get", "a_123")
+
+	if result.ExitCode != 2 {
+		t.Fatalf("expected exit 2 without an API key, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+	p := parseStderrError(t, result.Stderr)
+	if p.ErrorType != "auth_error" {
+		t.Errorf("expected error_type auth_error, got %q", p.ErrorType)
+	}
+}
+
+func TestPropertiesGetAPIErrorExitCodeMapping(t *testing.T) {
+	// API error responses must map to project exit codes via shared
+	// client.APIError handling: auth=2, rate-limit=3, credit-exhausted=4,
+	// server=5, any other 4xx=1. The command layer must not remap them.
+	cases := []struct {
+		status   int
+		exitCode int
+		errType  string
+	}{
+		{401, 2, "auth_error"},
+		{402, 4, "credit_exhausted"},
+		{404, 1, "validation_error"},
+		{422, 1, "validation_error"},
+		{429, 3, "rate_limited"},
+		{500, 5, "server_error"},
+		{503, 5, "server_error"},
+	}
+	for _, tc := range cases {
+		t.Run(fmt.Sprintf("%d", tc.status), func(t *testing.T) {
+			srv := httptest.NewServer(makeStatusHandler(tc.status))
+			defer srv.Close()
+
+			env := withIsolatedConfig(t)
+			result := runCLIWithEnv(t, env,
+				"--base-url", srv.URL,
+				"--no-retry",
+				"properties", "get", "a_123",
+			)
+			if result.ExitCode != tc.exitCode {
+				t.Fatalf("status %d: expected exit %d, got %d; stderr: %s", tc.status, tc.exitCode, result.ExitCode, result.Stderr)
+			}
+			p := parseStderrError(t, result.Stderr)
+			if p.ErrorType != tc.errType {
+				t.Errorf("status %d: expected error_type %q, got %q", tc.status, tc.errType, p.ErrorType)
+			}
+		})
+	}
+}
+
+func TestPropertiesGetTransportFailureExitsCode5(t *testing.T) {
+	// Port 1 refuses connections, so the request never reaches a server.
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--base-url", "http://127.0.0.1:1",
+		"--no-retry",
+		"--timeout", "2s",
+		"properties", "get", "a_123",
+	)
+
+	if result.ExitCode != 5 {
+		t.Fatalf("expected exit 5 for a transport failure, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+	p := parseStderrError(t, result.Stderr)
+	if p.ErrorType != "network_error" {
+		t.Errorf("expected error_type network_error, got %q", p.ErrorType)
+	}
+}
+
+func TestPropertiesGetTimeoutExitsCode5(t *testing.T) {
+	done := make(chan struct{})
+	defer close(done)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case <-done:
+		case <-r.Context().Done():
+		}
+	}))
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--base-url", srv.URL,
+		"--no-retry",
+		"--timeout", "1s",
+		"properties", "get", "a_123",
+	)
+
+	if result.ExitCode != 5 {
+		t.Fatalf("expected exit 5 when the request times out, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+	p := parseStderrError(t, result.Stderr)
+	if p.ErrorType != "network_error" {
+		t.Errorf("expected error_type network_error, got %q", p.ErrorType)
+	}
+}
+
+// --- properties get: Boundary conditions ---
+
+func TestPropertiesGetExactly50IDs(t *testing.T) {
+	ids := propertyGetIDs(50)
+	handler, requests := makePropertiesGetHandler(knownPropertyIDs(ids), 50, 9950)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	args := append([]string{"--base-url", srv.URL, "properties", "get"}, ids...)
+	result := runCLIWithEnv(t, env, args...)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0 for exactly 50 IDs, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+	if got := (*requests)[0]; !reflect.DeepEqual(got, ids) {
+		t.Errorf("expected all 50 ids forwarded in argument order, got %v", got)
+	}
+
+	parsed := parseEnvelope(t, result.Stdout)
+	if got := len(dataRows(t, parsed)); got != 50 {
+		t.Errorf("expected 50 rows, got %d", got)
+	}
+	if int(parsed.Meta["count"].(float64)) != 50 {
+		t.Errorf("expected count=50, got %v", parsed.Meta["count"])
+	}
+	assertNoMissing(t, parsed.Meta)
+	assertNoHasMore(t, parsed.Meta)
 }
