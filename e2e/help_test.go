@@ -718,7 +718,8 @@ func TestGeoIDFlagShowsAllResolutionCommands(t *testing.T) {
 // instability warning, the ZIP scopes properties accepts where decisions does
 // not, the absence-tag syntax and its trust metadata, the nationwide
 // owner-portfolio path, the geo_id resolution commands plus the jurisdiction
-// caveat, the absence of a --permit-to flag, the grouped-flag layout, and the
+// caveat, the absence of a --permit-to flag, the grouped-flag layout, the
+// property attribute filters with their units and coverage caveat, and the
 // timed-out total_count caveat.
 func TestPropertiesSearchHelp(t *testing.T) {
 	result := runCLI(t, "properties", "search", "--help")
@@ -765,8 +766,35 @@ func TestPropertiesSearchHelp(t *testing.T) {
 		},
 		{
 			name:    "GroupedFlags",
-			wants:   []string{"Required Scope", "Permit Filters:", "Response Options:"},
+			wants:   []string{"Required Scope", "Permit Filters:", "Property Filters:", "Response Options:"},
 			purpose: "render the grouped-flag layout so scope flags are distinguishable from filters",
+		},
+		{
+			name: "PropertyAttributeFilters",
+			wants: []string{
+				"--property-type",
+				"--property-min-market-value", "--property-max-market-value",
+				"--property-min-lot-size", "--property-max-lot-size",
+				"--property-min-building-area", "--property-max-building-area",
+				"--property-min-unit-count", "--property-max-unit-count",
+				"--property-min-year-built", "--property-max-year-built",
+			},
+			purpose: "list the type filter and both bounds of all five attribute range pairs",
+		},
+		{
+			name:    "PropertyTypeValues",
+			wants:   []string{"residential", "commercial", "industrial", "agricultural", "vacant land", "exempt", "miscellaneous", "office", "recreational"},
+			purpose: "name all nine valid --property-type values so an agent never has to guess one",
+		},
+		{
+			name:    "AttributeUnits",
+			wants:   []string{"integer cents", "square feet"},
+			purpose: "state the units the attribute range filters expect",
+		},
+		{
+			name:    "AttributeCoverageCaveat",
+			wants:   []string{"60-70%", "narrows"},
+			purpose: "warn that attribute data is partial, so a range filter narrows to the covered set",
 		},
 		{
 			name:    "TimedOutCount",
@@ -784,4 +812,12 @@ func TestPropertiesSearchHelp(t *testing.T) {
 			}
 		})
 	}
+
+	// Permits search filters on story count; the Properties API has no such
+	// parameter, so help must not offer one.
+	t.Run("NoStoryCountFilter", func(t *testing.T) {
+		if strings.Contains(out, "story-count") {
+			t.Error("properties search --help must not offer a story-count filter")
+		}
+	})
 }

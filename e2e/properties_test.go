@@ -177,6 +177,52 @@ func metaTrustSummaries(t *testing.T, stdout string) []json.RawMessage {
 	return env.Meta.TrustSummaries
 }
 
+// propertyRangePairCases is the full inventory of property attribute range
+// pairs: both bound flags, the parameters they map to, and a value in the
+// units each pair expects for the min == max case. The names are spelled out
+// here rather than read from the command's own tables, so a renamed or dropped
+// bound fails a test instead of moving on both sides at once.
+// TestPropertiesSearchAttributeRangesMapped keeps its own copy of the
+// parameter names so the flag-to-parameter mapping has a witness that does not
+// share this table.
+var propertyRangePairCases = []struct {
+	name              string
+	minFlag, minParam string
+	maxFlag, maxParam string
+	exact             string
+}{
+	{
+		name:    "MarketValue",
+		minFlag: "--property-min-market-value", minParam: "property_min_market_value",
+		maxFlag: "--property-max-market-value", maxParam: "property_max_market_value",
+		exact: "50000000",
+	},
+	{
+		name:    "LotSize",
+		minFlag: "--property-min-lot-size", minParam: "property_min_lot_size",
+		maxFlag: "--property-max-lot-size", maxParam: "property_max_lot_size",
+		exact: "4000",
+	},
+	{
+		name:    "BuildingArea",
+		minFlag: "--property-min-building-area", minParam: "property_min_building_area",
+		maxFlag: "--property-max-building-area", maxParam: "property_max_building_area",
+		exact: "1200",
+	},
+	{
+		name:    "UnitCount",
+		minFlag: "--property-min-unit-count", minParam: "property_min_unit_count",
+		maxFlag: "--property-max-unit-count", maxParam: "property_max_unit_count",
+		exact: "4",
+	},
+	{
+		name:    "YearBuilt",
+		minFlag: "--property-min-year-built", minParam: "property_min_year_built",
+		maxFlag: "--property-max-year-built", maxParam: "property_max_year_built",
+		exact: "1985",
+	},
+}
+
 // --- Happy paths ---
 
 func TestPropertiesSearchBasic(t *testing.T) {
@@ -598,7 +644,257 @@ func TestPropertiesSearchTrustSummariesAbsentWhenNoPageCarriesOne(t *testing.T) 
 	}
 }
 
+func TestPropertiesSearchPropertyTypeRepeatsParam(t *testing.T) {
+	// Comma-separating and repeating the flag are two spellings of one list,
+	// and every spelling reaches the API as repeated property_type params in
+	// the order given.
+	cases := []struct {
+		name string
+		args []string
+		want []string
+	}{
+		{
+			name: "CommaSeparated",
+			args: []string{"--property-type", "residential,commercial"},
+			want: []string{"residential", "commercial"},
+		},
+		{
+			name: "RepeatedFlag",
+			args: []string{"--property-type", "residential", "--property-type", "commercial"},
+			want: []string{"residential", "commercial"},
+		},
+		{
+			name: "BothForms",
+			args: []string{"--property-type", "residential,commercial", "--property-type", "vacant land"},
+			want: []string{"residential", "commercial", "vacant land"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			handler, queries := makePropertiesSearchHandler(singlePropertiesPage(1))
+			srv := httptest.NewServer(handler)
+			defer srv.Close()
+
+			args := append([]string{
+				"--base-url", srv.URL,
+				"properties", "search",
+				"--geo-id", "CA",
+			}, tc.args...)
+
+			env := withIsolatedConfig(t)
+			result := runCLIWithEnv(t, env, args...)
+
+			if result.ExitCode != 0 {
+				t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+			}
+
+			got := (*queries)[0]["property_type"]
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("expected property_type=%v, got %v", tc.want, got)
+			}
+		})
+	}
+}
+
+func TestPropertiesSearchAttributeRangesMapped(t *testing.T) {
+	handler, queries := makePropertiesSearchHandler(singlePropertiesPage(1))
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--base-url", srv.URL,
+		"properties", "search",
+		"--geo-id", "CA",
+		"--property-min-market-value", "50000000",
+		"--property-max-market-value", "100000000",
+		"--property-min-lot-size", "4000",
+		"--property-max-lot-size", "12000",
+		"--property-min-building-area", "1200",
+		"--property-max-building-area", "3500",
+		"--property-min-unit-count", "1",
+		"--property-max-unit-count", "4",
+		"--property-min-year-built", "1950",
+		"--property-max-year-built", "1989",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	q := (*queries)[0]
+	want := map[string]string{
+		"property_min_market_value":  "50000000",
+		"property_max_market_value":  "100000000",
+		"property_min_lot_size":      "4000",
+		"property_max_lot_size":      "12000",
+		"property_min_building_area": "1200",
+		"property_max_building_area": "3500",
+		"property_min_unit_count":    "1",
+		"property_max_unit_count":    "4",
+		"property_min_year_built":    "1950",
+		"property_max_year_built":    "1989",
+	}
+	for param, value := range want {
+		if got := q[param]; len(got) != 1 || got[0] != value {
+			t.Errorf("expected %s=[%q], got %v", param, value, got)
+		}
+	}
+	// Permits search filters on story count; the Properties API does not.
+	for _, param := range []string{"property_min_story_count", "property_max_story_count"} {
+		if _, ok := q[param]; ok {
+			t.Errorf("expected %s never to be sent, got %v", param, q[param])
+		}
+	}
+}
+
+func TestPropertiesSearchUnsetAttributeFiltersOmitted(t *testing.T) {
+	// Every range bound defaults to 0, so a bound sent without its flag would
+	// silently narrow the search instead of failing. The whole attribute
+	// parameter inventory is swept, both when no attribute flag is given and
+	// when one is, so a neighbouring bound riding along on a set flag is
+	// caught too.
+	inventory := []string{"property_type"}
+	for _, pair := range propertyRangePairCases {
+		inventory = append(inventory, pair.minParam, pair.maxParam)
+	}
+
+	cases := []struct {
+		name string
+		args []string
+		// sent maps each parameter the given flags must emit to its value;
+		// every other parameter in the inventory must be absent.
+		sent map[string]string
+	}{
+		{
+			name: "NoAttributeFlags",
+		},
+		{
+			name: "OneAttributeFlagSet",
+			args: []string{"--property-min-year-built", "1950"},
+			sent: map[string]string{"property_min_year_built": "1950"},
+		},
+		{
+			name: "OnlyTypeSet",
+			args: []string{"--property-type", "residential"},
+			sent: map[string]string{"property_type": "residential"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			handler, queries := makePropertiesSearchHandler(singlePropertiesPage(1))
+			srv := httptest.NewServer(handler)
+			defer srv.Close()
+
+			args := append([]string{
+				"--base-url", srv.URL,
+				"properties", "search",
+				"--geo-id", "CA",
+			}, tc.args...)
+
+			env := withIsolatedConfig(t)
+			result := runCLIWithEnv(t, env, args...)
+
+			if result.ExitCode != 0 {
+				t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+			}
+			if len(*queries) != 1 {
+				t.Fatalf("expected 1 API request, got %d", len(*queries))
+			}
+
+			q := (*queries)[0]
+			for _, param := range inventory {
+				want, isSet := tc.sent[param]
+				if isSet {
+					if got := q[param]; len(got) != 1 || got[0] != want {
+						t.Errorf("expected %s=[%q], got %v", param, want, got)
+					}
+					continue
+				}
+				if got, ok := q[param]; ok {
+					t.Errorf("expected %s absent when its flag is unset, got %v", param, got)
+				}
+			}
+		})
+	}
+}
+
 // --- Edge cases ---
+
+func TestPropertiesSearchEqualRangeBoundsSent(t *testing.T) {
+	// min == max is an exact-value match, not an empty range, and the rule
+	// holds within any pair, so every one of the five is tried.
+	for _, pair := range propertyRangePairCases {
+		t.Run(pair.name, func(t *testing.T) {
+			handler, queries := makePropertiesSearchHandler(singlePropertiesPage(1))
+			srv := httptest.NewServer(handler)
+			defer srv.Close()
+
+			env := withIsolatedConfig(t)
+			result := runCLIWithEnv(t, env,
+				"--base-url", srv.URL,
+				"properties", "search",
+				"--geo-id", "CA",
+				pair.minFlag, pair.exact,
+				pair.maxFlag, pair.exact,
+			)
+
+			if result.ExitCode != 0 {
+				t.Fatalf("expected exit 0 for equal %s bounds, got %d; stderr: %s", pair.name, result.ExitCode, result.Stderr)
+			}
+
+			q := (*queries)[0]
+			for _, param := range []string{pair.minParam, pair.maxParam} {
+				if got := q[param]; len(got) != 1 || got[0] != pair.exact {
+					t.Errorf("expected %s=[%q], got %v", param, pair.exact, got)
+				}
+			}
+		})
+	}
+}
+
+func TestPropertiesSearchUnknownPropertyTypeRejectedByServer(t *testing.T) {
+	// The valid-type list is the API's to police, so an unknown value is
+	// forwarded and the server's 422 is what the caller sees.
+	var queries []map[string][]string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		params := map[string][]string{}
+		for k, v := range r.URL.Query() {
+			params[k] = v
+		}
+		queries = append(queries, params)
+		w.WriteHeader(422)
+		w.Write([]byte(`{"detail":"property_type must be one of: residential, commercial, ..."}`))
+	}))
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--base-url", srv.URL,
+		"properties", "search",
+		"--geo-id", "CA",
+		"--property-type", "castle",
+	)
+
+	if result.ExitCode != 1 {
+		t.Fatalf("expected exit 1 for a server-side 422, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+	if len(queries) != 1 {
+		t.Fatalf("expected the unknown type to reach the API, got %d requests", len(queries))
+	}
+	if got := queries[0]["property_type"]; len(got) != 1 || got[0] != "castle" {
+		t.Errorf("expected property_type=[castle] forwarded unchanged, got %v", got)
+	}
+	p := parseStderrError(t, result.Stderr)
+	if p.ErrorType != "validation_error" {
+		t.Errorf("expected error_type validation_error, got %q", p.ErrorType)
+	}
+	if !strings.Contains(p.Error, "property_type") {
+		t.Errorf("expected the API's own message to be surfaced, got %q", p.Error)
+	}
+}
 
 func TestPropertiesSearchZipScopesAccepted(t *testing.T) {
 	// Properties accepts ZIP and ZIP+4 scopes directly, diverging from
@@ -960,5 +1256,33 @@ func TestPropertiesSearchExactlyTenLegalOwners(t *testing.T) {
 	}
 	if got := (*queries)[0]["legal_owner"]; len(got) != 10 {
 		t.Errorf("expected 10 legal_owner params, got %d: %v", len(got), got)
+	}
+}
+
+func TestPropertiesSearchExplicitZeroRangeBoundSent(t *testing.T) {
+	// 0 is also the flag's default, so only explicit-set detection tells
+	// "at least zero units" apart from "no unit-count filter".
+	handler, queries := makePropertiesSearchHandler(singlePropertiesPage(1))
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--base-url", srv.URL,
+		"properties", "search",
+		"--geo-id", "CA",
+		"--property-min-unit-count", "0",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	q := (*queries)[0]
+	if got := q["property_min_unit_count"]; len(got) != 1 || got[0] != "0" {
+		t.Errorf("expected property_min_unit_count=[0], got %v", got)
+	}
+	if _, ok := q["property_max_unit_count"]; ok {
+		t.Errorf("expected the unset counterpart to stay absent, got %v", q["property_max_unit_count"])
 	}
 }
