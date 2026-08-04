@@ -73,12 +73,9 @@ SHOVELS_API_KEY=sk-... go test -tags=eval ./evals/... -v -timeout 30m
 - Usability rating 1-5 per scenario: advisory by default, a hard failure where `EnforceUsability` is set
 - Requires `claude` CLI in PATH; skips gracefully if missing
 - ~1.5 minutes per scenario, so ~20 minutes for a full run
-- Each scenario is capped at `--max-budget-usd 1.00`, and the agent runs on whatever model `claude` defaults to. A costly default burns that cap before the task finishes and every scenario fails with `claude CLI failed: exit status 1` and an empty stderr. Pin an affordable model to run the suite:
-
-```bash
-ANTHROPIC_MODEL=sonnet SHOVELS_API_KEY=sk-... go test -tags=eval ./evals/... -v -timeout 30m
-```
-
+- The harness pins `--model sonnet`, so a change to the `claude` CLI default moves neither the cost nor the agent's capability. Sonnet is deliberate: a stronger model can reason past help-text wording a normal agent would trip on, which is the regression these evals exist to catch.
+- Model spend is ~$0.60 per scenario, so ~$7.50 for a full run. This is Anthropic API cost and is unrelated to Shovels API credits.
+- Each scenario is capped at `--max-budget-usd 3.00`. That is a runaway guard rather than a cost control — the worst observed legitimate run is ~$0.65, so a scenario approaching the cap is looping. A scenario that exceeds it fails with `claude CLI failed: exit status 1` and an empty stderr, which is worth recognizing since nothing reports which limit was hit.
 - `evals/scenarios_table_test.go` guards the scenario table and its validators with no API key, no `claude` CLI, and no network, so it still runs when `TestEval` skips
 
 ## Setup

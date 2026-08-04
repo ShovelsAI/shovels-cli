@@ -119,7 +119,15 @@ func runAgent(t *testing.T, scenario Scenario) AgentReport {
 		"--output-format", "text",
 		"--allowedTools", "Bash",
 		"--system-prompt", prompt,
-		"--max-budget-usd", "1.00",
+		// Pin the model: an unpinned run follows the claude CLI default, so a
+		// pricier default silently changes both what the evals cost and how
+		// capable the blind agent is. Sonnet is also the honest floor for a
+		// help-text usability test — a stronger model can reason past wording
+		// a normal agent would trip on.
+		"--model", "sonnet",
+		// Runaway guard, not a cost control. Worst observed legitimate run is
+		// ~$0.65 (19 turns on Sonnet); a scenario reaching $3.00 is looping.
+		"--max-budget-usd", "3.00",
 		scenario.Task,
 	)
 
