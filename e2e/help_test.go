@@ -821,3 +821,64 @@ func TestPropertiesSearchHelp(t *testing.T) {
 		}
 	})
 }
+
+// TestPropertiesGetHelp verifies that `shovels properties get --help` carries
+// what an agent needs before its first batch lookup: the Beta instability
+// warning, positional-argument usage with a correct and an incorrect example,
+// the ID count bound, where address IDs come from, the rejection of
+// city/county/jurisdiction IDs, and the meaning of meta.missing.
+func TestPropertiesGetHelp(t *testing.T) {
+	result := runCLI(t, "properties", "get", "--help")
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+	out := result.Stdout
+
+	cases := []struct {
+		name    string
+		wants   []string
+		purpose string
+	}{
+		{
+			name:    "BetaWarning",
+			wants:   []string{"Beta", "unstable"},
+			purpose: "label the endpoint Beta and warn the response shape is unstable",
+		},
+		{
+			name:    "PositionalUsage",
+			wants:   []string{"positional argument, not a flag", "Correct:   shovels properties get a_123", "Incorrect: shovels properties get --id a_123"},
+			purpose: "show that IDs are positional and that --id is wrong",
+		},
+		{
+			name:    "UseLine",
+			wants:   []string{"properties get ID [ID...]"},
+			purpose: "show the positional syntax in the usage line",
+		},
+		{
+			name:    "IDCountBound",
+			wants:   []string{"1 to 50"},
+			purpose: "state how many IDs one request accepts",
+		},
+		{
+			name:    "AddressIDsOnly",
+			wants:   []string{"address IDs", "addresses search", "jurisdiction"},
+			purpose: "state that only address IDs work and point at the command that resolves one",
+		},
+		{
+			name:    "MissingIDs",
+			wants:   []string{"meta.missing"},
+			purpose: "explain where unresolved IDs surface in the response",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, want := range tc.wants {
+				if !strings.Contains(out, want) {
+					t.Errorf("properties get --help should %s (missing %q)", tc.purpose, want)
+				}
+			}
+		})
+	}
+}

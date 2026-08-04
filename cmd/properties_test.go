@@ -450,6 +450,38 @@ func TestValidatePropertiesSearchFlags_UnknownPropertyTypeAccepted(t *testing.T)
 	}
 }
 
+// --- properties get: ID-count bounds ---
+
+func TestRunPropertiesGet_NoIDsRejected(t *testing.T) {
+	cmd := &cobra.Command{Use: "get"}
+
+	err := runPropertiesGet(cmd, nil)
+
+	if err == nil {
+		t.Fatal("expected an error when no property IDs are passed")
+	}
+	if ee, ok := err.(*exitError); !ok || ee.code != 1 {
+		t.Errorf("expected exitError code 1, got %v", err)
+	}
+}
+
+func TestRunPropertiesGet_TooManyIDsRejected(t *testing.T) {
+	cmd := &cobra.Command{Use: "get"}
+	ids := make([]string, maxPropertiesGetIDs+1)
+	for i := range ids {
+		ids[i] = fmt.Sprintf("a_%05d", i)
+	}
+
+	err := runPropertiesGet(cmd, ids)
+
+	if err == nil {
+		t.Fatalf("expected an error when more than %d IDs are passed", maxPropertiesGetIDs)
+	}
+	if ee, ok := err.(*exitError); !ok || ee.code != 1 {
+		t.Errorf("expected exitError code 1, got %v", err)
+	}
+}
+
 // --- helpers ---
 
 // ownerArgs builds n distinct --legal-owner flag pairs.
