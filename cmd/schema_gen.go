@@ -1,10 +1,22 @@
 //go:build ignore
 
-// Schema generator: fetches the OpenAPI spec and merges YAML overrides to
+// Schema generator: reads the OpenAPI spec and merges YAML overrides to
 // produce schema_data.go with embedded schema data for all CLI commands.
-// Runs from the cmd/ directory via go generate.
+// Runs from the cmd/ directory via go generate. The spec comes from
+// SCHEMA_GEN_SPEC_FILE when that is set, and from the live API otherwise.
 //
-// Usage: go generate ./cmd/...
+// The spec copy this reads and the schema data it writes are pinned against
+// each other, so refreshing the schemas is one sequence, run from the module
+// root:
+//
+//	# 1. refresh the pinned spec
+//	curl -s https://api.shovels.ai/v2/openapi.json > cmd/testdata/openapi.json
+//	# 2. regenerate the embedded schema data from it
+//	SCHEMA_GEN_SPEC_FILE="$PWD/cmd/testdata/openapi.json" go generate ./cmd/...
+//
+// Step 2 on its own reads the live spec rather than the pinned copy, which
+// leaves the two disagreeing whenever the API has moved on.
+// e2e/schema_generate_test.go is what fails when they do.
 
 package main
 
