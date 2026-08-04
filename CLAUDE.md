@@ -55,7 +55,7 @@ internal/
 | Unit | `go test ./...` | No network calls, mock HTTP client |
 | E2E | `go test -tags=e2e ./e2e/...` | Builds binary, invokes as subprocess, requires `SHOVELS_API_KEY` |
 | Integration | `go test -tags=integration ./...` | Hits live API, requires `SHOVELS_API_KEY` |
-| LLM Evals | `go test -tags=eval ./evals/... -v -timeout 10m` | Blind LLM usability tests, requires `SHOVELS_API_KEY` + `claude` CLI |
+| LLM Evals | `go test -tags=eval ./evals/... -v -timeout 30m` | Blind LLM usability tests, requires `SHOVELS_API_KEY` + `claude` CLI |
 
 ### LLM Evals
 
@@ -64,15 +64,20 @@ The `evals/` directory contains LLM usability tests that verify help text is age
 Run after help text changes or before releases to catch usability regressions:
 
 ```bash
-SHOVELS_API_KEY=sk-... go test -tags=eval ./evals/... -v -timeout 10m
+SHOVELS_API_KEY=sk-... go test -tags=eval ./evals/... -v -timeout 30m
 ```
 
 - Builds binary from source (tests current code, not installed version)
-- 4 scenarios: permit search, contractor lookup, city geo_id resolution, tag discovery
+- 11 scenarios: permit and contractor search, geo_id resolution, metrics, schema and dry-run discovery, jq pipelines, zoning decisions
 - Hard assertions: valid JSON output, correct domain (permits vs contractors), data present
-- Advisory: usability rating 1-5 logged per scenario (warns if < 4)
+- Usability rating 1-5 per scenario: advisory by default, a hard failure where `EnforceUsability` is set
 - Requires `claude` CLI in PATH; skips gracefully if missing
-- ~5 minutes total, ~$0.50 in API costs
+- ~1.5 minutes per scenario, so ~20 minutes for a full run
+- Each scenario is capped at `--max-budget-usd 1.00`, and the agent runs on whatever model `claude` defaults to. A costly default burns that cap before the task finishes and every scenario fails with `claude CLI failed: exit status 1` and an empty stderr. Pin an affordable model to run the suite:
+
+```bash
+ANTHROPIC_MODEL=sonnet SHOVELS_API_KEY=sk-... go test -tags=eval ./evals/... -v -timeout 30m
+```
 
 ## Setup
 

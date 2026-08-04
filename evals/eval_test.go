@@ -11,7 +11,7 @@
 //
 // Run:
 //
-//	go test -tags=eval ./evals/... -v -timeout 10m
+//	go test -tags=eval ./evals/... -v -timeout 30m
 package evals
 
 import (
