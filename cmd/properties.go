@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strings"
 
 	"github.com/shovels-ai/shovels-cli/internal/client"
 	"github.com/shovels-ai/shovels-cli/internal/output"
@@ -249,8 +250,7 @@ func runPropertiesGet(cmd *cobra.Command, args []string) error {
 
 // registerPropertiesSearchFlags adds the properties search flags onto cmd.
 // Properties has its own flag set because its scope is "geo and/or owner"
-// rather than a required geo plus date range, and it takes tag and status
-// filters as single comma-separated values.
+// rather than a required geo plus date range.
 func registerPropertiesSearchFlags(cmd *cobra.Command) {
 	f := cmd.Flags()
 
@@ -268,15 +268,20 @@ func registerPropertiesSearchFlags(cmd *cobra.Command) {
 			"so \"SMITH, JOHN\" is one owner. Without --geo-id this searches that owner nationwide")
 
 	// Permit filters
-	f.String("permit-tags", "",
-		"Canonical permit tags as ONE comma-separated value (e.g. \"solar,-roofing\").\n"+
-			"A bare tag keeps properties that have it; a - prefix keeps properties WITHOUT it")
-	f.String("permit-status", "", "Permit status as one comma-separated value: final, in_review, inactive, active")
+	f.StringSlice("permit-tags", nil,
+		"Canonical permit tags. Repeat the flag or comma-separate to filter on several tags.\n"+
+			"A bare tag keeps properties that have it; a - prefix keeps properties WITHOUT it.\n"+
+			"Several positive tags require EVERY tag, though not all on the same permit.\n"+
+			"An unknown tag is an error, not an empty result: run shovels tags list --limit all for the canonical set")
+	f.StringSlice("permit-status", nil,
+		"Permit status. Repeat the flag or comma-separate to match any of several statuses.\n"+
+			"Valid values: final, in_review, inactive, active")
 	f.String("permit-from", "",
 		"Bind the tag/status/absence filters to this date (YYYY-MM-DD).\n"+
 			"There is no --permit-to: use shovels permits search for a closed date window")
-	f.String("permit-tags-unfinaled", "",
-		"Keep properties with an UNFINALED permit of each named tag, as one comma-separated value (e.g. \"solar,roofing\")")
+	f.StringSlice("permit-tags-unfinaled", nil,
+		"Keep properties with an UNFINALED permit of each named tag.\n"+
+			"Repeat the flag or comma-separate to name several tags (e.g. solar,roofing)")
 
 	// Property attribute filters. Permits search additionally filters on story
 	// count; the Properties API has no story-count parameter.
@@ -331,9 +336,11 @@ func propertiesSearchFlagGroups() []flagGroup {
 }
 
 // validatePropertiesSearchFlags checks that a scope was given, that owner
-// values are non-empty and within the API's count limit, that --permit-from
-// has the YYYY-MM-DD shape, and that the attribute range bounds are usable.
-// Calendar validity and property-type membership are left to the API.
+// values are non-empty and within the API's count limit, that --permit-status
+// names real statuses, that --permit-from has the YYYY-MM-DD shape, and that
+// the attribute range bounds are usable. Calendar validity, tag vocabulary,
+// and property-type membership are left to the API, which rejects an unknown
+// value with a 422 naming it.
 // Returns a non-nil error (already printed to stderr) on failure.
 func validatePropertiesSearchFlags(cmd *cobra.Command) error {
 	geoID, _ := cmd.Flags().GetString("geo-id")
@@ -363,6 +370,19 @@ func validatePropertiesSearchFlags(cmd *cobra.Command) error {
 		msg := fmt.Sprintf("maximum %d --legal-owner values per request, got %d", maxPropertyLegalOwners, len(owners))
 		output.PrintErrorTyped(os.Stderr, msg, 1, client.ErrorTypeValidation)
 		return &exitError{code: 1}
+	}
+
+	// Statuses are a closed set, so catch a typo locally rather than spending a
+	// round trip on it. This matches permits and contractors search, which
+	// validate --status the same way. Tags are left to the API, whose
+	// vocabulary the CLI does not carry.
+	statuses, _ := cmd.Flags().GetStringSlice("permit-status")
+	for _, s := range statuses {
+		if !isValidStatus(s) {
+			msg := fmt.Sprintf("invalid --permit-status value %q: valid options are %s", s, strings.Join(validPermitStatuses, ", "))
+			output.PrintErrorTyped(os.Stderr, msg, 1, client.ErrorTypeValidation)
+			return &exitError{code: 1}
+		}
 	}
 
 	from, _ := cmd.Flags().GetString("permit-from")
@@ -418,10 +438,12 @@ func buildPropertiesSearchQuery(cmd *cobra.Command) url.Values {
 	setNonEmptyStringFlag(cmd, "geo-id", "geo_id", q)
 	addStringArrayParam(cmd, "legal-owner", "legal_owner", q)
 
-	setNonEmptyStringFlag(cmd, "permit-tags", "permit_tags", q)
-	setNonEmptyStringFlag(cmd, "permit-status", "permit_status", q)
+	// /properties/search takes these as repeated keys and rejects a comma-joined
+	// value with a 422, so each tag must become its own parameter.
+	addStringSliceParam(cmd, "permit-tags", "permit_tags", q)
+	addStringSliceParam(cmd, "permit-status", "permit_status", q)
 	setNonEmptyStringFlag(cmd, "permit-from", "permit_from", q)
-	setNonEmptyStringFlag(cmd, "permit-tags-unfinaled", "permit_tags_unfinaled", q)
+	addStringSliceParam(cmd, "permit-tags-unfinaled", "permit_tags_unfinaled", q)
 
 	addStringSliceParam(cmd, "property-type", "property_type", q)
 	setIntFlag(cmd, "property-min-market-value", "property_min_market_value", q)

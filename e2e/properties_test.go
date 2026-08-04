@@ -402,16 +402,27 @@ func TestPropertiesSearchPermitFiltersMapped(t *testing.T) {
 		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
 	}
 
+	// The endpoint takes these as repeated keys and rejects a comma-joined
+	// value with a 422, so a comma-separated flag value must be split into one
+	// parameter per tag on the wire.
 	q := (*queries)[0]
-	checks := map[string]string{
-		"permit_tags":           "solar,-roofing",
-		"permit_status":         "final,active",
-		"permit_from":           "2024-01-01",
-		"permit_tags_unfinaled": "solar",
+	checks := map[string][]string{
+		"permit_tags":           {"solar", "-roofing"},
+		"permit_status":         {"final", "active"},
+		"permit_from":           {"2024-01-01"},
+		"permit_tags_unfinaled": {"solar"},
 	}
 	for param, want := range checks {
-		if len(q[param]) != 1 || q[param][0] != want {
-			t.Errorf("expected %s=[%q], got %v", param, want, q[param])
+		got := q[param]
+		if len(got) != len(want) {
+			t.Errorf("expected %s=%v, got %v", param, want, got)
+			continue
+		}
+		for i := range want {
+			if got[i] != want[i] {
+				t.Errorf("expected %s=%v, got %v", param, want, got)
+				break
+			}
 		}
 	}
 	if _, ok := q["permit_to"]; ok {

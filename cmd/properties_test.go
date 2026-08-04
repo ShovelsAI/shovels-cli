@@ -66,6 +66,10 @@ func TestBuildPropertiesSearchQuery_GeoIDAndLegalOwnerBothSent(t *testing.T) {
 	}
 }
 
+// /properties/search takes permit_tags, permit_status and permit_tags_unfinaled
+// as repeated keys and rejects a comma-joined value with a 422 naming the bad
+// tag. A comma-separated flag value must therefore reach the API as one
+// parameter per tag, not as a single joined string.
 func TestBuildPropertiesSearchQuery_PermitFiltersMapped(t *testing.T) {
 	cmd := newPropertiesSearchTestCmd(t,
 		"--geo-id", "CA",
@@ -77,15 +81,61 @@ func TestBuildPropertiesSearchQuery_PermitFiltersMapped(t *testing.T) {
 
 	q := buildPropertiesSearchQuery(cmd)
 
-	checks := map[string]string{
-		"permit_tags":           "solar,-roofing",
-		"permit_status":         "final,active",
-		"permit_from":           "2024-01-01",
-		"permit_tags_unfinaled": "solar",
+	checks := map[string][]string{
+		"permit_tags":           {"solar", "-roofing"},
+		"permit_status":         {"final", "active"},
+		"permit_from":           {"2024-01-01"},
+		"permit_tags_unfinaled": {"solar"},
 	}
 	for param, want := range checks {
-		if got := q[param]; len(got) != 1 || got[0] != want {
-			t.Errorf("expected %s=[%q], got %v", param, want, got)
+		got := q[param]
+		if len(got) != len(want) {
+			t.Errorf("expected %s=%v, got %v", param, want, got)
+			continue
+		}
+		for i := range want {
+			if got[i] != want[i] {
+				t.Errorf("expected %s=%v, got %v", param, want, got)
+				break
+			}
+		}
+	}
+}
+
+// Regression test for ENG-4040: these three flags were registered as f.String,
+// so Cobra kept only the last occurrence and silently discarded the rest. The
+// worst case is an absence query, where dropping an exclusion widens the result
+// set into a longer list that still looks plausible.
+func TestBuildPropertiesSearchQuery_RepeatedPermitFlagsKeepEveryValue(t *testing.T) {
+	cmd := newPropertiesSearchTestCmd(t,
+		"--geo-id", "92024",
+		"--permit-tags", "-solar",
+		"--permit-tags", "-roofing",
+		"--permit-status", "final",
+		"--permit-status", "active",
+		"--permit-tags-unfinaled", "solar",
+		"--permit-tags-unfinaled", "roofing",
+	)
+
+	q := buildPropertiesSearchQuery(cmd)
+
+	checks := map[string][]string{
+		"permit_tags":           {"-solar", "-roofing"},
+		"permit_status":         {"final", "active"},
+		"permit_tags_unfinaled": {"solar", "roofing"},
+	}
+	for param, want := range checks {
+		got := q[param]
+		if len(got) != len(want) {
+			t.Errorf("repeating --%s dropped values: expected %v, got %v",
+				strings.ReplaceAll(param, "_", "-"), want, got)
+			continue
+		}
+		for i := range want {
+			if got[i] != want[i] {
+				t.Errorf("expected %s=%v, got %v", param, want, got)
+				break
+			}
 		}
 	}
 }
@@ -276,6 +326,29 @@ func TestValidatePropertiesSearchFlags_NoScopeRejected(t *testing.T) {
 
 	if err := validatePropertiesSearchFlags(cmd); err == nil {
 		t.Fatal("expected a scope error when neither --geo-id nor --legal-owner is given")
+	}
+}
+
+func TestValidatePropertiesSearchFlags_InvalidPermitStatusRejected(t *testing.T) {
+	cmd := newPropertiesSearchTestCmd(t,
+		"--geo-id", "92024",
+		"--permit-status", "final,finalised",
+	)
+
+	if err := validatePropertiesSearchFlags(cmd); err == nil {
+		t.Fatal("expected an unknown --permit-status value to be rejected locally")
+	}
+}
+
+func TestValidatePropertiesSearchFlags_ValidPermitStatusesAccepted(t *testing.T) {
+	cmd := newPropertiesSearchTestCmd(t,
+		"--geo-id", "92024",
+		"--permit-status", "final",
+		"--permit-status", "in_review",
+	)
+
+	if err := validatePropertiesSearchFlags(cmd); err != nil {
+		t.Fatalf("expected valid statuses to pass, got %v", err)
 	}
 }
 

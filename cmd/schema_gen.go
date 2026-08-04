@@ -648,10 +648,10 @@ func buildFilters(def commandDef) map[string]schemaField {
 		filters["--legal-owner"] = schemaField{Type: "string[]", Description: "Property legal owner, repeat the flag for up to 10 owners. Values are never split on commas, so \"SMITH, JOHN\" is one owner. Without --geo-id this searches the owner nationwide"}
 
 		// Permit filters
-		filters["--permit-tags"] = schemaField{Type: "string", Description: "Canonical permit tags as one comma-separated value (e.g. \"solar,-roofing\"). A bare tag keeps properties that have it, a - prefix keeps properties WITHOUT it"}
-		filters["--permit-status"] = schemaField{Type: "string", Description: "Permit status as one comma-separated value: final, in_review, inactive, active"}
+		filters["--permit-tags"] = schemaField{Type: "string[]", Description: "Canonical permit tags, repeat or comma-separate for multiple. A bare tag keeps properties that have it, a - prefix keeps properties WITHOUT it. Several positive tags require every tag, though not all on the same permit. An unknown tag is rejected with an error rather than returning an empty result: run tags list --limit all for the canonical set"}
+		filters["--permit-status"] = schemaField{Type: "string[]", Description: "Permit status, repeat or comma-separate for multiple: final, in_review, inactive, active"}
 		filters["--permit-from"] = schemaField{Type: "date", Description: "Bind the tag, status, and absence filters to this date in YYYY-MM-DD format. This endpoint has no --permit-to: use permits search for a closed date window"}
-		filters["--permit-tags-unfinaled"] = schemaField{Type: "string", Description: "Keep properties with an unfinaled permit of each named tag, as one comma-separated value (e.g. \"solar,roofing\")"}
+		filters["--permit-tags-unfinaled"] = schemaField{Type: "string[]", Description: "Keep properties with an unfinaled permit of each named tag, repeat or comma-separate for multiple (e.g. solar,roofing)"}
 
 		// Property filters. Attribute data covers roughly 60-70% of
 		// properties, so each of these narrows results to the covered set.

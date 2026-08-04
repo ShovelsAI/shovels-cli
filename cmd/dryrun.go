@@ -61,6 +61,7 @@ var numericParams = map[string]bool{
 var arrayParams = map[string]bool{
 	"permit_tags":                       true,
 	"permit_status":                     true,
+	"permit_tags_unfinaled":             true,
 	"contractor_classification_derived": true,
 	"id":                                true,
 	"legal_owner":                       true,
