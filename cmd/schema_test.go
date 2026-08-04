@@ -14,6 +14,8 @@ func TestGeneratedSchemaCoversAllDataCommands(t *testing.T) {
 	expected := []string{
 		"permits search",
 		"permits get",
+		"properties search",
+		"properties get",
 		"decisions search",
 		"decisions get",
 		"contractors search",
@@ -132,7 +134,7 @@ func TestSchemaFieldIndexContainsMetaFields(t *testing.T) {
 // has_more. The missing list surfaces requested IDs not found, and batch-get
 // responses are never paginated.
 func TestBatchGetSchemaMetaFields(t *testing.T) {
-	getCmds := []string{"permits get", "decisions get", "contractors get"}
+	getCmds := []string{"permits get", "properties get", "decisions get", "contractors get"}
 	want := []string{"meta.count", "meta.missing", "meta.credits_used", "meta.credits_remaining"}
 
 	for _, cmd := range getCmds {
@@ -826,5 +828,352 @@ func TestContractorsGetVsSearchScopingDiffers(t *testing.T) {
 
 	if searchDesc == getDesc {
 		t.Errorf("tag_tally descriptions should differ between search and get, both say: %s", searchDesc)
+	}
+}
+
+// =======================================================================
+// Nested object expansion and meta fields
+// =======================================================================
+
+// nestedExpansionCommands lists every command whose schema entry opts in to
+// nested-object expansion or extra meta fields. Every other registered
+// command must be untouched by those two features, so this list is the
+// boundary the tests below police.
+var nestedExpansionCommands = map[string]bool{
+	"properties search": true,
+	"properties get":    true,
+}
+
+// propertiesTrustChildren are the eight direct PropertyTrust children, which
+// both properties commands document as nested paths under trust.
+var propertiesTrustChildren = []string{
+	"trust.unresolved_rate",
+	"trust.coverage_tier",
+	"trust.data_horizon",
+	"trust.horizon_basis",
+	"trust.trust_jurisdiction_basis",
+	"trust.trust_jurisdiction_error_bar",
+	"trust.footprint_basis",
+	"trust.flags",
+}
+
+// TestNestedExpansionAndMetaFieldsAreOptIn verifies the generator's nested
+// expansion and meta_fields reach only the commands that ask for them: every
+// other command carries a flat response_fields map, no meta_fields, and a
+// field index whose entries stay one level under data[].
+func TestNestedExpansionAndMetaFieldsAreOptIn(t *testing.T) {
+	for _, cmd := range SchemaCommands() {
+		if nestedExpansionCommands[cmd] {
+			continue
+		}
+		s := LookupSchema(cmd)
+		for name := range s.ResponseFields {
+			if strings.Contains(name, ".") {
+				t.Errorf("schema for %q has expanded nested field %q; expansion is opt-in", cmd, name)
+			}
+		}
+		if len(s.MetaFields) != 0 {
+			t.Errorf("schema for %q has %d meta_fields; meta fields are opt-in", cmd, len(s.MetaFields))
+		}
+		for _, f := range s.FieldIndex {
+			if strings.Count(f, ".") > 1 {
+				t.Errorf("schema for %q has nested field index entry %q; expansion is opt-in", cmd, f)
+			}
+		}
+	}
+}
+
+// TestNestedObjectRefsOutsidePropertiesStayUnexpanded pins the specific
+// fields that would expand if expansion ever became global: a permit's
+// address and geo_ids, and a contractor's address are object references just
+// like a property's trust, and each must stay a single entry named by its
+// OpenAPI schema.
+func TestNestedObjectRefsOutsidePropertiesStayUnexpanded(t *testing.T) {
+	cases := []struct {
+		command, field, wantType string
+	}{
+		{"permits search", "address", "AddressesRead"},
+		{"permits search", "geo_ids", "GeoIdsRead"},
+		{"permits get", "address", "AddressesRead"},
+		{"permits get", "geo_ids", "GeoIdsRead"},
+		{"contractors search", "address", "AddressesEmbedded"},
+		{"contractors get", "address", "AddressesEmbedded"},
+	}
+
+	for _, tc := range cases {
+		s := LookupSchema(tc.command)
+		if s == nil {
+			t.Fatalf("schema for %q not found", tc.command)
+		}
+		f, ok := s.ResponseFields[tc.field]
+		if !ok {
+			t.Errorf("schema for %q missing field %q", tc.command, tc.field)
+			continue
+		}
+		if f.Type != tc.wantType {
+			t.Errorf("schema for %q field %q has type %q, want the unexpanded %q",
+				tc.command, tc.field, f.Type, tc.wantType)
+		}
+		for name := range s.ResponseFields {
+			if strings.HasPrefix(name, tc.field+".") {
+				t.Errorf("schema for %q expanded %q into %q", tc.command, tc.field, name)
+			}
+		}
+	}
+}
+
+// TestNestedExpansionStopsAtDepthOne verifies expansion documents direct
+// children only. A grandchild path would mean the generator recursed into a
+// child's own references.
+func TestNestedExpansionStopsAtDepthOne(t *testing.T) {
+	for cmd := range nestedExpansionCommands {
+		s := LookupSchema(cmd)
+		if s == nil {
+			t.Fatalf("schema for %q not found", cmd)
+		}
+		for name := range s.ResponseFields {
+			if strings.Count(name, ".") > 1 {
+				t.Errorf("schema for %q has depth-%d field %q; expansion goes one level only",
+					cmd, strings.Count(name, ".")+1, name)
+			}
+		}
+	}
+}
+
+// TestPropertiesTrustFieldsExpanded verifies both properties commands
+// document every direct PropertyTrust child as a dotted path with a type and
+// a description, and keep the parent trust entry as an object.
+func TestPropertiesTrustFieldsExpanded(t *testing.T) {
+	for cmd := range nestedExpansionCommands {
+		s := LookupSchema(cmd)
+		if s == nil {
+			t.Fatalf("schema for %q not found", cmd)
+		}
+
+		parent, ok := s.ResponseFields["trust"]
+		if !ok {
+			t.Errorf("schema for %q dropped the parent trust field", cmd)
+		} else if parent.Type != "object" {
+			t.Errorf("schema for %q types parent trust %q, want object", cmd, parent.Type)
+		}
+
+		index := make(map[string]bool, len(s.FieldIndex))
+		for _, f := range s.FieldIndex {
+			index[f] = true
+		}
+
+		for _, child := range propertiesTrustChildren {
+			f, ok := s.ResponseFields[child]
+			if !ok {
+				t.Errorf("schema for %q missing nested field %q", cmd, child)
+				continue
+			}
+			if f.Type == "" {
+				t.Errorf("schema for %q nested field %q has no type", cmd, child)
+			}
+			if f.Description == "" {
+				t.Errorf("schema for %q nested field %q has no description", cmd, child)
+			}
+			if !index["data[]."+child] {
+				t.Errorf("schema for %q field_index missing %q", cmd, "data[]."+child)
+			}
+		}
+	}
+}
+
+// TestPropertiesSearchMetaFieldsDocumentTrustSummaries verifies the search
+// schema documents every TrustSummary child under the trust_summaries[]
+// naming and indexes each one under meta.
+func TestPropertiesSearchMetaFieldsDocumentTrustSummaries(t *testing.T) {
+	want := []string{
+		"trust_summaries[].rows_flagged",
+		"trust_summaries[].row_weighted_unresolved_rate",
+		"trust_summaries[].expected_miss_rate",
+		"trust_summaries[].suppressed_scopes",
+	}
+
+	s := LookupSchema("properties search")
+	if s == nil {
+		t.Fatal("properties search schema not found")
+	}
+
+	index := make(map[string]bool, len(s.FieldIndex))
+	for _, f := range s.FieldIndex {
+		index[f] = true
+	}
+
+	for _, name := range want {
+		f, ok := s.MetaFields[name]
+		if !ok {
+			t.Errorf("properties search meta_fields missing %q", name)
+			continue
+		}
+		if f.Type == "" {
+			t.Errorf("properties search meta field %q has no type", name)
+		}
+		if f.Description == "" {
+			t.Errorf("properties search meta field %q has no description", name)
+		}
+		if !index["meta."+name] {
+			t.Errorf("properties search field_index missing %q", "meta."+name)
+		}
+	}
+
+	if len(s.MetaFields) != len(want) {
+		t.Errorf("properties search has %d meta_fields, want the %d TrustSummary children",
+			len(s.MetaFields), len(want))
+	}
+}
+
+// TestPropertiesGetHasNoMetaFields verifies the batch endpoint advertises no
+// meta additions: it never returns a trust_summary to collect.
+func TestPropertiesGetHasNoMetaFields(t *testing.T) {
+	s := LookupSchema("properties get")
+	if s == nil {
+		t.Fatal("properties get schema not found")
+	}
+	if len(s.MetaFields) != 0 {
+		t.Errorf("properties get should have no meta_fields, got %v", s.MetaFields)
+	}
+	for _, f := range s.FieldIndex {
+		if strings.HasPrefix(f, "meta.trust_summaries") {
+			t.Errorf("properties get field_index should not carry %q", f)
+		}
+	}
+}
+
+// TestPropertiesGetSharesSearchResponseFields verifies both properties
+// commands describe the same row shape, since one OpenAPI schema serves both
+// endpoints.
+func TestPropertiesGetSharesSearchResponseFields(t *testing.T) {
+	search := LookupSchema("properties search")
+	get := LookupSchema("properties get")
+	if search == nil || get == nil {
+		t.Fatal("properties search or get schema not found")
+	}
+
+	for name := range search.ResponseFields {
+		if _, ok := get.ResponseFields[name]; !ok {
+			t.Errorf("properties get missing response field %q present on search", name)
+		}
+	}
+	for name := range get.ResponseFields {
+		if _, ok := search.ResponseFields[name]; !ok {
+			t.Errorf("properties search missing response field %q present on get", name)
+		}
+	}
+}
+
+// TestPropertiesGetTrustFieldsMarkedSearchOnly verifies every trust path on
+// the batch command says where trust is actually populated, so an agent
+// reading this schema does not expect a trust object back from get.
+func TestPropertiesGetTrustFieldsMarkedSearchOnly(t *testing.T) {
+	const note = "search absence queries only — never returned by properties get"
+
+	s := LookupSchema("properties get")
+	if s == nil {
+		t.Fatal("properties get schema not found")
+	}
+
+	want := append([]string{"trust"}, propertiesTrustChildren...)
+	for _, path := range want {
+		f, ok := s.ResponseFields[path]
+		if !ok {
+			t.Errorf("properties get missing trust path %q", path)
+			continue
+		}
+		if !strings.Contains(f.Description, note) {
+			t.Errorf("properties get field %q should state %q, got: %s", path, note, f.Description)
+		}
+	}
+
+	// An unmarked trust path is as misleading as a missing one, so count what
+	// the schema actually carries rather than only what was looked up.
+	var found int
+	for name := range s.ResponseFields {
+		if name == "trust" || strings.HasPrefix(name, "trust.") {
+			found++
+		}
+	}
+	if found != len(want) {
+		t.Errorf("properties get carries %d trust paths, want %d", found, len(want))
+	}
+}
+
+// TestPropertiesMoneyFieldsUseCents verifies the integer-cents fields carry
+// the unit, since a bare integer market value reads as dollars otherwise.
+func TestPropertiesMoneyFieldsUseCents(t *testing.T) {
+	for cmd := range nestedExpansionCommands {
+		s := LookupSchema(cmd)
+		if s == nil {
+			t.Fatalf("schema for %q not found", cmd)
+		}
+		for _, field := range []string{"total_job_value", "assess_market_value"} {
+			f, ok := s.ResponseFields[field]
+			if !ok {
+				t.Errorf("schema for %q missing field %q", cmd, field)
+				continue
+			}
+			if f.Unit != "cents" {
+				t.Errorf("schema for %q field %q has unit %q, want cents", cmd, field, f.Unit)
+			}
+		}
+	}
+
+	search := LookupSchema("properties search")
+	for _, filter := range []string{"--property-min-market-value", "--property-max-market-value"} {
+		f, ok := search.Filters[filter]
+		if !ok {
+			t.Errorf("properties search missing filter %q", filter)
+			continue
+		}
+		if f.Unit != "cents" {
+			t.Errorf("properties search filter %q has unit %q, want cents", filter, f.Unit)
+		}
+	}
+}
+
+// TestPropertiesSearchSchemaFiltersMatchFlags verifies the schema documents
+// exactly the flags properties search registers. The names are spelled out
+// here rather than read from the command so that renaming a flag fails this
+// test instead of moving on both sides at once.
+func TestPropertiesSearchSchemaFiltersMatchFlags(t *testing.T) {
+	want := []string{
+		// Required scope
+		"--geo-id", "--legal-owner",
+		// Permit filters
+		"--permit-tags", "--permit-status", "--permit-from", "--permit-tags-unfinaled",
+		// Property filters
+		"--property-type",
+		"--property-min-market-value", "--property-max-market-value",
+		"--property-min-lot-size", "--property-max-lot-size",
+		"--property-min-building-area", "--property-max-building-area",
+		"--property-min-unit-count", "--property-max-unit-count",
+		"--property-min-year-built", "--property-max-year-built",
+		// Response options
+		"--include-count",
+		// No --permit-to: the API rejects permit_to and points callers at
+		// permits search, so the extra-filter check below must keep it out.
+	}
+
+	s := LookupSchema("properties search")
+	if s == nil {
+		t.Fatal("properties search schema not found")
+	}
+
+	wanted := make(map[string]bool, len(want))
+	for _, filter := range want {
+		wanted[filter] = true
+		if _, ok := s.Filters[filter]; !ok {
+			t.Errorf("properties search schema missing filter %q", filter)
+		}
+		if propertiesSearchCmd.Flags().Lookup(strings.TrimPrefix(filter, "--")) == nil {
+			t.Errorf("properties search schema documents %q, which the command does not register", filter)
+		}
+	}
+	for filter := range s.Filters {
+		if !wanted[filter] {
+			t.Errorf("properties search schema has undocumented extra filter %q", filter)
+		}
 	}
 }

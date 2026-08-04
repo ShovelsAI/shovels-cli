@@ -90,6 +90,58 @@ permits get:
     tags:
       description: "Permit classification tags (e.g., solar, roofing, electrical)"
 
+properties search:
+  fields:
+    total_job_value:
+      description: "Sum of the job values on the property's permits, in cents (divide by 100 for dollars)"
+      unit: "cents"
+    assess_market_value:
+      description: "Assessed market value of the property, in cents (divide by 100 for dollars)"
+      unit: "cents"
+    lot_size:
+      description: "Lot size of the property, in square feet"
+      unit: "square feet"
+    building_area:
+      description: "Building area of the property, in square feet"
+      unit: "square feet"
+
+# properties get returns the same rows as properties search minus the trust
+# surface, which the search endpoint attaches only to absence-class responses.
+# The trust paths stay in the schema so an agent reading either command's
+# schema learns the shape, and each one says where it is actually populated.
+properties get:
+  fields:
+    total_job_value:
+      description: "Sum of the job values on the property's permits, in cents (divide by 100 for dollars)"
+      unit: "cents"
+    assess_market_value:
+      description: "Assessed market value of the property, in cents (divide by 100 for dollars)"
+      unit: "cents"
+    lot_size:
+      description: "Lot size of the property, in square feet"
+      unit: "square feet"
+    building_area:
+      description: "Building area of the property, in square feet"
+      unit: "square feet"
+    trust:
+      description: "Per-row absence-honesty surface, populated on search absence queries only — never returned by properties get."
+    trust.unresolved_rate:
+      description: "Share of the row jurisdiction's permits of the tag that never linked to an address. Populated on search absence queries only — never returned by properties get."
+    trust.coverage_tier:
+      description: "Coverage bucket for the row's jurisdiction (90/50 cutoffs). Populated on search absence queries only — never returned by properties get."
+    trust.data_horizon:
+      description: "Most recent start_date past which 'no X since D' is under-observed. Populated on search absence queries only — never returned by properties get."
+    trust.horizon_basis:
+      description: "How data_horizon was estimated: a measured cohort, a pooled fallback, or the state prior. Populated on search absence queries only — never returned by properties get."
+    trust.trust_jurisdiction_basis:
+      description: "Whether the trust join used the row's own jurisdiction, its ZIP's dominant one, or none. Populated on search absence queries only — never returned by properties get."
+    trust.trust_jurisdiction_error_bar:
+      description: "Measured error rate of the trust jurisdiction. Populated on search absence queries only — never returned by properties get."
+    trust.footprint_basis:
+      description: "Whether footprint suppression could resolve the row's geo scope. Populated on search absence queries only — never returned by properties get."
+    trust.flags:
+      description: "Row-grain honesty flags, e.g. since_d_beyond_horizon or trust_row_missing. Populated on search absence queries only — never returned by properties get."
+
 decisions search:
   fields:
     project_value:

@@ -96,6 +96,15 @@ type metaArrayDef struct {
 var allCommands = []commandDef{
 	{Command: "permits search", ResponseSchema: "PermitsRead", Endpoint: "/permits/search", FiltersFrom: "permits_search"},
 	{Command: "permits get", ResponseSchema: "PermitsRead", Endpoint: "/permits", FiltersFrom: "get"},
+	{
+		Command: "properties search", ResponseSchema: "PropertiesRead", Endpoint: "/properties/search", FiltersFrom: "properties_search",
+		ExpandPaths: []string{"trust"},
+		MetaArrays:  []metaArrayDef{{Name: "trust_summaries", Schema: "TrustSummary"}},
+	},
+	{
+		Command: "properties get", ResponseSchema: "PropertiesRead", Endpoint: "/properties", FiltersFrom: "get",
+		ExpandPaths: []string{"trust"},
+	},
 	{Command: "decisions search", ResponseSchema: "DecisionsRead", Endpoint: "/decisions/search", FiltersFrom: "decisions_search"},
 	{Command: "decisions get", ResponseSchema: "DecisionsRead", Endpoint: "/decisions", FiltersFrom: "get"},
 	{Command: "contractors search", ResponseSchema: "ContractorsRead", Endpoint: "/contractors/search", FiltersFrom: "contractors_search"},
@@ -633,6 +642,33 @@ func buildFilters(def commandDef) map[string]schemaField {
 
 		// Response options
 		filters["--include-count"] = schemaField{Type: "boolean", Description: "Request total result count in meta.total_count"}
+	case "properties_search":
+		// Required scope: at least one of geo-id / legal-owner.
+		filters["--geo-id"] = schemaField{Type: "string", Description: "Geographic scope: 5-digit zip code, zip+4, 2-letter state code, or a resolved Shovels city, county, or address geo_id. Jurisdiction geo_ids are rejected by this endpoint. Required unless --legal-owner is given"}
+		filters["--legal-owner"] = schemaField{Type: "string[]", Description: "Property legal owner, repeat the flag for up to 10 owners. Values are never split on commas, so \"SMITH, JOHN\" is one owner. Without --geo-id this searches the owner nationwide"}
+
+		// Permit filters
+		filters["--permit-tags"] = schemaField{Type: "string", Description: "Canonical permit tags as one comma-separated value (e.g. \"solar,-roofing\"). A bare tag keeps properties that have it, a - prefix keeps properties WITHOUT it"}
+		filters["--permit-status"] = schemaField{Type: "string", Description: "Permit status as one comma-separated value: final, in_review, inactive, active"}
+		filters["--permit-from"] = schemaField{Type: "date", Description: "Bind the tag, status, and absence filters to this date in YYYY-MM-DD format. This endpoint has no --permit-to: use permits search for a closed date window"}
+		filters["--permit-tags-unfinaled"] = schemaField{Type: "string", Description: "Keep properties with an unfinaled permit of each named tag, as one comma-separated value (e.g. \"solar,roofing\")"}
+
+		// Property filters. Attribute data covers roughly 60-70% of
+		// properties, so each of these narrows results to the covered set.
+		filters["--property-type"] = schemaField{Type: "string[]", Description: "Property type, repeat or comma-separate for multiple: residential, commercial, industrial, agricultural, vacant land, exempt, miscellaneous, office, recreational"}
+		filters["--property-min-market-value"] = schemaField{Type: "integer", Description: "Minimum assessed market value in integer cents (50000000 = $500,000)", Unit: "cents"}
+		filters["--property-max-market-value"] = schemaField{Type: "integer", Description: "Maximum assessed market value in integer cents (100000000 = $1,000,000)", Unit: "cents"}
+		filters["--property-min-lot-size"] = schemaField{Type: "integer", Description: "Minimum lot size in square feet", Unit: "square feet"}
+		filters["--property-max-lot-size"] = schemaField{Type: "integer", Description: "Maximum lot size in square feet", Unit: "square feet"}
+		filters["--property-min-building-area"] = schemaField{Type: "integer", Description: "Minimum building area in square feet", Unit: "square feet"}
+		filters["--property-max-building-area"] = schemaField{Type: "integer", Description: "Maximum building area in square feet", Unit: "square feet"}
+		filters["--property-min-unit-count"] = schemaField{Type: "integer", Description: "Minimum number of units"}
+		filters["--property-max-unit-count"] = schemaField{Type: "integer", Description: "Maximum number of units"}
+		filters["--property-min-year-built"] = schemaField{Type: "integer", Description: "Minimum year built (e.g. 1990)"}
+		filters["--property-max-year-built"] = schemaField{Type: "integer", Description: "Maximum year built (e.g. 1990)"}
+
+		// Response options
+		filters["--include-count"] = schemaField{Type: "boolean", Description: "Request total result count in meta.total_count, capped at 10,000. Omitted from meta when the count query times out"}
 	case "get":
 		filters["ID"] = schemaField{Type: "string", Description: "One or more IDs as positional arguments (max 50)"}
 	case "geo_search":

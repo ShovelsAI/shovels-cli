@@ -119,6 +119,10 @@ Examples:
 }
 
 func runPropertiesSearch(cmd *cobra.Command, args []string) error {
+	if handled, err := handleSchemaFlag(cmd, commandPathFromCobra(cmd)); handled {
+		return err
+	}
+
 	if err := validatePropertiesSearchFlags(cmd); err != nil {
 		return err
 	}
@@ -190,6 +194,10 @@ surface: rows returned here carry no trust object.`,
 }
 
 func runPropertiesGet(cmd *cobra.Command, args []string) error {
+	if handled, err := handleSchemaFlag(cmd, commandPathFromCobra(cmd)); handled {
+		return err
+	}
+
 	if len(args) == 0 {
 		output.PrintErrorTyped(os.Stderr, "at least one property ID required", 1, client.ErrorTypeValidation)
 		return &exitError{code: 1}
@@ -434,6 +442,8 @@ func buildPropertiesSearchQuery(cmd *cobra.Command) url.Values {
 
 func init() {
 	registerPropertiesSearchFlags(propertiesSearchCmd)
+	registerSchemaFlag(propertiesSearchCmd)
+	registerSchemaFlag(propertiesGetCmd)
 	setGroupedUsage(propertiesSearchCmd, propertiesSearchFlagGroups())
 
 	propertiesCmd.AddCommand(propertiesSearchCmd)
