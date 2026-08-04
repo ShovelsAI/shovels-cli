@@ -24,10 +24,14 @@ type SchemaField struct {
 }
 
 // CommandSchema holds the complete schema for a single CLI command's response.
+// MetaFields is optional: it documents the meta envelope entries a command
+// adds beyond the standard count/has_more/credits set, and a command that adds
+// none omits the key from its output entirely.
 type CommandSchema struct {
 	SchemaVersion  int                    `json:"schema_version"`
 	Command        string                 `json:"command"`
 	ResponseFields map[string]SchemaField `json:"response_fields"`
+	MetaFields     map[string]SchemaField `json:"meta_fields,omitempty"`
 	FieldIndex     []string               `json:"field_index"`
 	Filters        map[string]SchemaField `json:"filters"`
 }
@@ -137,6 +141,10 @@ The schema includes:
   schema_version   Schema format version (currently 1)
   command          The command path this schema describes
   response_fields  Map of field name to type, description, unit, range, and enum
+                   Nested objects appear as dotted paths, e.g. trust.coverage_tier
+  meta_fields      Map of extra meta envelope fields, same shape as response_fields
+                   Present only for commands whose meta carries more than
+                   count, has_more, and credits
   field_index      Ordered list of jq-compatible field paths (data[].field, meta.field)
   filters          Map of CLI flag to type and description
 
