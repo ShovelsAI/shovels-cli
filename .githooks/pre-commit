@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
-# Pre-commit hook: mirrors CI checks from .github/workflows/ci.yml
+# Pre-commit hook: the fast subset of CI (.github/workflows/ci.yml).
 # Install: git config core.hooksPath .githooks
+#
+# CI additionally runs the e2e suite (go test -tags=e2e ./e2e/...). That is left
+# out here deliberately — it takes ~47s, which is too slow for every commit — so
+# a green hook is not a promise that CI will be green.
 set -euo pipefail
 
 echo "==> Checking gofmt..."
@@ -13,6 +17,13 @@ fi
 
 echo "==> Running go vet..."
 go vet ./...
+
+# Build-tagged packages are invisible to `go vet ./...`, so a rename in a shared
+# helper would otherwise only surface in CI. Both are keyless and offline.
+echo "==> Vetting build-tagged packages..."
+go vet -tags=integration ./integration/...
+go vet -tags=eval ./evals/...
+go vet -tags=e2e ./e2e/...
 
 echo "==> Running unit tests..."
 go test ./...

@@ -21,7 +21,15 @@ jobs:
           go-version-file: go.mod
 
       - name: Run unit tests
-        run: go test ./...
+        run: go test -count=1 ./...
+
+      # The e2e suite is entirely httptest stubs — no API key, no network, fully
+      # deterministic — but it lives behind an `e2e` build tag, so plain
+      # `go test ./...` silently excludes it. It had never run in CI. It is the
+      # cheapest guard against another Cobra flag-registration regression of the
+      # kind that shipped as ENG-4040, so it runs on every PR and every release.
+      - name: Run e2e tests
+        run: go test -count=1 -tags=e2e ./e2e/...
 
   lint:
     name: Lint
@@ -44,6 +52,15 @@ jobs:
 
       - name: Vet
         run: go vet ./...
+
+      # Build-tagged packages are invisible to `go vet ./...` and to the test
+      # job, so a rename or signature change in a shared helper merges green and
+      # surfaces later as a build error inside a nightly failure report. Vetting
+      # them is free: no key, no network, no live calls.
+      - name: Vet build-tagged packages
+        run: |
+          go vet -tags=integration ./integration/...
+          go vet -tags=eval ./evals/...
 
   build:
     name: Build
