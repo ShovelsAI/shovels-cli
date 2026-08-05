@@ -4,6 +4,7 @@ package integration
 
 import (
 	"encoding/json"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -180,3 +181,94 @@ func TestSiblingSearchesAcceptRepeatedTagsLive(t *testing.T) {
 		})
 	}
 }
+
+// coverageItem mirrors one entry of a coverage response.
+type coverageItem struct {
+	Field string `json:"field"`
+	Tier  string `json:"tier"`
+}
+
+// TestCoverageLiveSmoke moved here from the e2e suite, where it sat behind a
+// skip-without-a-key guard inside a layer documented as stubbed.
+//
+// Coverage returns one entry per field that is NOT reliably populated, so an
+// empty data array is a legitimate answer meaning full coverage — the envelope
+// shape and the per-item vocabulary are what can actually regress. The tier
+// check is the live half: "missing" and "partial" are the only values the CLI
+// documents, and a third one appearing would silently change what an agent
+// reading this output concludes. Credit-exempt (measured).
+func TestCoverageLiveSmoke(t *testing.T) {
+	result := runCLI(t,
+		"zipcodes", "coverage", "92024",
+		"--coverage-from", "2024-01-01",
+		"--coverage-to", "2024-12-31",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	var env envelope
+	if err := json.Unmarshal([]byte(result.Stdout), &env); err != nil {
+		t.Fatalf("stdout is not a JSON envelope: %v\nstdout: %s", err, result.Stdout)
+	}
+	if env.Data == nil {
+		t.Fatal("envelope has no data array (an empty array is fine, a missing one is not)")
+	}
+	if env.Meta == nil {
+		t.Error("envelope has no meta object")
+	}
+
+	for i, raw := range env.Data {
+		var item coverageItem
+		if err := json.Unmarshal(raw, &item); err != nil {
+			t.Fatalf("item %d is not a coverage item: %v", i, err)
+		}
+		if item.Field == "" {
+			t.Errorf("item %d has an empty field name", i)
+		}
+		if item.Tier != "missing" && item.Tier != "partial" {
+			t.Errorf("item %d has tier %q; the CLI documents only \"missing\" and \"partial\", "+
+				"so a new value here changes what an agent concludes from this output", i, item.Tier)
+		}
+	}
+}
+
+// TestVersionReportsDataReleaseDate moved here from the e2e suite for the same
+// reason. `version` with a key calls /meta/release, so it is a live call in a
+// stubbed layer. Credit-exempt (measured).
+//
+// Asserting the key exists would be theatre: cmd/version.go always emits
+// data_release_date and turns every network, auth, status and decode failure
+// into null, so a presence check passes even when /meta/release is completely
+// broken. The value has to be a real date for this request to mean anything.
+func TestVersionReportsDataReleaseDate(t *testing.T) {
+	result := runCLI(t, "version")
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	var out struct {
+		Data map[string]any `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(result.Stdout), &out); err != nil {
+		t.Fatalf("stdout is not JSON: %v\nstdout: %s", err, result.Stdout)
+	}
+
+	raw, ok := out.Data["data_release_date"]
+	if !ok {
+		t.Fatalf("expected data.data_release_date when a key is present, got: %v", out.Data)
+	}
+	date, isString := raw.(string)
+	if !isString || date == "" {
+		t.Fatalf("data_release_date is %v; the CLI nulls this field on any /meta/release "+
+			"failure, so a null here means the live call failed", raw)
+	}
+	if !dataReleaseDatePattern.MatchString(date) {
+		t.Errorf("data_release_date %q is not YYYY-MM-DD", date)
+	}
+}
+
+// dataReleaseDatePattern pins the shape agents parse out of `version`.
+var dataReleaseDatePattern = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}`)

@@ -685,31 +685,3 @@ func TestCoverageSchemaFlagSkipsArgAndNetwork(t *testing.T) {
 		t.Errorf("--schema must allow missing GEO_ID, got arg error: %s", result.Stderr)
 	}
 }
-
-// --- Live smoke (only when SHOVELS_API_KEY is present) ---
-
-func TestCoverageLiveSmoke(t *testing.T) {
-	requireAPIKey(t)
-
-	result := runCLI(t,
-		"zipcodes", "coverage", "92024",
-		"--coverage-from", "2024-01-01",
-		"--coverage-to", "2024-12-31",
-	)
-	if result.ExitCode != 0 {
-		t.Fatalf("expected exit 0 against live API, got %d; stderr: %s", result.ExitCode, result.Stderr)
-	}
-	parsed := parseEnvelope(t, result.Stdout)
-	var data []coverageItem
-	if err := json.Unmarshal(parsed.Data, &data); err != nil {
-		t.Fatalf("expected data array from live API: %v\ndata: %s", err, parsed.Data)
-	}
-	for i, item := range data {
-		if item.Field == "" {
-			t.Errorf("live item %d has empty field", i)
-		}
-		if item.Tier != "missing" && item.Tier != "partial" {
-			t.Errorf("live item %d has unexpected tier %q", i, item.Tier)
-		}
-	}
-}

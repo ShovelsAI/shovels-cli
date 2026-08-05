@@ -58,34 +58,6 @@ func TestVersionExitCodeZero(t *testing.T) {
 	}
 }
 
-func TestVersionWithAPIKeyIncludesDataReleaseDate(t *testing.T) {
-	requireAPIKey(t)
-
-	result := runCLI(t, "version")
-
-	if result.ExitCode != 0 {
-		t.Fatalf("expected exit code 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
-	}
-
-	var envelope struct {
-		Data map[string]any `json:"data"`
-	}
-	if err := json.Unmarshal([]byte(result.Stdout), &envelope); err != nil {
-		t.Fatalf("stdout is not valid JSON: %v\nstdout: %s", err, result.Stdout)
-	}
-
-	releaseDate, ok := envelope.Data["data_release_date"]
-	if !ok {
-		t.Fatal("data_release_date field is missing from version output")
-	}
-
-	// With a valid API key, data_release_date should be a non-empty string.
-	dateStr, isString := releaseDate.(string)
-	if !isString || dateStr == "" {
-		t.Errorf("expected data_release_date to be a non-empty string, got %v", releaseDate)
-	}
-}
-
 func TestVersionWithoutAPIKeyHasNullDataReleaseDate(t *testing.T) {
 	env := withIsolatedConfigNoAuth(t)
 	result := runCLIWithEnv(t, env, "version")
