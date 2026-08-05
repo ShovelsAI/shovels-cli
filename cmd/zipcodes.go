@@ -25,6 +25,18 @@ commands like permits search and contractors search. No resolution step needed
 for zip codes you already know, but this command helps discover zip codes by
 partial prefix.
 
+There is no zip-scoped metrics command. Geo-scoped metrics exist only for a
+resolved address, city, county, or jurisdiction, so a 5-digit code is rejected
+there even though it works on permits search, contractors search, and zipcodes
+coverage. No substitute reports on a zip: a zip may span several
+municipalities, and a city covers areas outside the zip. If city-wide scope is
+acceptable for your question, resolve a relevant city and say so in the answer:
+  GEO=$(shovels cities search -q "Encinitas" | jq -r '.data[0].geo_id')
+  shovels cities metrics current "$GEO" --tag solar --property-type residential
+
+To aggregate over a zip exactly, use permits search, which does accept a zip,
+and compute the aggregate yourself.
+
 Every response is a JSON envelope: {"data": [...], "meta": {...}}`,
 }
 

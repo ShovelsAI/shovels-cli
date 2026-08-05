@@ -11,10 +11,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var citiesMetricsCfg = metricsConfig{
-	resource:            "cities",
-	requirePropertyType: true,
-}
+var citiesMetricsCfg = newMetricsConfig("cities", "city", true)
 
 var citiesCmd = &cobra.Command{
 	Use:   "cities",

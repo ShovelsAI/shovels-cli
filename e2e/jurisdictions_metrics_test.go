@@ -19,7 +19,7 @@ func TestJurisdictionsMetricsCurrentBasic(t *testing.T) {
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
 		"--base-url", srv.URL,
-		"jurisdictions", "metrics", "current", "JURIS_GEO_1",
+		"jurisdictions", "metrics", "current", "jGeo1OpaqueId",
 		"--tag", "solar",
 		"--property-type", "residential",
 	)
@@ -68,7 +68,7 @@ func TestJurisdictionsMetricsMonthlyBasic(t *testing.T) {
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
 		"--base-url", srv.URL,
-		"jurisdictions", "metrics", "monthly", "JURIS_GEO_1",
+		"jurisdictions", "metrics", "monthly", "jGeo1OpaqueId",
 		"--tag", "solar",
 		"--property-type", "residential",
 		"--metric-from", "2024-01-01",

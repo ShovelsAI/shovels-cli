@@ -20,7 +20,7 @@ func TestAddressesMetricsCurrentBasic(t *testing.T) {
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
 		"--base-url", srv.URL,
-		"addresses", "metrics", "current", "ADDR_GEO_1",
+		"addresses", "metrics", "current", "aGeo1OpaqueId",
 		"--tag", "solar",
 	)
 
@@ -84,7 +84,7 @@ func TestAddressesMetricsMonthlyBasic(t *testing.T) {
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
 		"--base-url", srv.URL,
-		"addresses", "metrics", "monthly", "ADDR_GEO_1",
+		"addresses", "metrics", "monthly", "aGeo1OpaqueId",
 		"--tag", "solar",
 		"--metric-from", "2024-01-01",
 		"--metric-to", "2024-12-31",
@@ -144,7 +144,7 @@ func TestAddressesMetricsMonthlyBasic(t *testing.T) {
 func TestAddressesMetricsCurrentRejectsPropertyType(t *testing.T) {
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"addresses", "metrics", "current", "ADDR_GEO_1",
+		"addresses", "metrics", "current", "aGeo1OpaqueId",
 		"--tag", "solar",
 		"--property-type", "residential",
 	)
@@ -162,7 +162,7 @@ func TestAddressesMetricsCurrentRejectsPropertyType(t *testing.T) {
 func TestAddressesMetricsMonthlyRejectsPropertyType(t *testing.T) {
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
-		"addresses", "metrics", "monthly", "ADDR_GEO_1",
+		"addresses", "metrics", "monthly", "aGeo1OpaqueId",
 		"--tag", "solar",
 		"--metric-from", "2024-01-01",
 		"--metric-to", "2024-12-31",

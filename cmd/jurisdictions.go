@@ -11,10 +11,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var jurisdictionsMetricsCfg = metricsConfig{
-	resource:            "jurisdictions",
-	requirePropertyType: true,
-}
+var jurisdictionsMetricsCfg = newMetricsConfig("jurisdictions", "jurisdiction", true)
 
 var jurisdictionsCmd = &cobra.Command{
 	Use:   "jurisdictions",
