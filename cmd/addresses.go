@@ -11,10 +11,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var addressesMetricsCfg = metricsConfig{
-	resource:            "addresses",
-	requirePropertyType: false,
-}
+var addressesMetricsCfg = newMetricsConfig("addresses", "address", false)
 
 var addressesCmd = &cobra.Command{
 	Use:   "addresses",

@@ -690,3 +690,108 @@ func TestCitiesMetricsCurrentAuthError(t *testing.T) {
 		t.Errorf("expected error_type %q, got %q", "auth_error", p.ErrorType)
 	}
 }
+
+// A ZIP, a ZIP+4 and a state code are all rejected by every metrics endpoint.
+// The CLI answers those locally so the user is not sent to the API's shared
+// geo_id validator message, which lists "5-digit ZIP" among the accepted
+// formats and therefore names the exact format it just refused. This asserts
+// both halves of that promise: the message names the scope and the remedy, and
+// no request reaches the API at all.
+func TestMetricsRejectsOutOfScopeGeoIDWithoutCallingAPI(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		args      []string
+		wantScope string
+		wantCmd   string
+	}{
+		{
+			name:      "cities current, bare ZIP",
+			args:      []string{"cities", "metrics", "current", "92024", "--tag", "solar", "--property-type", "residential"},
+			wantScope: "city",
+			wantCmd:   "shovels cities search",
+		},
+		{
+			name:      "counties monthly, state code",
+			args:      []string{"counties", "metrics", "monthly", "CA", "--tag", "solar", "--property-type", "residential", "--metric-from", "2024-01-01", "--metric-to", "2024-12-31"},
+			wantScope: "county",
+			wantCmd:   "shovels counties search",
+		},
+		{
+			name:      "jurisdictions current, ZIP+4",
+			args:      []string{"jurisdictions", "metrics", "current", "92024-1234", "--tag", "solar", "--property-type", "residential"},
+			wantScope: "jurisdiction",
+			wantCmd:   "shovels jurisdictions search",
+		},
+		{
+			name:      "cities current, lowercase state code",
+			args:      []string{"cities", "metrics", "current", "ca", "--tag", "solar", "--property-type", "residential"},
+			wantScope: "city",
+			wantCmd:   "shovels cities search",
+		},
+		{
+			name:      "addresses current, bare ZIP",
+			args:      []string{"addresses", "metrics", "current", "92024", "--tag", "solar"},
+			wantScope: "address",
+			wantCmd:   "shovels addresses search",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var apiCalls atomic.Int32
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				apiCalls.Add(1)
+				w.WriteHeader(200)
+			}))
+			defer srv.Close()
+
+			env := withIsolatedConfig(t)
+			result := runCLIWithEnv(t, env, append([]string{"--base-url", srv.URL}, tc.args...)...)
+
+			if result.ExitCode != 1 {
+				t.Fatalf("expected exit 1, got %d; stdout: %s stderr: %s",
+					result.ExitCode, result.Stdout, result.Stderr)
+			}
+			if n := apiCalls.Load(); n != 0 {
+				t.Errorf("expected 0 API calls for a locally-rejected geo_id, got %d", n)
+			}
+			if strings.TrimSpace(result.Stdout) != "" {
+				t.Errorf("expected empty stdout on a validation error, got %q", result.Stdout)
+			}
+			for _, want := range []string{tc.wantScope, tc.wantCmd} {
+				if !strings.Contains(result.Stderr, want) {
+					t.Errorf("expected stderr to mention %q, got: %s", want, result.Stderr)
+				}
+			}
+		})
+	}
+}
+
+// The guard must not reject a real geo_id. Opaque IDs use a base64url alphabet
+// that includes the underscore, so one can legitimately look like a fabricated
+// prefixed format — rejecting it locally would be unrecoverable and invisible
+// server-side. These reach the stub server, which is the whole point.
+func TestMetricsAcceptsOpaqueGeoIDsIncludingUnderscoreForms(t *testing.T) {
+	for _, geoID := range []string{
+		"RMjg6rIIh2k", // real city geo_id
+		"w8aD_ZCQmSE", // real, underscore in the middle
+		"oT_pAw3pfKY", // real, underscore at position 3
+		"ZIP_AAAAAAA", // prefix-shaped but a legal 11-char opaque ID
+	} {
+		t.Run(geoID, func(t *testing.T) {
+			handler, _ := makeMetricsHandler("/cities", 1, false, 1, 9999)
+			srv := httptest.NewServer(handler)
+			defer srv.Close()
+
+			env := withIsolatedConfig(t)
+			result := runCLIWithEnv(t, env,
+				"--base-url", srv.URL,
+				"cities", "metrics", "current", geoID,
+				"--tag", "solar", "--property-type", "residential",
+			)
+
+			if result.ExitCode != 0 {
+				t.Fatalf("geo_id %q must reach the API, got exit %d; stderr: %s",
+					geoID, result.ExitCode, result.Stderr)
+			}
+		})
+	}
+}
