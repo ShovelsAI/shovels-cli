@@ -82,13 +82,7 @@ SHOVELS_API_KEY=sk-... go test -count=1 -tags=integration ./integration/...
 - The unknown-tag case puts the sentinel **between two valid exclusions**. "Repeated keys return 200" proves nothing, because two valid values still return 200 when the CLI drops one. A middle sentinel means dropping in *either* direction leaves a request the API answers happily, so both first-value-wins and last-value-wins turn the test red. Exclusions specifically, because that is where a dropped value widens results.
 - Runs against both HEAD and the latest stable release (`.github/workflows/integration.yml`). Not per-PR: it needs a production key in a workflow running changeable code, fork PRs get no secrets and would pass vacuously, and live-API flakiness should not block unrelated merges.
 
-**The schedule is disabled until a dispatch run passes.** A nightly that fails for a configuration gap gets muted, and then the suite is decorative. Enabling it requires, in order:
-
-1. An `integration` environment with **deployment branch rules** limited to `main` and `v*`.
-2. `SHOVELS_INTEGRATION_API_KEY` as an **environment secret on that environment** — a repo-scoped secret is gated by the branch policy but not scoped by it. Use a dedicated low-quota key.
-3. A passing `workflow_dispatch` run from `main`, then uncomment the `schedule:` block.
-
-Step 1 precedes step 2 and is not implied by naming the environment in the workflow: GitHub auto-creates a referenced environment on first use **with no protection rules**. `workflow_dispatch` can target any ref and runs that ref's copy of the workflow, so without the branch rules any branch can dispatch this workflow and read the key.
+The key is an environment secret on `integration`, whose deployment branch rules limit it to `main` and `v*`. Those rules are what scope it: `workflow_dispatch` can target any ref and runs that ref's copy of the workflow, so a branch could otherwise dispatch this workflow and read the key. Naming an environment does not create them — GitHub auto-creates a referenced environment **with no protection rules**, so a repo restored from this file needs the rules configured before the secret is added.
 
 ### LLM Evals
 

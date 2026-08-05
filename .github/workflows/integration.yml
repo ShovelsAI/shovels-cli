@@ -14,25 +14,12 @@ name: Integration
 # canary is unauthenticated, free, and binary-independent, so it runs once in
 # its own job. Credits govern the bill; request count governs timeout exposure.
 
-# SETUP REQUIRED BEFORE ENABLING THE SCHEDULE — see CLAUDE.md, "Integration".
-# As of this commit the repo has no environments and no Actions secrets, so a
-# scheduled run would fail on every leg, every night, and open contract-drift
-# issues whose text blames a CLI/API disagreement. A nightly that pages nightly
-# for a configuration gap gets muted within a week, and then the suite is
-# decorative. The schedule stays commented out until:
-#
-#   1. an `integration` environment exists with deployment branch rules limited
-#      to `main` and `v*`, and
-#   2. SHOVELS_INTEGRATION_API_KEY is added as an ENVIRONMENT secret on it (a
-#      repo-scoped secret is gated by the branch policy but not scoped by it).
-#
-# Until then `workflow_dispatch` from main is the way to run this.
 on:
-  # schedule:
-  #   # 07:11 UTC. Deliberately off the hour: GitHub delays or drops scheduled
-  #   # runs most heavily at :00, and a dropped nightly is indistinguishable
-  #   # from a passing one.
-  #   - cron: "11 7 * * *"
+  schedule:
+    # 07:11 UTC. Deliberately off the hour: GitHub delays or drops scheduled
+    # runs most heavily at :00, and a dropped nightly is indistinguishable
+    # from a passing one.
+    - cron: "11 7 * * *"
   workflow_dispatch:
 
 permissions:
