@@ -1,0 +1,272 @@
+name: Integration
+
+# The live contract suite. Deliberately not run per-PR: it needs a production
+# API key, and a workflow holding that secret while executing changeable PR code
+# is a bad trade. Fork PRs receive no secrets at all, so a per-PR job would go
+# misleadingly green. Live-API flakiness would also block unrelated merges.
+#
+# Nightly instead, on the default branch, plus manual dispatch before a release.
+#
+# Cost per binary, measured: 6 authenticated requests (3 positive searches, the
+# sentinel, coverage, version) and 3 billable credits — a search costs 1, a 422
+# costs 0, and coverage and /meta/release are credit-exempt. The matrix runs two
+# binaries, so ~12 authenticated requests and ~6 credits a night. The OpenAPI
+# canary is unauthenticated, free, and binary-independent, so it runs once in
+# its own job. Credits govern the bill; request count governs timeout exposure.
+
+# SETUP REQUIRED BEFORE ENABLING THE SCHEDULE — see CLAUDE.md, "Integration".
+# As of this commit the repo has no environments and no Actions secrets, so a
+# scheduled run would fail on every leg, every night, and open contract-drift
+# issues whose text blames a CLI/API disagreement. A nightly that pages nightly
+# for a configuration gap gets muted within a week, and then the suite is
+# decorative. The schedule stays commented out until:
+#
+#   1. an `integration` environment exists with deployment branch rules limited
+#      to `main` and `v*`, and
+#   2. SHOVELS_INTEGRATION_API_KEY is added as an ENVIRONMENT secret on it (a
+#      repo-scoped secret is gated by the branch policy but not scoped by it).
+#
+# Until then `workflow_dispatch` from main is the way to run this.
+on:
+  # schedule:
+  #   # 07:11 UTC. Deliberately off the hour: GitHub delays or drops scheduled
+  #   # runs most heavily at :00, and a dropped nightly is indistinguishable
+  #   # from a passing one.
+  #   - cron: "11 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: integration
+  cancel-in-progress: false
+
+jobs:
+  contract:
+    name: Live contract (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # The key MUST live in an environment whose deployment branch rules restrict
+    # it to main and release tags. workflow_dispatch can target any ref, and the
+    # workflow file on that ref is the one that runs — so an `if:` guard inside
+    # this file would not be a boundary, since a branch can edit it. Only the
+    # environment rule is enforced outside the workflow.
+    #
+    # Naming an environment here does NOT create that protection: GitHub
+    # auto-creates a referenced environment on first use with no rules at all.
+    # If the secret is added to an unprotected auto-created environment, any
+    # branch can dispatch this workflow and read it — the exact threat this
+    # design is meant to close. Configure the branch rules first.
+    environment: integration
+    strategy:
+      # Both targets always run: a failure on one is informative about the
+      # other, so stopping early would hide which side is broken.
+      fail-fast: false
+      matrix:
+        # head          — catches a contract change before the next release.
+        # latest-stable — catches a contract change that has already broken the
+        #                 current release, i.e. the autoupdate target. This is
+        #                 the one that matters: the API deploy that tightened
+        #                 /properties/search broke v0.8.0 while main was
+        #                 healthy, so a HEAD-only suite would have stayed green.
+        #                 Users can be on older versions still; this lane does
+        #                 not speak for those.
+        target: [head, latest-stable]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: Download the latest stable release
+        if: matrix.target == 'latest-stable'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # gh release list orders by publish date, not version, so .[0] would
+          # pick a patch cut for an older line over a newer minor. Sort by
+          # version instead: this lane is meant to track the highest stable
+          # release, which is the autoupdate target.
+          tag=$(gh release list --repo "$REPO" --limit 50 \
+                  --exclude-drafts --exclude-pre-releases \
+                  --json tagName --jq '.[].tagName' | sort -V | tail -1)
+          if [ -z "$tag" ]; then
+            echo "no stable release found" >&2
+            exit 1
+          fi
+          echo "Testing released $tag"
+          mkdir -p released
+          gh release download "$tag" --repo "$REPO" \
+            --pattern '*linux_amd64.tar.gz' --pattern 'checksums.txt' --dir released
+          cd released
+          # Corruption check, not a supply-chain control: checksums.txt comes
+          # from the same release fetched with the same token, so anything able
+          # to tamper with the asset could tamper with the checksums too. It
+          # catches a truncated or partial download, which would otherwise show
+          # up as a baffling test failure rather than an obvious one.
+          # Anchored so a future .sbom or .sig sibling cannot add a line for a
+          # file that was never downloaded, which sha256sum would report as a
+          # checksum failure. No --status: under set -e the step would die with
+          # no output at all, which is the opposite of the point.
+          grep -E '  shovels_[^ ]*_linux_amd64\.tar\.gz$' checksums.txt > expected.sha256
+          sha256sum --check expected.sha256
+          tar xzf ./*linux_amd64.tar.gz
+          echo "SHOVELS_TEST_BINARY=$PWD/shovels" >> "$GITHUB_ENV"
+          echo "TESTED_VERSION=$tag" >> "$GITHUB_ENV"
+
+      - name: Record the HEAD target
+        if: matrix.target == 'head'
+        run: echo "TESTED_VERSION=${GITHUB_SHA}" >> "$GITHUB_ENV"
+
+      - name: Run the live contract suite
+        env:
+          # A dedicated low-quota key, not the production integration key: this
+          # suite needs a handful of credits, so a leak or a runaway loop should
+          # be cheap.
+          SHOVELS_API_KEY: ${{ secrets.SHOVELS_INTEGRATION_API_KEY }}
+        # -count=1 is load-bearing, not habit. Go caches successful test results,
+        # and neither the CLI source (built via os/exec in TestMain) nor the live
+        # API's state is a cache input — so without it a later nightly can report
+        # yesterday's success without building anything or contacting production.
+        # Verified: a second identical run returns "(cached)".
+        # -skip excludes the OpenAPI canary, which has its own job below. Without
+        # it the spec is fetched once per matrix leg as well, and a spec-only
+        # drift opens three issues for one cause — two of them titled "Live
+        # contract suite failing" and blaming a CLI/API disagreement.
+        run: go test -count=1 -tags=integration ./integration/... -skip 'TestOpenAPIDeclares' -v -timeout 10m
+
+      - name: Report a failure
+        # Scheduled runs have nobody watching them, so a red X in the Actions
+        # tab is not a notification. An issue is.
+        if: failure() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TARGET: ${{ matrix.target }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          # TESTED_VERSION is unset if an earlier step failed, and this step runs
+          # precisely when something failed — so it must not be the reason the
+          # notification never arrives.
+          version="${TESTED_VERSION:-unknown}"
+          title="Live contract suite failing ($TARGET)"
+
+          # Create the label idempotently: without it the first gh issue create
+          # fails and the notification is silently lost.
+          gh label create contract-drift --repo "$REPO" \
+            --color B60205 --description "CLI and live API disagree" 2>/dev/null || true
+
+          body=$(printf '%s\n' \
+            "The live contract suite failed against \`$TARGET\` (\`$version\`)." \
+            "" \
+            "Run: $RUN_URL" \
+            "" \
+            "Most often this means the CLI and the live API disagree — but the suite" \
+            "also fails on an expired or exhausted API key, a Shovels outage, DNS or" \
+            "network trouble, a failed release download, or malformed OpenAPI. Check" \
+            "the run before assuming a contract change." \
+            "" \
+            "If \`latest-stable\` is the failing target, the current release is already" \
+            "broken for users and likely needs a fix released, not just merged.")
+
+          existing=$(gh issue list --repo "$REPO" --state open \
+                       --label contract-drift --search "$title in:title" \
+                       --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$REPO" --body "$body"
+          else
+            gh issue create --repo "$REPO" --title "$title" \
+              --label contract-drift --body "$body"
+          fi
+
+      - name: Close the failure issue on recovery
+        # Without this the first failure opens an issue that nobody ever closes,
+        # so the suite going green leaves a permanently red-looking signal and
+        # the next real failure is just another comment on a stale thread.
+        if: success() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TARGET: ${{ matrix.target }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          title="Live contract suite failing ($TARGET)"
+          existing=$(gh issue list --repo "$REPO" --state open \
+                       --label contract-drift --search "$title in:title" \
+                       --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue close "$existing" --repo "$REPO" \
+              --comment "Recovered: the live contract suite passed against \`$TARGET\`. Run: $RUN_URL"
+          fi
+
+  openapi-canary:
+    name: OpenAPI canary
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Unauthenticated and binary-independent, so it is deliberately outside the
+    # matrix: in the matrix it would fetch the spec twice and open two identical
+    # issues for one drift. No environment needed — it uses no secret.
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: Check the declared parameter shapes
+        run: go test -count=1 -tags=integration ./integration/... -run TestOpenAPIDeclares -v -timeout 5m
+
+      - name: Report a failure
+        if: failure() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          title="OpenAPI parameter shapes changed"
+          gh label create contract-drift --repo "$REPO" \
+            --color B60205 --description "CLI and live API disagree" 2>/dev/null || true
+          body=$(printf '%s\n' \
+            "The live OpenAPI spec no longer declares a parameter the CLI encodes as" \
+            "repeated keys with the shape the CLI expects." \
+            "" \
+            "Run: $RUN_URL" \
+            "" \
+            "The spec can also lag an implementation change, so this may fire before or" \
+            "after the request-level tests do — or not at all if the spec was not updated.")
+          existing=$(gh issue list --repo "$REPO" --state open \
+                       --label contract-drift --search "$title in:title" \
+                       --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$REPO" --body "$body"
+          else
+            gh issue create --repo "$REPO" --title "$title" \
+              --label contract-drift --body "$body"
+          fi
+
+      - name: Close the failure issue on recovery
+        # Same reasoning as the contract job: without this a one-day spec blip
+        # leaves a permanently open contract-drift issue.
+        if: success() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          title="OpenAPI parameter shapes changed"
+          existing=$(gh issue list --repo "$REPO" --state open \
+                       --label contract-drift --search "$title in:title" \
+                       --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue close "$existing" --repo "$REPO" \
+              --comment "Recovered: the declared parameter shapes match again. Run: $RUN_URL"
+          fi
