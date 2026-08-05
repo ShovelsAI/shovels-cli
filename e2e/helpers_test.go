@@ -90,11 +90,3 @@ func runCLIWithEnv(t *testing.T, env []string, args ...string) CLIResult {
 		ExitCode: exitCode,
 	}
 }
-
-// requireAPIKey skips the test if SHOVELS_API_KEY is not set.
-func requireAPIKey(t *testing.T) {
-	t.Helper()
-	if os.Getenv("SHOVELS_API_KEY") == "" {
-		t.Skip("SHOVELS_API_KEY not set")
-	}
-}
