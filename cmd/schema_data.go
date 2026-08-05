@@ -643,7 +643,7 @@ func init() {
 				"--property-type":                      {Type: "string", Description: "Property type: residential, commercial, industrial, agricultural, vacant land, exempt, miscellaneous, office, recreational"},
 				"--query":                              {Type: "string", Description: "Substring search in permit description, max 50 chars"},
 				"--status":                             {Type: "string[]", Description: "Permit status: final, in_review, inactive, active"},
-				"--tags":                               {Type: "string[]", Description: "Permit tags, AND logic, prefix with - to exclude"},
+				"--tags":                               {Type: "string[]", Description: "Permit tags, AND logic, prefix with - to exclude. Repeat or comma-separate with no space after the comma. Resolve canonical tag IDs with tags list --limit all"},
 			},
 		},
 		"counties coverage": {
@@ -907,8 +907,8 @@ func init() {
 				"meta.credits_remaining",
 			},
 			Filters: map[string]SchemaField{
-				"--asset-class":       {Type: "string[]", Description: "Asset class, repeat or comma-separate for multiple (e.g. Residential, Commercial)"},
-				"--category":          {Type: "string[]", Description: "Decision category, repeat or comma-separate for multiple (e.g. Rezoning, Variance)"},
+				"--asset-class":       {Type: "string[]", Description: "Asset class, repeat or comma-separate with no space after the comma. Lowercase snake_case: commercial, detached_housing, land, mixed_use, multifamily, specialized_housing"},
+				"--category":          {Type: "string[]", Description: "Decision category, repeat or comma-separate with no space after the comma. Lowercase snake_case: affordable_housing, annexation, area_rezoning, city_properties, contract, economic_development_incentives, final_plat, infrastructure_development, land_use_planning, project_amendments, spot_rezoning, zoning_code_modification. An unrecognised value is not an error: it returns an empty result set"},
 				"--decision-from":     {Type: "date", Description: "Start date in YYYY-MM-DD format"},
 				"--decision-to":       {Type: "date", Description: "End date in YYYY-MM-DD format"},
 				"--geo-id":            {Type: "string", Description: "Geographic area: 2-letter state code or a resolved Shovels geo_id. ZIP codes are not supported for decisions"},
@@ -1234,7 +1234,7 @@ func init() {
 				"--property-type":                      {Type: "string", Description: "Property type: residential, commercial, industrial, agricultural, vacant land, exempt, miscellaneous, office, recreational"},
 				"--query":                              {Type: "string", Description: "Substring search in permit description, max 50 chars"},
 				"--status":                             {Type: "string[]", Description: "Permit status: final, in_review, inactive, active"},
-				"--tags":                               {Type: "string[]", Description: "Permit tags, AND logic, prefix with - to exclude"},
+				"--tags":                               {Type: "string[]", Description: "Permit tags, AND logic, prefix with - to exclude. Repeat or comma-separate with no space after the comma. Resolve canonical tag IDs with tags list --limit all"},
 			},
 		},
 		"properties get": {

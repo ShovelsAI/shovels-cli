@@ -22,6 +22,12 @@ const maxDecisionQueryRunes = 100
 // maxDecisionsGetIDs is the maximum number of decision IDs accepted per request.
 const maxDecisionsGetIDs = 50
 
+// decisionsSearchEndpoint is the API path for decisions search. It is a
+// constant because endpointArrayParams keys off the same string: a literal
+// that drifted from the map key would silently change --dry-run typing
+// without failing a test.
+const decisionsSearchEndpoint = "/decisions/search"
+
 // zipPlusFourPattern matches ZIP+4 codes (e.g. 92024-1234).
 var zipPlusFourPattern = regexp.MustCompile(`^\d{5}-\d{4}$`)
 
@@ -59,14 +65,14 @@ Geographic IDs:
 
 Examples:
   Rezoning decisions in California in 2024:
-    shovels decisions search --geo-id CA --decision-from 2024-01-01 --decision-to 2024-12-31 --category Rezoning
+    shovels decisions search --geo-id CA --decision-from 2024-01-01 --decision-to 2024-12-31 --category spot_rezoning
 
   Filter by asset class and project value (values in cents, 100000000 = $1,000,000):
-    shovels decisions search --geo-id CA --decision-from 2024-01-01 --decision-to 2024-12-31 --asset-class Residential --min-project-value 100000000
+    shovels decisions search --geo-id CA --decision-from 2024-01-01 --decision-to 2024-12-31 --asset-class multifamily --min-project-value 100000000
 
   Multiple categories (repeat the flag or comma-separate):
-    shovels decisions search --geo-id CA --decision-from 2024-01-01 --decision-to 2024-12-31 --category Rezoning --category Variance
-    shovels decisions search --geo-id CA --decision-from 2024-01-01 --decision-to 2024-12-31 --category Rezoning,Variance
+    shovels decisions search --geo-id CA --decision-from 2024-01-01 --decision-to 2024-12-31 --category spot_rezoning --category area_rezoning
+    shovels decisions search --geo-id CA --decision-from 2024-01-01 --decision-to 2024-12-31 --category spot_rezoning,area_rezoning
 
   Substring search in decision text:
     shovels decisions search --geo-id CA --decision-from 2024-01-01 --decision-to 2024-12-31 --query "downtown"`,
@@ -98,7 +104,7 @@ func runDecisionsSearch(cmd *cobra.Command, args []string) error {
 
 	if isDryRun(cmd) {
 		q.Set("size", fmt.Sprintf("%d", lc.FirstPageSize()))
-		return printDryRun(cmd, "/decisions/search", q)
+		return printDryRun(cmd, decisionsSearchEndpoint, q)
 	}
 
 	cl, err := newClientFromFlags(cmd)
@@ -106,7 +112,7 @@ func runDecisionsSearch(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	result, err := cl.Paginate(context.Background(), "/decisions/search", q, lc)
+	result, err := cl.Paginate(context.Background(), decisionsSearchEndpoint, q, lc)
 	if err != nil {
 		return handleAPIError(err)
 	}
@@ -207,8 +213,17 @@ func registerDecisionsSearchFlags(cmd *cobra.Command) {
 	f.String("decision-to", "", "Decision end date in YYYY-MM-DD format (required)")
 
 	// Decision filters
-	f.StringSlice("asset-class", nil, "Asset class, repeat or comma-separate for multiple (e.g. Residential, Commercial)")
-	f.StringSlice("category", nil, "Decision category, repeat or comma-separate for multiple (e.g. Rezoning, Variance)")
+	f.StringSlice("asset-class", nil,
+		"Asset class. Repeat the flag or comma-separate with no space after the comma.\n"+
+			"Values are lowercase snake_case: commercial, detached_housing, land, mixed_use,\n"+
+			"multifamily, specialized_housing")
+	f.StringSlice("category", nil,
+		"Decision category. Repeat the flag or comma-separate with no space after the comma.\n"+
+			"Values are lowercase snake_case: affordable_housing, annexation, area_rezoning,\n"+
+			"city_properties, contract, economic_development_incentives, final_plat,\n"+
+			"infrastructure_development, land_use_planning, project_amendments, spot_rezoning,\n"+
+			"zoning_code_modification.\n"+
+			"An unrecognised value is NOT an error: it returns an empty result set")
 	f.StringSlice("subcategory", nil, "Decision subcategory, repeat or comma-separate for multiple")
 	f.StringSlice("property-type", nil, "Property type, repeat or comma-separate for multiple")
 	f.Int("min-project-value", 0, "Minimum project value in cents (100000000 = $1,000,000)")

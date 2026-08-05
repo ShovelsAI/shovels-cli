@@ -31,7 +31,7 @@ func printDryRun(cmd *cobra.Command, endpoint string, query url.Values) error {
 	cfg := ResolvedConfig()
 	fullURL := cfg.BaseURL + endpoint
 
-	params := valuesToMap(query)
+	params := valuesToMap(endpoint, query)
 
 	out := dryRunRequest{
 		Method: "GET",
@@ -55,9 +55,13 @@ var numericParams = map[string]bool{
 	"size": true,
 }
 
-// arrayParams lists query parameter names that are always rendered as
-// JSON arrays, even when they contain a single value. These correspond
-// to API parameters that accept repeated values (e.g., permit_tags=solar&permit_tags=roofing).
+// arrayParams lists query parameter names that are array-shaped on every
+// endpoint that sends them, so they are always rendered as JSON arrays even
+// when they hold a single value. These correspond to API parameters that
+// accept repeated values (e.g., permit_tags=solar&permit_tags=roofing).
+//
+// A parameter whose shape varies by endpoint does NOT belong here — no single
+// entry can be correct for it. Use endpointArrayParams instead.
 var arrayParams = map[string]bool{
 	"permit_tags":                       true,
 	"permit_status":                     true,
@@ -70,12 +74,35 @@ var arrayParams = map[string]bool{
 	"subcategory":                       true,
 }
 
+// paramKey identifies a query parameter on one specific endpoint.
+type paramKey struct {
+	endpoint string
+	param    string
+}
+
+// endpointArrayParams lists parameters whose shape depends on the endpoint,
+// so a name alone cannot decide how to render them. property_type is a
+// repeated key on properties and decisions search, but a single scalar on
+// permits search, contractors search, and the metrics commands.
+//
+// Endpoints are matched literally against the path passed to printDryRun, so
+// only fixed paths can appear here — a path built with fmt.Sprintf (for
+// example /cities/{geo_id}/metrics/current) can never match a key. This map
+// also only expresses "scalar by default, array on these endpoints"; a
+// parameter that is array-shaped everywhere except one endpoint would need
+// the inverse and does not belong in either map as written.
+var endpointArrayParams = map[paramKey]bool{
+	{endpoint: propertiesSearchEndpoint, param: "property_type"}: true,
+	{endpoint: decisionsSearchEndpoint, param: "property_type"}:  true,
+}
+
 // valuesToMap converts url.Values into a map suitable for JSON output.
 // Single-value keys become strings; multi-value keys become string arrays.
 // Parameters listed in numericParams are converted to integers. Parameters
-// listed in arrayParams always produce arrays. Keys are sorted for
+// that are array-shaped — globally via arrayParams, or on this endpoint via
+// endpointArrayParams — always produce arrays. Keys are sorted for
 // deterministic output.
-func valuesToMap(query url.Values) map[string]any {
+func valuesToMap(endpoint string, query url.Values) map[string]any {
 	m := make(map[string]any, len(query))
 	keys := make([]string, 0, len(query))
 	for k := range query {
@@ -84,7 +111,7 @@ func valuesToMap(query url.Values) map[string]any {
 	sort.Strings(keys)
 	for _, k := range keys {
 		v := query[k]
-		if arrayParams[k] {
+		if arrayParams[k] || endpointArrayParams[paramKey{endpoint, k}] {
 			m[k] = v
 			continue
 		}

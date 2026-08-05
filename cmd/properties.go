@@ -17,6 +17,12 @@ import (
 // API accepts on one properties search.
 const maxPropertyLegalOwners = 10
 
+// propertiesSearchEndpoint is the API path for properties search. It is a
+// constant because endpointArrayParams keys off the same string: a literal
+// that drifted from the map key would silently change --dry-run typing
+// without failing a test.
+const propertiesSearchEndpoint = "/properties/search"
+
 // maxPropertiesGetIDs is the maximum number of address IDs accepted per
 // properties get request.
 const maxPropertiesGetIDs = 50
@@ -141,7 +147,7 @@ func runPropertiesSearch(cmd *cobra.Command, args []string) error {
 
 	if isDryRun(cmd) {
 		q.Set("size", fmt.Sprintf("%d", lc.FirstPageSize()))
-		return printDryRun(cmd, "/properties/search", q)
+		return printDryRun(cmd, propertiesSearchEndpoint, q)
 	}
 
 	cl, err := newClientFromFlags(cmd)
@@ -149,7 +155,7 @@ func runPropertiesSearch(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	result, err := cl.Paginate(context.Background(), "/properties/search", q, lc)
+	result, err := cl.Paginate(context.Background(), propertiesSearchEndpoint, q, lc)
 	if err != nil {
 		return handleAPIError(err)
 	}

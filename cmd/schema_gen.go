@@ -584,7 +584,7 @@ func addSearchFilters(filters map[string]schemaField) {
 	filters["--permit-to"] = schemaField{Type: "date", Description: "End date in YYYY-MM-DD format"}
 
 	// Permit filters
-	filters["--tags"] = schemaField{Type: "string[]", Description: "Permit tags, AND logic, prefix with - to exclude"}
+	filters["--tags"] = schemaField{Type: "string[]", Description: "Permit tags, AND logic, prefix with - to exclude. Repeat or comma-separate with no space after the comma. Resolve canonical tag IDs with tags list --limit all"}
 	filters["--query"] = schemaField{Type: "string", Description: "Substring search in permit description, max 50 chars"}
 	filters["--status"] = schemaField{Type: "string[]", Description: "Permit status: final, in_review, inactive, active"}
 	filters["--min-approval-duration"] = schemaField{Type: "integer", Description: "Minimum approval duration in days"}
@@ -632,8 +632,8 @@ func buildFilters(def commandDef) map[string]schemaField {
 		filters["--decision-to"] = schemaField{Type: "date", Description: "End date in YYYY-MM-DD format"}
 
 		// Decision filters
-		filters["--asset-class"] = schemaField{Type: "string[]", Description: "Asset class, repeat or comma-separate for multiple (e.g. Residential, Commercial)"}
-		filters["--category"] = schemaField{Type: "string[]", Description: "Decision category, repeat or comma-separate for multiple (e.g. Rezoning, Variance)"}
+		filters["--asset-class"] = schemaField{Type: "string[]", Description: "Asset class, repeat or comma-separate with no space after the comma. Lowercase snake_case: commercial, detached_housing, land, mixed_use, multifamily, specialized_housing"}
+		filters["--category"] = schemaField{Type: "string[]", Description: "Decision category, repeat or comma-separate with no space after the comma. Lowercase snake_case: affordable_housing, annexation, area_rezoning, city_properties, contract, economic_development_incentives, final_plat, infrastructure_development, land_use_planning, project_amendments, spot_rezoning, zoning_code_modification. An unrecognised value is not an error: it returns an empty result set"}
 		filters["--subcategory"] = schemaField{Type: "string[]", Description: "Decision subcategory, repeat or comma-separate for multiple"}
 		filters["--property-type"] = schemaField{Type: "string[]", Description: "Property type, repeat or comma-separate for multiple"}
 		filters["--min-project-value"] = schemaField{Type: "integer", Description: "Minimum project value in cents (100000000 = $1,000,000)", Unit: "cents"}

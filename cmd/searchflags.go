@@ -64,7 +64,10 @@ func registerSearchFlags(cmd *cobra.Command) {
 	f.String("permit-to", "", "Permit end date in YYYY-MM-DD format (required)")
 
 	// Permit filters
-	f.StringSlice("tags", nil, "Permit tags, AND logic, prefix with - to exclude (e.g. solar, -roofing)")
+	f.StringSlice("tags", nil,
+		"Permit tags, AND logic, prefix with - to exclude. Repeat the flag or comma-separate,\n"+
+			"with no space after the comma (e.g. solar,-roofing).\n"+
+			"Resolve canonical tag IDs with shovels tags list --limit all")
 	f.String("query", "", "Substring search in permit description, case-insensitive, max 50 chars")
 	f.StringSlice("status", nil, "Permit status: final, in_review, inactive, active")
 	f.Int("min-approval-duration", 0, "Minimum approval duration in days (integer)")
