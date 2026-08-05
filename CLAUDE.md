@@ -1,5 +1,7 @@
 # Shovels CLI — Engineering Standards
 
+@~/.claude/plugins/marketplaces/shovels-claude-plugins/engineering/CLAUDE.md
+
 > Agent-first CLI for the Shovels REST API. Go + cobra.
 
 ---
@@ -29,6 +31,8 @@ cmd/            cobra command tree (one file per resource)
   config.go
   version.go
 evals/          LLM usability evals (build tag: eval)
+e2e/            stubbed end-to-end tests (build tag: e2e)
+integration/    live contract tests (build tag: integration)
 internal/
   client/       HTTP client (generated types, hand-crafted calls)
   config/       config file + env var resolution
@@ -52,10 +56,39 @@ internal/
 
 | Layer | Command | Notes |
 |-------|---------|-------|
-| Unit | `go test ./...` | No network calls, mock HTTP client |
-| E2E | `go test -tags=e2e ./e2e/...` | Builds binary, invokes as subprocess, requires `SHOVELS_API_KEY` |
-| Integration | `go test -tags=integration ./...` | Hits live API, requires `SHOVELS_API_KEY` |
+| Unit | `go test ./...` | No network calls, no API key. Mock HTTP client; the schema generator guard reads the pinned `cmd/testdata/openapi.json` |
+| E2E | `go test -tags=e2e ./e2e/...` | Builds binary, invokes as subprocess. **No API key needed** — every case is served by an httptest stub. Runs in CI on every PR |
+| Integration | `go test -count=1 -tags=integration ./integration/...` | Hits the live API. Requires `SHOVELS_API_KEY` and **fails loudly** without one |
 | LLM Evals | `go test -tags=eval ./evals/... -v -timeout 30m` | Blind LLM usability tests, requires `SHOVELS_API_KEY` + `claude` CLI |
+
+The layers answer different questions, and the distinction matters:
+
+- **Unit and E2E verify what the CLI sends** — that the flags map to the query parameters we intend. They are deterministic, free, and run on every PR.
+- **Integration verifies what the API accepts.** No stub can answer that. Both ENG-4040 and the API deploy that broke v0.8.0 slipped through a fully green unit + e2e suite, because the CLI was faithfully sending exactly what the CLI believed it should.
+
+So an assertion belongs in `integration/` only if it depends on live API behaviour. Anything pinnable locally goes in `cmd/` or `e2e/`, which cost nothing.
+
+### Integration (live contract suite)
+
+```bash
+SHOVELS_API_KEY=sk-... go test -count=1 -tags=integration ./integration/...
+```
+
+- Deliberately thin: a contract smoke, not a second e2e suite.
+- **Cost, measured:** 8 authenticated requests (5 searches, the sentinel, coverage, version) and **5 billable credits** per binary. A search costs 1 credit, a 422 costs 0, and coverage and `/meta/release` are credit-exempt. The OpenAPI canary is unauthenticated, free, and runs once in its own job rather than per binary.
+- `SHOVELS_TEST_BINARY=/path/to/shovels` runs the same assertions against a downloaded release instead of a build of HEAD. That is the point: a suite that only tests HEAD stays green while the binary users are running is broken, which is exactly what happened with v0.8.0.
+- Subprocesses get `CI=1` and a scratch `HOME`. `CI=1` disables the self-updater — a build of HEAD is protected by `buildVersion == "dev"`, but a released binary is not, and would otherwise replace itself mid-run.
+- **`-count=1` is load-bearing.** Go caches successful test results, and neither the CLI source (built via `os/exec`) nor the live API's state is a cache input — without it a run can report an earlier success without contacting production at all.
+- The unknown-tag case puts the sentinel **between two valid exclusions**. "Repeated keys return 200" proves nothing, because two valid values still return 200 when the CLI drops one. A middle sentinel means dropping in *either* direction leaves a request the API answers happily, so both first-value-wins and last-value-wins turn the test red. Exclusions specifically, because that is where a dropped value widens results.
+- Runs against both HEAD and the latest stable release (`.github/workflows/integration.yml`). Not per-PR: it needs a production key in a workflow running changeable code, fork PRs get no secrets and would pass vacuously, and live-API flakiness should not block unrelated merges.
+
+**The schedule is disabled until a dispatch run passes.** A nightly that fails for a configuration gap gets muted, and then the suite is decorative. Enabling it requires, in order:
+
+1. An `integration` environment with **deployment branch rules** limited to `main` and `v*`.
+2. `SHOVELS_INTEGRATION_API_KEY` as an **environment secret on that environment** — a repo-scoped secret is gated by the branch policy but not scoped by it. Use a dedicated low-quota key.
+3. A passing `workflow_dispatch` run from `main`, then uncomment the `schedule:` block.
+
+Step 1 precedes step 2 and is not implied by naming the environment in the workflow: GitHub auto-creates a referenced environment on first use **with no protection rules**. `workflow_dispatch` can target any ref and runs that ref's copy of the workflow, so without the branch rules any branch can dispatch this workflow and read the key.
 
 ### LLM Evals
 
@@ -84,7 +117,7 @@ SHOVELS_API_KEY=sk-... go test -tags=eval ./evals/... -v -timeout 30m
 git config core.hooksPath .githooks
 ```
 
-This enables the pre-commit hook that runs gofmt, go vet, and unit tests — matching the CI checks in `.github/workflows/ci.yml`.
+This enables the pre-commit hook: gofmt, `go vet` including the build-tagged packages, and the unit suite. It omits the e2e suite that `.github/workflows/ci.yml` also runs, so a green hook is not a promise of green CI.
 
 ## Build & Release
 
