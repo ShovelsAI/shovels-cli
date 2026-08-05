@@ -603,3 +603,53 @@ func TestDryRunLargeLimitCapsAtPageMax(t *testing.T) {
 		t.Errorf("expected size=100 for --limit 200, got %v", size)
 	}
 }
+
+// property_type is a repeated key on properties and decisions search but a
+// single scalar on permits search and the metrics commands, so its dry-run
+// rendering is keyed on the endpoint. The unit test pins the mapping; this
+// pins the wiring, which is the half that fails silently — if a command's
+// endpoint literal ever drifts from the map key, the lookup misses and the
+// param quietly renders as a string with no other test failing.
+func TestDryRunPropertyTypeShapeIsEndpointScoped(t *testing.T) {
+	env := withIsolatedConfig(t)
+
+	for _, tc := range []struct {
+		name      string
+		args      []string
+		wantArray bool
+	}{
+		{
+			name:      "properties search",
+			args:      []string{"properties", "search", "--geo-id", "92024", "--property-type", "residential", "--dry-run"},
+			wantArray: true,
+		},
+		{
+			name: "decisions search",
+			args: []string{"decisions", "search", "--geo-id", "CA",
+				"--decision-from", "2024-01-01", "--decision-to", "2024-12-31",
+				"--property-type", "residential", "--dry-run"},
+			wantArray: true,
+		},
+		{
+			name: "permits search",
+			args: []string{"permits", "search", "--geo-id", "92024",
+				"--permit-from", "2024-01-01", "--permit-to", "2024-12-31",
+				"--property-type", "residential", "--dry-run"},
+			wantArray: false,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			result := runCLIWithEnv(t, env, tc.args...)
+			if result.ExitCode != 0 {
+				t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+			}
+
+			out := parseDryRun(t, result.Stdout)
+			_, gotArray := out.Params["property_type"].([]any)
+			if gotArray != tc.wantArray {
+				t.Errorf("property_type array=%v, want %v (rendered %T: %v)",
+					gotArray, tc.wantArray, out.Params["property_type"], out.Params["property_type"])
+			}
+		})
+	}
+}
