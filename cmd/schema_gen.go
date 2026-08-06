@@ -594,7 +594,7 @@ func addSearchFilters(filters map[string]schemaField) {
 	filters["--min-fees"] = schemaField{Type: "integer", Description: "Minimum permit fees in cents (100000 = $1,000)", Unit: "cents"}
 
 	// Property filters
-	filters["--property-type"] = schemaField{Type: "string", Description: "Property type: residential, commercial, industrial, agricultural, vacant land, exempt, miscellaneous, office, recreational"}
+	filters["--property-type"] = schemaField{Type: "string[]", Description: "Property type, repeat or comma-separate with no space after the comma for multiple: residential, commercial, industrial, agricultural, vacant land, exempt, miscellaneous, office, recreational"}
 	filters["--property-min-market-value"] = schemaField{Type: "integer", Description: "Minimum assessed market value in cents (50000000 = $500,000)", Unit: "cents"}
 	filters["--property-min-building-area"] = schemaField{Type: "integer", Description: "Minimum building area in square feet"}
 	filters["--property-min-lot-size"] = schemaField{Type: "integer", Description: "Minimum lot size in square feet"}

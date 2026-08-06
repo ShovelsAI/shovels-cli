@@ -604,12 +604,12 @@ func TestDryRunLargeLimitCapsAtPageMax(t *testing.T) {
 	}
 }
 
-// property_type is a repeated key on properties and decisions search but a
-// single scalar on permits search and the metrics commands, so its dry-run
-// rendering is keyed on the endpoint. The unit test pins the mapping; this
-// pins the wiring, which is the half that fails silently — if a command's
-// endpoint literal ever drifts from the map key, the lookup misses and the
-// param quietly renders as a string with no other test failing.
+// property_type is a repeated key on every search route but a single scalar on
+// the metrics commands, so its dry-run rendering is keyed on the endpoint. The
+// unit test pins the mapping; this pins the wiring, which is the half that
+// fails silently — if a command's endpoint literal ever drifts from the map
+// key, the lookup misses and the param quietly renders as a string with no
+// other test failing.
 func TestDryRunPropertyTypeShapeIsEndpointScoped(t *testing.T) {
 	env := withIsolatedConfig(t)
 
@@ -635,6 +635,26 @@ func TestDryRunPropertyTypeShapeIsEndpointScoped(t *testing.T) {
 			args: []string{"permits", "search", "--geo-id", "92024",
 				"--permit-from", "2024-01-01", "--permit-to", "2024-12-31",
 				"--property-type", "residential", "--dry-run"},
+			wantArray: true,
+		},
+		{
+			name: "contractors search",
+			args: []string{"contractors", "search", "--geo-id", "92024",
+				"--permit-from", "2024-01-01", "--permit-to", "2024-12-31",
+				"--property-type", "residential", "--dry-run"},
+			wantArray: true,
+		},
+		{
+			name: "cities metrics current",
+			args: []string{"cities", "metrics", "current", "RMjg6rIIh2k",
+				"--tag", "solar", "--property-type", "residential", "--dry-run"},
+			wantArray: false,
+		},
+		{
+			name: "contractors metrics",
+			args: []string{"contractors", "metrics", "abc123",
+				"--tag", "solar", "--property-type", "residential",
+				"--metric-from", "2024-01-01", "--metric-to", "2024-12-31", "--dry-run"},
 			wantArray: false,
 		},
 	} {
