@@ -408,6 +408,39 @@ func TestContractorsMetricsHelpShowsRequiredFlags(t *testing.T) {
 	assertAllPropertyTypes(t, out, "contractors metrics")
 }
 
+func TestContractorsMetricsHelpDescribesCreditExemptPagination(t *testing.T) {
+	result := runCLI(t, "contractors", "metrics", "--help")
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	out := result.Stdout
+	if !strings.Contains(out, "cursor-paginated") {
+		t.Error("contractors metrics --help should describe cursor pagination")
+	}
+	if !strings.Contains(out, `"count": N, "has_more": bool`) {
+		t.Error("contractors metrics --help should describe pagination metadata")
+	}
+	if !strings.Contains(out, "credit-exempt") {
+		t.Error("contractors metrics --help should describe the endpoint as credit-exempt")
+	}
+	if strings.Contains(out, "Metrics are not paginated") {
+		t.Error("contractors metrics --help should not describe the endpoint as unpaginated")
+	}
+}
+
+func TestContractorsMetricsHelpListsAllPropertyType(t *testing.T) {
+	result := runCLI(t, "contractors", "metrics", "--help")
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+	if !strings.Contains(result.Stdout, "recreational, all") {
+		t.Error("contractors metrics --help should list property type all")
+	}
+}
+
 // TestCitiesMetricsHelpListsAllPropertyTypes verifies that
 // cities metrics current and monthly help text lists all 9 property types.
 func TestCitiesMetricsHelpListsAllPropertyTypes(t *testing.T) {

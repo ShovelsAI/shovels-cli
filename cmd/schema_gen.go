@@ -68,6 +68,7 @@ type commandDef struct {
 	ResponseSchema string // OpenAPI $ref schema name for items
 	Endpoint       string // API endpoint path
 	FiltersFrom    string // source for filters: "search", "metrics_prop", "metrics_noprop", "get", "none"
+	CreditExempt   bool   // paginated endpoint omits credit metadata
 
 	// ExpandPaths names response fields whose object children are documented
 	// individually as dotted child paths. Expansion is opt-in per command:
@@ -111,7 +112,7 @@ var allCommands = []commandDef{
 	{Command: "contractors get", ResponseSchema: "ContractorsRead", Endpoint: "/contractors", FiltersFrom: "get"},
 	{Command: "contractors permits", ResponseSchema: "PermitsRead", Endpoint: "/contractors/{id}/permits", FiltersFrom: "none"},
 	{Command: "contractors employees", ResponseSchema: "Employees", Endpoint: "/contractors/{id}/employees", FiltersFrom: "none"},
-	{Command: "contractors metrics", ResponseSchema: "ContractorsMetricsMonthlyRead", Endpoint: "/contractors/{id}/metrics", FiltersFrom: "contractor_metrics"},
+	{Command: "contractors metrics", ResponseSchema: "ContractorsMetricsMonthlyRead", Endpoint: "/contractors/{id}/metrics", FiltersFrom: "contractor_metrics", CreditExempt: true},
 	{Command: "cities search", ResponseSchema: "GeoEntitiesRead", Endpoint: "/cities/search", FiltersFrom: "geo_search"},
 	{Command: "cities metrics current", ResponseSchema: "CitiesMetricsCurrentRead", Endpoint: "/cities/{geo_id}/metrics/current", FiltersFrom: "metrics_prop"},
 	{Command: "cities metrics monthly", ResponseSchema: "CitiesMetricsMonthlyRead", Endpoint: "/cities/{geo_id}/metrics/monthly", FiltersFrom: "metrics_prop_monthly"},
@@ -547,6 +548,7 @@ func mergeFields(base map[string]schemaField, overrides map[string]overrideField
 //     envelope), so no meta fields are added.
 //   - batch-get commands return a non-paginated batch envelope with count,
 //     credits, and a missing list of unresolved IDs, and never has_more.
+//   - credit-exempt paginated commands return count and has_more without credits.
 //   - all other commands are paginated, with count, has_more, and credits.
 //
 // Any meta fields the command adds beyond that standard set follow, sorted.
@@ -563,7 +565,10 @@ func buildFieldIndex(fields, metaFields map[string]schemaField, def commandDef) 
 	case "get":
 		index = append(index, "meta.count", "meta.missing", "meta.credits_used", "meta.credits_remaining")
 	default:
-		index = append(index, "meta.count", "meta.has_more", "meta.credits_used", "meta.credits_remaining")
+		index = append(index, "meta.count", "meta.has_more")
+		if !def.CreditExempt {
+			index = append(index, "meta.credits_used", "meta.credits_remaining")
+		}
 	}
 
 	var extra []string
@@ -698,7 +703,7 @@ func buildFilters(def commandDef) map[string]schemaField {
 	case "contractor_metrics":
 		filters["ID"] = schemaField{Type: "string", Description: "Contractor ID as positional argument"}
 		filters["--tag"] = schemaField{Type: "string", Description: "Permit tag: solar, roofing, electrical, etc."}
-		filters["--property-type"] = schemaField{Type: "string", Description: "Property type: residential, commercial, industrial, agricultural, vacant land, exempt, miscellaneous, office, recreational"}
+		filters["--property-type"] = schemaField{Type: "string", Description: "Property type: residential, commercial, industrial, agricultural, vacant land, exempt, miscellaneous, office, recreational, all"}
 		filters["--metric-from"] = schemaField{Type: "date", Description: "Start date in YYYY-MM-DD format"}
 		filters["--metric-to"] = schemaField{Type: "date", Description: "End date in YYYY-MM-DD format"}
 	case "coverage":

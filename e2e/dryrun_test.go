@@ -404,6 +404,7 @@ func TestDryRunContractorsGet(t *testing.T) {
 func TestDryRunContractorsMetrics(t *testing.T) {
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env,
+		"--limit", "3",
 		"contractors", "metrics", "C123",
 		"--metric-from", "2024-01-01",
 		"--metric-to", "2024-12-31",
@@ -422,6 +423,13 @@ func TestDryRunContractorsMetrics(t *testing.T) {
 	}
 	if out.Params["tag"] != "solar" {
 		t.Errorf("expected tag=solar, got %v", out.Params["tag"])
+	}
+	size, ok := out.Params["size"].(float64)
+	if !ok {
+		t.Fatalf("expected size to be a number, got %T: %v", out.Params["size"], out.Params["size"])
+	}
+	if int(size) != 3 {
+		t.Errorf("expected size=3 for --limit 3, got %v", size)
 	}
 }
 

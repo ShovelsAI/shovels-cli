@@ -346,7 +346,9 @@ var contractorsMetricsCmd = &cobra.Command{
 	Use:   "metrics ID",
 	Short: "Get monthly performance metrics for a specific contractor",
 	Long: `Retrieve monthly performance metrics for a specific contractor. Accepts exactly
-one contractor ID as a positional argument. All four flags are required.
+one contractor ID as a positional argument. All four flags are required. Results
+are cursor-paginated; use --limit to control how many records are returned, or
+--limit all to fetch up to the --max-records cap.
 
 Note: ID is a positional argument, not a flag.
   Correct:   shovels contractors metrics ABC123 --metric-from ...
@@ -355,7 +357,7 @@ Note: ID is a positional argument, not a flag.
 Required flags:
   --metric-from YYYY-MM-DD     Metrics start date, inclusive (required)
   --metric-to YYYY-MM-DD       Metrics end date, inclusive (required)
-  --property-type TYPE          Property type: residential, commercial, industrial, agricultural, vacant land, exempt, miscellaneous, office, recreational (required)
+  --property-type TYPE          Property type: residential, commercial, industrial, agricultural, vacant land, exempt, miscellaneous, office, recreational, all (required)
   --tag TAG                     Permit tag: solar, roofing, electrical, etc. (required)
 
 Example:
@@ -363,8 +365,8 @@ Example:
     --metric-from 2024-01-01 --metric-to 2024-12-31 \
     --property-type residential --tag solar
 
-Response: {"data": [...], "meta": {"credits_used": N, "credits_remaining": N}}
-Metrics are not paginated. The response contains monthly aggregate data.`,
+Response: {"data": [...], "meta": {"count": N, "has_more": bool}}
+This endpoint is credit-exempt, so meta does not include credit fields.`,
 	Args: exactArgsUnlessSchema(1),
 	Annotations: map[string]string{
 		AnnotationRequiresAuth: "true",
@@ -410,6 +412,11 @@ func runContractorsMetrics(cmd *cobra.Command, args []string) error {
 		return &exitError{code: 1}
 	}
 
+	lc, err := parseLimitConfig(cmd)
+	if err != nil {
+		return err
+	}
+
 	q := url.Values{
 		"metric_from":   {metricFrom},
 		"metric_to":     {metricTo},
@@ -424,6 +431,7 @@ func runContractorsMetrics(cmd *cobra.Command, args []string) error {
 	}
 
 	if isDryRun(cmd) {
+		q.Set("size", fmt.Sprintf("%d", lc.FirstPageSize()))
 		return printDryRun(cmd, endpoint, q)
 	}
 
@@ -432,7 +440,7 @@ func runContractorsMetrics(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	resp, err := cl.Get(context.Background(), endpoint, q)
+	result, err := cl.Paginate(context.Background(), endpoint, q, lc)
 	if err != nil {
 		apiErr, ok := err.(*client.APIError)
 		if ok {
@@ -443,15 +451,7 @@ func runContractorsMetrics(cmd *cobra.Command, args []string) error {
 		return &exitError{code: 1}
 	}
 
-	var page struct {
-		Items []json.RawMessage `json:"items"`
-	}
-	if err := json.Unmarshal(resp.Body, &page); err != nil {
-		output.PrintErrorTyped(os.Stderr, "failed to parse API response", 1, client.ErrorTypeClient)
-		return &exitError{code: 1}
-	}
-
-	output.PrintSingle(cmd.OutOrStdout(), page.Items, resp.Credits)
+	output.PrintPaginated(cmd.OutOrStdout(), result)
 	return nil
 }
 
@@ -482,7 +482,7 @@ func init() {
 	// Metrics flags
 	contractorsMetricsCmd.Flags().String("metric-from", "", "Metrics start date in YYYY-MM-DD format (required)")
 	contractorsMetricsCmd.Flags().String("metric-to", "", "Metrics end date in YYYY-MM-DD format (required)")
-	contractorsMetricsCmd.Flags().String("property-type", "", "Property type: residential, commercial, industrial, agricultural, vacant land, exempt, miscellaneous, office, recreational (required)")
+	contractorsMetricsCmd.Flags().String("property-type", "", "Property type: residential, commercial, industrial, agricultural, vacant land, exempt, miscellaneous, office, recreational, all (required)")
 	contractorsMetricsCmd.Flags().String("tag", "", "Permit tag: solar, roofing, electrical, plumbing, etc. (required)")
 
 	contractorsCmd.AddCommand(contractorsSearchCmd)

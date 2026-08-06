@@ -75,7 +75,7 @@ SHOVELS_API_KEY=sk-... go test -count=1 -tags=integration ./integration/...
 ```
 
 - Deliberately thin: a contract smoke, not a second e2e suite.
-- **Cost, measured:** 8 authenticated requests (5 searches, the sentinel, coverage, version) and **5 billable credits** per binary. A search costs 1 credit, a 422 costs 0, and coverage and `/meta/release` are credit-exempt. The OpenAPI canary is unauthenticated, free, and runs once in its own job rather than per binary.
+- **Cost, measured:** 9 authenticated requests (5 searches, the sentinel, contractor metrics, coverage, version) and **5 billable credits** per binary. A search costs 1 credit, a 422 costs 0, and contractor metrics, coverage, and `/meta/release` are credit-exempt. The OpenAPI canary is unauthenticated, free, and runs once in its own job rather than per binary.
 - `SHOVELS_TEST_BINARY=/path/to/shovels` runs the same assertions against a downloaded release instead of a build of HEAD. That is the point: a suite that only tests HEAD stays green while the binary users are running is broken, which is exactly what happened with v0.8.0.
 - Subprocesses get `CI=1` and a scratch `HOME`. `CI=1` disables the self-updater — a build of HEAD is protected by `buildVersion == "dev"`, but a released binary is not, and would otherwise replace itself mid-run.
 - **`-count=1` is load-bearing.** Go caches successful test results, and neither the CLI source (built via `os/exec`) nor the live API's state is a cache input — without it a run can report an earlier success without contacting production at all.
