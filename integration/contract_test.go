@@ -182,6 +182,53 @@ func TestSiblingSearchesAcceptRepeatedTagsLive(t *testing.T) {
 	}
 }
 
+// TestContractorMetricsCreditExemptAllPropertyTypeLive pins the two endpoint
+// behaviors the OpenAPI contract does not express: "all" is an accepted
+// property type, and a successful metrics response carries no credit headers.
+// The local e2e suite owns cursor and limit mechanics; this request only verifies
+// the live facts its stub cannot prove. The ID is the ENG-4070 reproduction
+// fixture; a 404 means the fixture churned and must be replaced with another
+// known contractor, not that the assertion should be weakened. Credit-exempt
+// (measured).
+func TestContractorMetricsCreditExemptAllPropertyTypeLive(t *testing.T) {
+	result := runCLI(t,
+		"contractors", "metrics", "zhcjmaxpIp",
+		"--metric-from", "2020-01-01",
+		"--metric-to", "2024-12-31",
+		"--property-type", "all",
+		"--tag", "electrical",
+		"--limit", "1",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("contractor metrics rejected property_type=all: exit %d\nstderr: %s",
+			result.ExitCode, result.Stderr)
+	}
+	if strings.TrimSpace(result.Stderr) != "" {
+		t.Errorf("expected empty stderr on success, got: %s", result.Stderr)
+	}
+
+	var env envelope
+	if err := json.Unmarshal([]byte(result.Stdout), &env); err != nil {
+		t.Fatalf("stdout is not a JSON envelope: %v\nstdout: %s", err, result.Stdout)
+	}
+	if env.Data == nil {
+		t.Error("envelope has no data array")
+	}
+	if _, ok := env.Meta["count"].(float64); !ok {
+		t.Errorf("meta.count is missing or not numeric: %v", env.Meta["count"])
+	}
+	if _, ok := env.Meta["has_more"].(bool); !ok {
+		t.Errorf("meta.has_more is missing or not boolean: %v", env.Meta["has_more"])
+	}
+	if _, exists := env.Meta["credits_used"]; exists {
+		t.Errorf("credit-exempt metrics response contains credits_used: %v", env.Meta["credits_used"])
+	}
+	if _, exists := env.Meta["credits_remaining"]; exists {
+		t.Errorf("credit-exempt metrics response contains credits_remaining: %v", env.Meta["credits_remaining"])
+	}
+}
+
 // coverageItem mirrors one entry of a coverage response.
 type coverageItem struct {
 	Field string `json:"field"`

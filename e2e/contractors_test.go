@@ -1324,30 +1324,73 @@ func TestContractorsEmployeesExtraArgsRejected(t *testing.T) {
 // contractors metrics
 // =======================================================================
 
-// makeContractorMetricsHandler returns an HTTP handler that validates required
-// query parameters and serves monthly metrics for a contractor.
-func makeContractorMetricsHandler(creditsUsed, creditsRemaining int) (http.Handler, *[]map[string][]string) {
+// makeContractorMetricsHandler returns a credit-exempt HTTP handler that validates
+// required query parameters and serves cursor-paginated contractor metrics.
+func makeContractorMetricsHandler(totalItems int) (http.Handler, *[]map[string][]string) {
+	var served atomic.Int32
 	capturedQueries := &[]map[string][]string{}
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		query := r.URL.Query()
 		params := map[string][]string{}
-		for k, v := range r.URL.Query() {
+		for k, v := range query {
 			params[k] = v
 		}
 		*capturedQueries = append(*capturedQueries, params)
 
-		w.Header().Set("X-Credits-Request", strconv.Itoa(creditsUsed))
-		w.Header().Set("X-Credits-Remaining", strconv.Itoa(creditsRemaining))
+		for _, required := range []string{"metric_from", "metric_to", "property_type", "tag"} {
+			if query.Get(required) == "" {
+				w.WriteHeader(http.StatusUnprocessableEntity)
+				fmt.Fprintf(w, `{"detail":%q}`, required+" is required")
+				return
+			}
+		}
 
-		items := []json.RawMessage{
-			json.RawMessage(`{"month":"2024-01","permit_count":10,"avg_job_value":50000}`),
-			json.RawMessage(`{"month":"2024-02","permit_count":8,"avg_job_value":45000}`),
-			json.RawMessage(`{"month":"2024-03","permit_count":12,"avg_job_value":55000}`),
+		size, err := strconv.Atoi(query.Get("size"))
+		if err != nil || size < 1 || size > 100 {
+			w.WriteHeader(http.StatusUnprocessableEntity)
+			w.Write([]byte(`{"detail":"size must be between 1 and 100"}`))
+			return
+		}
+
+		start := int(served.Load())
+		expectedCursor := ""
+		if start > 0 {
+			expectedCursor = fmt.Sprintf("cursor_%d", start)
+		}
+		if query.Get("cursor") != expectedCursor {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, `{"error":"expected cursor %q, got %q"}`, expectedCursor, query.Get("cursor"))
+			return
+		}
+
+		count := min(size, totalItems-start)
+		if count < 0 {
+			count = 0
+		}
+
+		items := make([]json.RawMessage, count)
+		for i := range count {
+			index := start + i
+			date := fmt.Sprintf("%04d-%02d-01", 2000+index/12, index%12+1)
+			items[i] = json.RawMessage(fmt.Sprintf(
+				`{"property_type":%q,"date":%q,"tag":%q,"permit_count":%d,"avg_job_value":50000}`,
+				query.Get("property_type"), date, query.Get("tag"), index+1,
+			))
+		}
+		served.Add(int32(count))
+
+		end := start + count
+		var nextCursor *string
+		if end < totalItems {
+			cursor := fmt.Sprintf("cursor_%d", end)
+			nextCursor = &cursor
 		}
 
 		resp := struct {
-			Items []json.RawMessage `json:"items"`
-		}{Items: items}
+			Items      []json.RawMessage `json:"items"`
+			NextCursor *string           `json:"next_cursor"`
+		}{Items: items, NextCursor: nextCursor}
 		json.NewEncoder(w).Encode(resp)
 	})
 
@@ -1357,7 +1400,7 @@ func makeContractorMetricsHandler(creditsUsed, creditsRemaining int) (http.Handl
 // --- contractors metrics: Happy paths ---
 
 func TestContractorsMetricsBasic(t *testing.T) {
-	handler, queries := makeContractorMetricsHandler(10, 9990)
+	handler, queries := makeContractorMetricsHandler(3)
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
@@ -1391,29 +1434,19 @@ func TestContractorsMetricsBasic(t *testing.T) {
 	if err := json.Unmarshal(data[0], &firstMetric); err != nil {
 		t.Fatalf("failed to parse first metric: %v", err)
 	}
-	if firstMetric["month"] != "2024-01" {
-		t.Errorf("expected month=2024-01, got %v", firstMetric["month"])
+	if firstMetric["date"] != "2000-01-01" {
+		t.Errorf("expected date=2000-01-01, got %v", firstMetric["date"])
 	}
-	if int(firstMetric["permit_count"].(float64)) != 10 {
-		t.Errorf("expected permit_count=10, got %v", firstMetric["permit_count"])
-	}
-
-	// Non-paginated: no count or has_more in meta.
-	if _, exists := parsed.Meta["count"]; exists {
-		t.Error("metrics response must not contain count in meta")
-	}
-	if _, exists := parsed.Meta["has_more"]; exists {
-		t.Error("metrics response must not contain has_more in meta")
+	if int(firstMetric["permit_count"].(float64)) != 1 {
+		t.Errorf("expected permit_count=1, got %v", firstMetric["permit_count"])
 	}
 
-	cu := int(parsed.Meta["credits_used"].(float64))
-	if cu != 10 {
-		t.Errorf("expected credits_used=10, got %d", cu)
+	count := int(parsed.Meta["count"].(float64))
+	if count != 3 {
+		t.Errorf("expected count=3, got %d", count)
 	}
-
-	cr := int(parsed.Meta["credits_remaining"].(float64))
-	if cr != 9990 {
-		t.Errorf("expected credits_remaining=9990, got %d", cr)
+	if parsed.Meta["has_more"].(bool) {
+		t.Error("expected has_more=false")
 	}
 
 	// Verify query params sent to API.
@@ -1432,6 +1465,158 @@ func TestContractorsMetricsBasic(t *testing.T) {
 	}
 	if q["tag"][0] != "solar" {
 		t.Errorf("expected tag=solar, got %q", q["tag"])
+	}
+	if q["size"][0] != "50" {
+		t.Errorf("expected size=50, got %q", q["size"])
+	}
+}
+
+func TestContractorsMetricsOmitsCreditMetadata(t *testing.T) {
+	handler, _ := makeContractorMetricsHandler(1)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--base-url", srv.URL,
+		"contractors", "metrics", "ABC123",
+		"--metric-from", "2024-01-01",
+		"--metric-to", "2024-12-31",
+		"--property-type", "residential",
+		"--tag", "solar",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	parsed := parseEnvelope(t, result.Stdout)
+	if _, exists := parsed.Meta["credits_used"]; exists {
+		t.Error("credit-exempt metrics response must not contain credits_used")
+	}
+	if _, exists := parsed.Meta["credits_remaining"]; exists {
+		t.Error("credit-exempt metrics response must not contain credits_remaining")
+	}
+}
+
+func TestContractorsMetricsLimit3(t *testing.T) {
+	handler, queries := makeContractorMetricsHandler(8)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--base-url", srv.URL,
+		"contractors", "metrics", "ABC123",
+		"--metric-from", "2024-01-01",
+		"--metric-to", "2024-12-31",
+		"--property-type", "residential",
+		"--tag", "solar",
+		"--limit", "3",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	parsed := parseEnvelope(t, result.Stdout)
+	var data []json.RawMessage
+	if err := json.Unmarshal(parsed.Data, &data); err != nil {
+		t.Fatalf("expected data array: %v", err)
+	}
+	if len(data) != 3 {
+		t.Errorf("expected 3 metrics, got %d", len(data))
+	}
+	if !parsed.Meta["has_more"].(bool) {
+		t.Error("expected has_more=true")
+	}
+	if len(*queries) != 1 {
+		t.Fatalf("expected 1 API request, got %d", len(*queries))
+	}
+	if (*queries)[0]["size"][0] != "3" {
+		t.Errorf("expected size=3, got %q", (*queries)[0]["size"])
+	}
+}
+
+func TestContractorsMetricsLimitAllFollowsCursor(t *testing.T) {
+	handler, queries := makeContractorMetricsHandler(105)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--base-url", srv.URL,
+		"contractors", "metrics", "ABC123",
+		"--metric-from", "2000-01-01",
+		"--metric-to", "2024-12-31",
+		"--property-type", "residential",
+		"--tag", "solar",
+		"--limit", "all",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	parsed := parseEnvelope(t, result.Stdout)
+	var data []json.RawMessage
+	if err := json.Unmarshal(parsed.Data, &data); err != nil {
+		t.Fatalf("expected data array: %v", err)
+	}
+	if len(data) != 105 {
+		t.Errorf("expected all 105 metrics, got %d", len(data))
+	}
+	if parsed.Meta["has_more"].(bool) {
+		t.Error("expected has_more=false")
+	}
+	if len(*queries) != 2 {
+		t.Fatalf("expected 2 API requests, got %d", len(*queries))
+	}
+	if (*queries)[0]["size"][0] != "100" || (*queries)[1]["size"][0] != "100" {
+		t.Errorf("expected page sizes [100 100], got [%s %s]", (*queries)[0]["size"][0], (*queries)[1]["size"][0])
+	}
+	if (*queries)[1]["cursor"][0] != "cursor_100" {
+		t.Errorf("expected second request cursor=cursor_100, got %q", (*queries)[1]["cursor"])
+	}
+}
+
+func TestContractorsMetricsMaxRecordsCapsLimitAll(t *testing.T) {
+	handler, queries := makeContractorMetricsHandler(120)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	env := withIsolatedConfig(t)
+	result := runCLIWithEnv(t, env,
+		"--base-url", srv.URL,
+		"contractors", "metrics", "ABC123",
+		"--metric-from", "2000-01-01",
+		"--metric-to", "2024-12-31",
+		"--property-type", "residential",
+		"--tag", "solar",
+		"--limit", "all",
+		"--max-records", "105",
+	)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+
+	parsed := parseEnvelope(t, result.Stdout)
+	var data []json.RawMessage
+	if err := json.Unmarshal(parsed.Data, &data); err != nil {
+		t.Fatalf("expected data array: %v", err)
+	}
+	if len(data) != 105 {
+		t.Errorf("expected max-records cap of 105, got %d", len(data))
+	}
+	if !parsed.Meta["has_more"].(bool) {
+		t.Error("expected has_more=true when max-records stops pagination")
+	}
+	if len(*queries) != 2 {
+		t.Fatalf("expected 2 API requests, got %d", len(*queries))
+	}
+	if (*queries)[0]["size"][0] != "100" || (*queries)[1]["size"][0] != "5" {
+		t.Errorf("expected page sizes [100 5], got [%s %s]", (*queries)[0]["size"][0], (*queries)[1]["size"][0])
 	}
 }
 
@@ -1522,7 +1707,7 @@ func TestContractorsMetricsNoID(t *testing.T) {
 // --- contractors metrics: Boundary conditions ---
 
 func TestContractorsMetricsExactlyOneIDAccepted(t *testing.T) {
-	handler, _ := makeContractorMetricsHandler(5, 9995)
+	handler, _ := makeContractorMetricsHandler(3)
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 

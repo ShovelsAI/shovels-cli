@@ -106,14 +106,14 @@ func TestSchemaHasFieldIndex(t *testing.T) {
 }
 
 // TestSchemaFieldIndexContainsMetaFields verifies every paginated schema's
-// field index includes the standard pagination/credit meta fields. Coverage
-// commands carry an empty meta envelope, and batch-get commands carry a batch
-// envelope; both are exempt here and asserted separately.
+// field index includes the standard pagination/credit meta fields. Coverage,
+// batch-get, and credit-exempt commands have distinct envelopes asserted
+// separately.
 func TestSchemaFieldIndexContainsMetaFields(t *testing.T) {
 	metaFields := []string{"meta.count", "meta.has_more", "meta.credits_used", "meta.credits_remaining"}
 
 	for _, cmd := range SchemaCommands() {
-		if strings.HasSuffix(cmd, " coverage") || strings.HasSuffix(cmd, " get") {
+		if strings.HasSuffix(cmd, " coverage") || strings.HasSuffix(cmd, " get") || cmd == "contractors metrics" {
 			continue
 		}
 		s := LookupSchema(cmd)
@@ -126,6 +126,45 @@ func TestSchemaFieldIndexContainsMetaFields(t *testing.T) {
 				t.Errorf("schema for %q missing meta field %q in field_index", cmd, mf)
 			}
 		}
+	}
+}
+
+func TestContractorMetricsSchemaHasCreditExemptPaginationMeta(t *testing.T) {
+	s := LookupSchema("contractors metrics")
+	if s == nil {
+		t.Fatal("schema for contractors metrics not found")
+	}
+
+	indexSet := make(map[string]bool, len(s.FieldIndex))
+	for _, field := range s.FieldIndex {
+		indexSet[field] = true
+	}
+	if !indexSet["meta.count"] {
+		t.Error("contractors metrics schema missing meta.count")
+	}
+	if !indexSet["meta.has_more"] {
+		t.Error("contractors metrics schema missing meta.has_more")
+	}
+	if indexSet["meta.credits_used"] {
+		t.Error("credit-exempt contractors metrics schema advertises meta.credits_used")
+	}
+	if indexSet["meta.credits_remaining"] {
+		t.Error("credit-exempt contractors metrics schema advertises meta.credits_remaining")
+	}
+}
+
+func TestContractorMetricsSchemaDocumentsAllPropertyType(t *testing.T) {
+	s := LookupSchema("contractors metrics")
+	if s == nil {
+		t.Fatal("schema for contractors metrics not found")
+	}
+
+	propertyType, ok := s.Filters["--property-type"]
+	if !ok {
+		t.Fatal("contractors metrics schema missing --property-type")
+	}
+	if !strings.Contains(propertyType.Description, "recreational, all") {
+		t.Errorf("contractors metrics property types should include all, got %q", propertyType.Description)
 	}
 }
 

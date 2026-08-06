@@ -15,11 +15,11 @@
 // because it depends on what the live API does. Anything that can be pinned
 // locally belongs in cmd/ or e2e/, which cost nothing to run.
 //
-// Cost, measured: a search costs 1 credit, a 422 costs 0, and the coverage and
-// version endpoints are credit-exempt. One pass is 8 authenticated requests
-// (5 searches, the sentinel, coverage, version) and 5 billable credits. Running
-// against two binaries doubles both, but not the OpenAPI fetch, which is
-// unauthenticated and runs once in its own job.
+// Cost, measured: a search costs 1 credit, a 422 costs 0, and contractor metrics,
+// coverage, and version are credit-exempt. One pass is 9 authenticated requests
+// (5 searches, the sentinel, contractor metrics, coverage, version) and 5 billable
+// credits. Running against two binaries doubles both, but not the OpenAPI fetch,
+// which is unauthenticated and runs once in its own job.
 package integration
 
 import (
