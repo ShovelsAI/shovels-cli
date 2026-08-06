@@ -16,6 +16,12 @@ import (
 // maxContractorGetIDs is the maximum number of contractor IDs accepted per request.
 const maxContractorGetIDs = 50
 
+// contractorsSearchEndpoint is the API path for contractors search. It is a
+// constant because endpointArrayParams keys off the same string: a literal that
+// drifted from the map key would silently change --dry-run typing without
+// failing a test.
+const contractorsSearchEndpoint = "/contractors/search"
+
 var contractorsCmd = &cobra.Command{
 	Use:   "contractors",
 	Short: "Search contractors and retrieve their permits, employees, and metrics",
@@ -80,7 +86,7 @@ Tip: run with --schema to see all response field names, types, and units before 
 }
 
 func runContractorsSearch(cmd *cobra.Command, args []string) error {
-	return runPaginatedSearch(cmd, "/contractors/search", func(q url.Values) {
+	return runPaginatedSearch(cmd, contractorsSearchEndpoint, func(q url.Values) {
 		noTallies, _ := cmd.Flags().GetBool("no-tallies")
 		if noTallies {
 			q.Set("include_tallies", "false")
