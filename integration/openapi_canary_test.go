@@ -33,11 +33,6 @@ const openAPISpecURL = "https://api.shovels.ai/v2/openapi.json"
 func TestOpenAPIDeclaresRepeatedKeyFiltersAsArrays(t *testing.T) {
 	spec := fetchSpec(t)
 
-	// NOTE on property_type for /permits/search and /contractors/search: the API
-	// declares and honours an array here, but the CLI still registers
-	// --property-type as f.String on those two commands, so repeating it drops
-	// all but the last value (ENG-4061). These entries assert the API side only.
-	// Passing here does NOT mean that parameter is healthy end to end.
 	arrayParams := map[string][]string{
 		"/properties/search":  {"permit_tags", "permit_status", "permit_tags_unfinaled", "property_type"},
 		"/permits/search":     {"permit_tags", "permit_status", "property_type"},

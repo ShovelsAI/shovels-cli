@@ -106,10 +106,10 @@ func TestValuesToMapDeterministicKeyOrder(t *testing.T) {
 	}
 }
 
-// property_type is a repeated key on properties and decisions search but a
-// single scalar on permits search, so its dry-run rendering cannot be decided
-// from the parameter name alone. A global entry would be wrong for one side or
-// the other; these three cases pin both shapes.
+// property_type is a repeated key on every search route but a single scalar on
+// the metrics routes, which take one value, so its dry-run rendering cannot be
+// decided from the parameter name alone. A global entry would render the
+// metrics request as a one-element array; these cases pin both shapes.
 func TestValuesToMapPropertyTypeShapeIsEndpointScoped(t *testing.T) {
 	q := url.Values{"property_type": {"residential"}}
 
@@ -119,7 +119,9 @@ func TestValuesToMapPropertyTypeShapeIsEndpointScoped(t *testing.T) {
 	}{
 		{"/properties/search", true},
 		{"/decisions/search", true},
-		{"/permits/search", false},
+		{"/permits/search", true},
+		{"/contractors/search", true},
+		{"/cities/RMjg6rIIh2k/metrics/current", false},
 	} {
 		m := valuesToMap(tc.endpoint, q)
 		_, gotArray := m["property_type"].([]string)

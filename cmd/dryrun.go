@@ -82,8 +82,9 @@ type paramKey struct {
 
 // endpointArrayParams lists parameters whose shape depends on the endpoint,
 // so a name alone cannot decide how to render them. property_type is a
-// repeated key on properties and decisions search, but a single scalar on
-// permits search, contractors search, and the metrics commands.
+// repeated key on the four search routes but a single scalar on the metrics
+// commands, which take one value — hence per-endpoint rather than a global
+// entry, which would render those as a one-element array.
 //
 // Endpoints are matched literally against the path passed to printDryRun, so
 // only fixed paths can appear here — a path built with fmt.Sprintf (for
@@ -92,8 +93,10 @@ type paramKey struct {
 // parameter that is array-shaped everywhere except one endpoint would need
 // the inverse and does not belong in either map as written.
 var endpointArrayParams = map[paramKey]bool{
-	{endpoint: propertiesSearchEndpoint, param: "property_type"}: true,
-	{endpoint: decisionsSearchEndpoint, param: "property_type"}:  true,
+	{endpoint: propertiesSearchEndpoint, param: "property_type"}:  true,
+	{endpoint: decisionsSearchEndpoint, param: "property_type"}:   true,
+	{endpoint: permitsSearchEndpoint, param: "property_type"}:     true,
+	{endpoint: contractorsSearchEndpoint, param: "property_type"}: true,
 }
 
 // valuesToMap converts url.Values into a map suitable for JSON output.

@@ -77,7 +77,11 @@ func registerSearchFlags(cmd *cobra.Command) {
 	f.Int("min-fees", 0, "Minimum permit fees in cents (100000 = $1,000)")
 
 	// Property filters
-	f.String("property-type", "", "Property type: residential, commercial, industrial, agricultural, vacant land, exempt, miscellaneous, office, recreational")
+	f.StringSlice("property-type", nil,
+		"Property type. Repeat the flag or comma-separate with no space after the comma\n"+
+			"to match any of several types.\n"+
+			"Valid values: residential, commercial, industrial, agricultural, vacant land,\n"+
+			"exempt, miscellaneous, office, recreational")
 	f.Int("property-min-market-value", 0, "Minimum assessed market value in cents (50000000 = $500,000)")
 	f.Int("property-min-building-area", 0, "Minimum building area in square feet (integer)")
 	f.Int("property-min-lot-size", 0, "Minimum lot size in square feet (integer)")
@@ -202,11 +206,22 @@ func validateSearchFlags(cmd *cobra.Command) error {
 		}
 	}
 
-	propertyType, _ := cmd.Flags().GetString("property-type")
-	if propertyType != "" && !isValidPropertyType(propertyType) {
-		msg := fmt.Sprintf("invalid --property-type %q: valid options are %s", propertyType, strings.Join(validPropertyTypes, ", "))
-		output.PrintErrorTyped(os.Stderr, msg, 1, client.ErrorTypeValidation)
-		return &exitError{code: 1}
+	// Each element is checked separately: validating the joined value would
+	// reject a combination the endpoint accepts.
+	propertyTypes, _ := cmd.Flags().GetStringSlice("property-type")
+	for _, pt := range propertyTypes {
+		if pt == "" {
+			// A stray comma yields an empty element, and reporting it as an
+			// invalid value of "" names the symptom rather than the typo.
+			msg := "empty --property-type value: remove the stray comma"
+			output.PrintErrorTyped(os.Stderr, msg, 1, client.ErrorTypeValidation)
+			return &exitError{code: 1}
+		}
+		if !isValidPropertyType(pt) {
+			msg := fmt.Sprintf("invalid --property-type %q: valid options are %s", pt, strings.Join(validPropertyTypes, ", "))
+			output.PrintErrorTyped(os.Stderr, msg, 1, client.ErrorTypeValidation)
+			return &exitError{code: 1}
+		}
 	}
 
 	classifications, _ := cmd.Flags().GetStringSlice("contractor-classification")
@@ -256,7 +271,7 @@ func buildSearchQuery(cmd *cobra.Command) url.Values {
 	setIntFlag(cmd, "min-fees", "permit_min_fees", q)
 
 	// Property filters
-	setStringFlag(cmd, "property-type", "property_type", q)
+	addStringSliceParam(cmd, "property-type", "property_type", q)
 	setIntFlag(cmd, "property-min-market-value", "property_min_market_value", q)
 	setIntFlag(cmd, "property-min-building-area", "property_min_building_area", q)
 	setIntFlag(cmd, "property-min-lot-size", "property_min_lot_size", q)
