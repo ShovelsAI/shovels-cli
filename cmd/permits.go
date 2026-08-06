@@ -14,6 +14,12 @@ import (
 // maxPermitGetIDs is the maximum number of permit IDs accepted per request.
 const maxPermitGetIDs = 50
 
+// permitsSearchEndpoint is the API path for permits search. It is a constant
+// because endpointArrayParams keys off the same string: a literal that drifted
+// from the map key would silently change --dry-run typing without failing a
+// test.
+const permitsSearchEndpoint = "/permits/search"
+
 var permitsCmd = &cobra.Command{
 	Use:   "permits",
 	Short: "Search and retrieve building permits by location, date, type, and contractor",
@@ -75,7 +81,7 @@ Tip: run with --schema to see all response field names, types, and units before 
 }
 
 func runPermitsSearch(cmd *cobra.Command, args []string) error {
-	return runPaginatedSearch(cmd, "/permits/search", func(q url.Values) {
+	return runPaginatedSearch(cmd, permitsSearchEndpoint, func(q url.Values) {
 		setBoolFlag(cmd, "has-contractor", "permit_has_contractor", q)
 	})
 }
