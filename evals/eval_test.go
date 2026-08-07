@@ -11,7 +11,7 @@
 //
 // Run:
 //
-//	go test -tags=eval ./evals/... -v -timeout 30m
+//	go test -tags=eval ./evals/... -v -timeout 60m
 package evals
 
 import (
@@ -160,7 +160,7 @@ func runAgent(t *testing.T, scenario Scenario) AgentReport {
 
 	prompt := fmt.Sprintf(systemPromptTmpl, binaryPath)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "claude",

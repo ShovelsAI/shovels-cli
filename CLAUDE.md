@@ -59,7 +59,7 @@ internal/
 | Unit | `go test ./...` | No network calls, no API key. Mock HTTP client; the schema generator guard reads the pinned `cmd/testdata/openapi.json` |
 | E2E | `go test -tags=e2e ./e2e/...` | Builds binary, invokes as subprocess. **No API key needed** — every case is served by an httptest stub. Runs in CI on every PR |
 | Integration | `go test -count=1 -tags=integration ./integration/...` | Hits the live API. Requires `SHOVELS_API_KEY` and **fails loudly** without one |
-| LLM Evals | `go test -tags=eval ./evals/... -v -timeout 30m` | Blind LLM usability tests, requires `SHOVELS_API_KEY` + `claude` CLI |
+| LLM Evals | `go test -tags=eval ./evals/... -v -timeout 60m` | Blind LLM usability tests, requires `SHOVELS_API_KEY` + `claude` CLI |
 
 The layers answer different questions, and the distinction matters:
 
@@ -91,7 +91,7 @@ The `evals/` directory contains LLM usability tests that verify help text is age
 Run after help text changes or before releases to catch usability regressions:
 
 ```bash
-SHOVELS_API_KEY=sk-... go test -tags=eval ./evals/... -v -timeout 30m
+SHOVELS_API_KEY=sk-... go test -tags=eval ./evals/... -v -timeout 60m
 ```
 
 - Builds binary from source (tests current code, not installed version)

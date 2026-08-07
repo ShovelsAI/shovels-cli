@@ -105,6 +105,24 @@ func TestScenarioNamesAreUnique(t *testing.T) {
 	}
 }
 
+func TestMonthlyBreakdownValidatorAcceptsOneRealBucket(t *testing.T) {
+	sc := scenarioByName(t, "JqMonthlyBreakdown")
+	sc.ValidateOutput(t, AgentReport{
+		FinalCommand: `shovels permits search ... | jq '[...]'`,
+		FinalOutput:  `[{"month":"2024-03","count":30}]`,
+	})
+}
+
+func TestMonthlyBreakdownValidatorRejectsMalformedBuckets(t *testing.T) {
+	problems := checkMonthlyBreakdown(`[{"month":"March","count":-1},"not an object"]`)
+	joined := strings.Join(problems, "\n")
+	for _, want := range []string{"invalid month", "invalid count", "not a JSON object"} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("problems do not mention %q:\n%s", want, joined)
+		}
+	}
+}
+
 // The eval notes in CLAUDE.md quote a scenario count that readers use to
 // judge runtime and cost, so it tracks the table rather than drifting from it.
 func TestCLAUDEMDScenarioCountMatchesTheTable(t *testing.T) {
