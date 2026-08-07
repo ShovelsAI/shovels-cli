@@ -95,14 +95,14 @@ SHOVELS_API_KEY=sk-... go test -tags=eval ./evals/... -v -timeout 60m
 ```
 
 - Builds binary from source (tests current code, not installed version)
-- 12 scenarios: permit and contractor search, geo_id resolution, metrics, schema and dry-run discovery, jq pipelines, zoning decisions, properties absence search
+- 13 scenarios: permit and contractor search, geo_id resolution, metrics, contractor metrics pagination dry-run, schema and dry-run discovery, jq pipelines, zoning decisions, properties absence search
 - Hard assertions: valid JSON output, correct domain (permits vs contractors), data present
 - Usability rating 1-5 per scenario: advisory by default, a hard failure where `EnforceUsability` is set
-- Requires `claude` CLI in PATH; skips gracefully if missing
-- ~1.5 minutes per scenario, so ~20 minutes for a full run
+- Requires a `claude` CLI with `--json-schema` support in PATH; skips gracefully if missing
+- ~1.5 minutes per scenario, so ~22 minutes for a full run
 - The harness pins `--model sonnet`, so a change to the `claude` CLI default moves neither the cost nor the agent's capability. Sonnet is deliberate: a stronger model can reason past help-text wording a normal agent would trip on, which is the regression these evals exist to catch.
-- Model spend is ~$0.60 per scenario, so ~$7.50 for a full run. This is Anthropic API cost and is unrelated to Shovels API credits.
-- Each scenario is capped at `--max-budget-usd 3.00`. That is a runaway guard rather than a cost control — the worst observed legitimate run is ~$0.65, so a scenario approaching the cap is looping. A scenario that exceeds it fails with `claude CLI failed: exit status 1` and an empty stderr, which is worth recognizing since nothing reports which limit was hit.
+- Model spend is ~$0.60 per scenario, so ~$8.00 for a full run. This is Anthropic API cost and is unrelated to Shovels API credits. The contractor metrics scenario is dry-run-only and adds no Shovels API credits.
+- Each scenario is capped at `--max-budget-usd 3.00`. That is a runaway guard rather than a cost control — the worst observed legitimate run is ~$0.65, so a scenario approaching the cap is looping. Failed Claude JSON envelopes are logged from stdout as well as stderr so budget and structured-output failures remain diagnosable.
 - `evals/scenarios_table_test.go` guards the scenario table and its validators with no API key, no `claude` CLI, and no network, so it still runs when `TestEval` skips
 
 ## Setup
