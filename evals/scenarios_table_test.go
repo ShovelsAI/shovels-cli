@@ -123,6 +123,47 @@ func TestMonthlyBreakdownValidatorRejectsMalformedBuckets(t *testing.T) {
 	}
 }
 
+func TestContractorMetricsDryRunValidatorAcceptsResolvedRequest(t *testing.T) {
+	sc := scenarioByName(t, "ContractorMetricsDryRun")
+	sc.ValidateOutput(t, AgentReport{
+		Steps: []AgentStep{
+			{Command: "shovels --help", Purpose: "discover commands"},
+			{Command: "shovels contractors metrics --help", Purpose: "discover metrics flags"},
+			{Command: "shovels contractors metrics zhcjmaxpIp --schema", Purpose: "inspect response fields offline"},
+		},
+		FinalCommand: "shovels contractors metrics zhcjmaxpIp --metric-from 2020-01-01 --metric-to 2024-12-31 --property-type all --tag electrical --limit all --dry-run",
+		FinalOutput:  `{"method":"GET","url":"https://api.shovels.ai/v2/contractors/zhcjmaxpIp/metrics","params":{"metric_from":"2020-01-01","metric_to":"2024-12-31","property_type":"all","tag":"electrical","size":100}}`,
+	})
+}
+
+func TestContractorMetricsDryRunValidatorRejectsWrongOrLiveRequest(t *testing.T) {
+	problems := checkContractorMetricsDryRun(AgentReport{
+		Steps: []AgentStep{
+			{Command: "shovels contractors metrics zhcjmaxpIp --property-type residential", Purpose: "try the endpoint"},
+		},
+		FinalCommand: "shovels contractors metrics zhcjmaxpIp --limit 100",
+		FinalOutput:  `{"method":"POST","url":"https://api.shovels.ai/v2/contractors/wrong/metrics","params":{"property_type":"residential","tag":"solar","size":"100"}}`,
+	})
+	joined := strings.Join(problems, "\n")
+	for _, want := range []string{
+		"want GET", "want contractor metrics endpoint", "metric_from", "metric_to",
+		"property_type", "tag", "numeric 100", "--dry-run", "--limit all", "live contractor metrics request",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("problems do not mention %q:\n%s", want, joined)
+		}
+	}
+}
+
+func TestContractorMetricsDryRunTaskNamesNoCLIJargon(t *testing.T) {
+	task := strings.ToLower(scenarioByName(t, "ContractorMetricsDryRun").Task)
+	for _, jargon := range []string{"shovels", "--", "dry-run", "property-type", "limit all", "subcommand", "flag"} {
+		if strings.Contains(task, jargon) {
+			t.Errorf("task names CLI jargon %q: %s", jargon, task)
+		}
+	}
+}
+
 // The eval notes in CLAUDE.md quote a scenario count that readers use to
 // judge runtime and cost, so it tracks the table rather than drifting from it.
 func TestCLAUDEMDScenarioCountMatchesTheTable(t *testing.T) {

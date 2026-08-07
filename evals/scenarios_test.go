@@ -96,6 +96,17 @@ var scenarios = []Scenario{
 		},
 	},
 	{
+		Name:             "ContractorMetricsDryRun",
+		Task:             `Show me the API request that would retrieve every monthly metric tagged electrical for contractor zhcjmaxpIp from January 1, 2020 through December 31, 2024 across all property types, without sending it.`,
+		EnforceUsability: true,
+		ValidateOutput: func(t *testing.T, report AgentReport) {
+			t.Helper()
+			for _, problem := range checkContractorMetricsDryRun(report) {
+				t.Error(problem)
+			}
+		},
+	},
+	{
 		// ZIP 32801 is deliberate: the live coverage endpoint reports job_value
 		// as reliable, and the 2024 solar result set is exactly three records.
 		// That keeps the aggregation meaningful and its credit cost bounded.
@@ -156,6 +167,63 @@ var scenarios = []Scenario{
 			}
 		},
 	},
+}
+
+func checkContractorMetricsDryRun(report AgentReport) []string {
+	obj, ok := parseJSONObject(report.FinalOutput)
+	if !ok {
+		return []string{"final_output contains no JSON object"}
+	}
+
+	var problems []string
+	if method, _ := obj["method"].(string); method != "GET" {
+		problems = append(problems, fmt.Sprintf("dry-run method = %v, want GET", obj["method"]))
+	}
+	urlValue, _ := obj["url"].(string)
+	if !strings.HasSuffix(urlValue, "/contractors/zhcjmaxpIp/metrics") {
+		problems = append(problems, fmt.Sprintf("dry-run URL = %q, want contractor metrics endpoint", urlValue))
+	}
+
+	params, ok := obj["params"].(map[string]any)
+	if !ok {
+		problems = append(problems, "dry-run output has no params object")
+	} else {
+		wantStrings := map[string]string{
+			"metric_from":   "2020-01-01",
+			"metric_to":     "2024-12-31",
+			"property_type": "all",
+			"tag":           "electrical",
+		}
+		for key, want := range wantStrings {
+			if got, _ := params[key].(string); got != want {
+				problems = append(problems, fmt.Sprintf("params.%s = %v, want %q", key, params[key], want))
+			}
+		}
+		if size, ok := params["size"].(float64); !ok || size != 100 {
+			problems = append(problems, fmt.Sprintf("params.size = %v, want numeric 100", params["size"]))
+		}
+	}
+
+	if !strings.Contains(report.FinalCommand, "contractors metrics") {
+		problems = append(problems, "final_command does not use contractors metrics")
+	}
+	if !strings.Contains(report.FinalCommand, "--dry-run") {
+		problems = append(problems, "final_command does not use --dry-run")
+	}
+	if !strings.Contains(report.FinalCommand, "--limit all") && !strings.Contains(report.FinalCommand, "--limit=all") {
+		problems = append(problems, "final_command does not use --limit all")
+	}
+
+	for _, step := range report.Steps {
+		command := step.Command
+		if strings.Contains(command, "contractors metrics") &&
+			!strings.Contains(command, "--help") &&
+			!strings.Contains(command, "--schema") &&
+			!strings.Contains(command, "--dry-run") {
+			problems = append(problems, fmt.Sprintf("agent sent a live contractor metrics request: %s", command))
+		}
+	}
+	return problems
 }
 
 // noSolarDisambiguation is the manual command that separates a wrong agent
