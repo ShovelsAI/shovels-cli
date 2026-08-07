@@ -6,7 +6,7 @@
 // right commands, flags, and workflows to produce a valid result.
 //
 // Prerequisites:
-//   - claude CLI in PATH
+//   - claude CLI with --json-schema support in PATH
 //   - SHOVELS_API_KEY environment variable
 //
 // Run:
@@ -61,24 +61,76 @@ func moduleRoot() string {
 	return filepath.Dir(dir)
 }
 
+type AgentStep struct {
+	Command string `json:"command"`
+	Purpose string `json:"purpose"`
+}
+
+type AgentIssue struct {
+	Description string `json:"description"`
+	Severity    string `json:"severity"`
+}
+
 // AgentReport is the structured response from the LLM agent.
 type AgentReport struct {
-	Steps []struct {
-		Command string `json:"command"`
-		Purpose string `json:"purpose"`
-	} `json:"steps"`
-	FinalCommand    string   `json:"final_command"`
-	FinalOutput     string   `json:"final_output"`
-	Success         bool     `json:"success"`
-	UsabilityRating int      `json:"usability_rating"`
-	UsabilityNotes  string   `json:"usability_notes"`
-	Issues          []string `json:"issues"`
+	Steps           []AgentStep  `json:"steps"`
+	FinalCommand    string       `json:"final_command"`
+	FinalOutput     string       `json:"final_output"`
+	Success         bool         `json:"success"`
+	UsabilityRating int          `json:"usability_rating"`
+	UsabilityNotes  string       `json:"usability_notes"`
+	Issues          []AgentIssue `json:"issues"`
 }
+
+const agentReportSchema = `{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "command": {"type": "string"},
+          "purpose": {"type": "string"}
+        },
+        "required": ["command", "purpose"]
+      }
+    },
+    "final_command": {"type": "string"},
+    "final_output": {"type": "string"},
+    "success": {"type": "boolean"},
+    "usability_rating": {"type": "integer", "minimum": 1, "maximum": 5},
+    "usability_notes": {"type": "string"},
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "description": {"type": "string"},
+          "severity": {"type": "string", "enum": ["low", "medium", "high"]}
+        },
+        "required": ["description", "severity"]
+      }
+    }
+  },
+  "required": ["steps", "final_command", "final_output", "success", "usability_rating", "usability_notes", "issues"]
+}`
 
 func requireClaude(t *testing.T) {
 	t.Helper()
-	if _, err := exec.LookPath("claude"); err != nil {
+	path, err := exec.LookPath("claude")
+	if err != nil {
 		t.Skip("claude CLI not found in PATH")
+	}
+	help, err := exec.Command(path, "--help").Output()
+	if err != nil {
+		t.Fatalf("cannot inspect claude CLI capabilities: %v", err)
+	}
+	if !bytes.Contains(help, []byte("--json-schema")) {
+		t.Fatal("claude CLI does not support --json-schema; upgrade Claude Code before running evals")
 	}
 }
 
@@ -99,12 +151,9 @@ Rules:
 3. Do NOT guess ID formats. If you need an ID for a city, county, or jurisdiction, use the appropriate search command to resolve it first.
 4. The CLI requires SHOVELS_API_KEY to be set (it is already configured).
 5. All CLI output is JSON. Parse it to verify your results.
-6. After completing the task, output EXACTLY one JSON object with this schema (no other text after it):
+6. After completing the task, submit the structured report requested by the caller. Each issue must include a description and a low, medium, or high severity.
 
-{"steps": [{"command": "...", "purpose": "..."}], "final_command": "the command that produced the answer", "final_output": "the complete raw stdout from that command", "success": true, "usability_rating": 5, "usability_notes": "what was clear or unclear", "issues": []}
-
-The usability_rating is 1-5 where 5 means the help text made the task trivial.
-Output the JSON report as the very last thing you write.`
+The usability_rating is 1-5 where 5 means the help text made the task trivial.`
 
 func runAgent(t *testing.T, scenario Scenario) AgentReport {
 	t.Helper()
@@ -116,7 +165,8 @@ func runAgent(t *testing.T, scenario Scenario) AgentReport {
 
 	cmd := exec.CommandContext(ctx, "claude",
 		"--print",
-		"--output-format", "text",
+		"--output-format", "json",
+		"--json-schema", agentReportSchema,
 		"--allowedTools", "Bash",
 		"--system-prompt", prompt,
 		// Pin the model: an unpinned run follows the claude CLI default, so a
@@ -154,12 +204,15 @@ func runAgent(t *testing.T, scenario Scenario) AgentReport {
 	t.Logf("scenario %s completed in %s", scenario.Name, elapsed)
 
 	if err != nil {
-		t.Logf("claude stderr: %s", stderr.String())
+		t.Logf("claude stderr: %.1000s", stderr.String())
+		t.Logf("claude stdout: %.1000s", stdout.String())
 		t.Fatalf("claude CLI failed: %v", err)
 	}
 
-	raw := stdout.String()
-	report := extractJSON(t, raw)
+	report, err := parseAgentReport(stdout.Bytes())
+	if err != nil {
+		t.Fatalf("invalid Claude structured output: %v\nstdout: %.1000s", err, stdout.String())
+	}
 
 	t.Logf("steps taken: %d", len(report.Steps))
 	for i, s := range report.Steps {
@@ -168,72 +221,32 @@ func runAgent(t *testing.T, scenario Scenario) AgentReport {
 	t.Logf("final command: %s", report.FinalCommand)
 	t.Logf("usability: %d/5 — %s", report.UsabilityRating, report.UsabilityNotes)
 	if len(report.Issues) > 0 {
-		t.Logf("issues: %s", strings.Join(report.Issues, "; "))
+		issues := make([]string, 0, len(report.Issues))
+		for _, issue := range report.Issues {
+			issues = append(issues, fmt.Sprintf("%s (%s)", issue.Description, issue.Severity))
+		}
+		t.Logf("issues: %s", strings.Join(issues, "; "))
 	}
 
 	return report
 }
 
-// extractJSON finds the last complete JSON object in the agent's output.
-func extractJSON(t *testing.T, raw string) AgentReport {
-	t.Helper()
-
-	// Walk backwards to find the last '{' that starts a balanced object.
-	for i := len(raw) - 1; i >= 0; i-- {
-		if raw[i] != '{' {
-			continue
-		}
-		candidate := raw[i:]
-		// Find the matching close brace.
-		depth := 0
-		end := -1
-		inString := false
-		escape := false
-		for j, ch := range candidate {
-			if escape {
-				escape = false
-				continue
-			}
-			if ch == '\\' && inString {
-				escape = true
-				continue
-			}
-			if ch == '"' {
-				inString = !inString
-				continue
-			}
-			if inString {
-				continue
-			}
-			switch ch {
-			case '{':
-				depth++
-			case '}':
-				depth--
-				if depth == 0 {
-					end = j + 1
-				}
-			}
-			if end != -1 {
-				break
-			}
-		}
-		if end == -1 {
-			continue
-		}
-
-		var report AgentReport
-		if err := json.Unmarshal([]byte(candidate[:end]), &report); err != nil {
-			continue // not our target object, keep looking
-		}
-		// Verify it looks like a report (has usability_rating).
-		if report.UsabilityRating > 0 {
-			return report
-		}
+func parseAgentReport(raw []byte) (AgentReport, error) {
+	var result struct {
+		StructuredOutput json.RawMessage `json:"structured_output"`
+	}
+	if err := json.Unmarshal(raw, &result); err != nil {
+		return AgentReport{}, fmt.Errorf("decode Claude JSON envelope: %w", err)
+	}
+	if len(result.StructuredOutput) == 0 || string(result.StructuredOutput) == "null" {
+		return AgentReport{}, fmt.Errorf("Claude JSON envelope has no structured_output")
 	}
 
-	t.Fatalf("no valid agent report found in output:\n%s", raw)
-	return AgentReport{} // unreachable
+	var report AgentReport
+	if err := json.Unmarshal(result.StructuredOutput, &report); err != nil {
+		return AgentReport{}, fmt.Errorf("decode structured_output: %w", err)
+	}
+	return report, nil
 }
 
 func TestEval(t *testing.T) {
