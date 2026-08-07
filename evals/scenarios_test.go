@@ -5,6 +5,7 @@ package evals
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"regexp"
 	"strings"
 	"testing"
@@ -95,8 +96,11 @@ var scenarios = []Scenario{
 		},
 	},
 	{
+		// ZIP 32801 is deliberate: the live coverage endpoint reports job_value
+		// as reliable, and the 2024 solar result set is exactly three records.
+		// That keeps the aggregation meaningful and its credit cost bounded.
 		Name:             "JqTotalJobValue",
-		Task:             `Find the total job value of all solar permits in zip 92024 from 2024.`,
+		Task:             `Find the total job value of all solar permits in zip 32801 from 2024.`,
 		EnforceUsability: true,
 		ValidateOutput: func(t *testing.T, report AgentReport) {
 			t.Helper()
@@ -106,7 +110,7 @@ var scenarios = []Scenario{
 	},
 	{
 		Name:             "JqTopPermits",
-		Task:             `Show me the top 3 highest-value solar permits in zip 92024 from 2024, sorted by job value.`,
+		Task:             `Show me the top 3 highest-value solar permits in zip 32801 from 2024, sorted by job value.`,
 		EnforceUsability: true,
 		ValidateOutput: func(t *testing.T, report AgentReport) {
 			t.Helper()
@@ -136,8 +140,9 @@ var scenarios = []Scenario{
 		ValidateOutput: func(t *testing.T, report AgentReport) {
 			t.Helper()
 			requireJqCommand(t, report.FinalCommand)
-			requireMultiEntryOutput(t, report.FinalOutput, 2)
-			requireDateLikeContent(t, report.FinalOutput)
+			for _, problem := range checkMonthlyBreakdown(report.FinalOutput) {
+				t.Error(problem)
+			}
 		},
 	},
 	{
@@ -417,118 +422,6 @@ func requireDecisionsSearchUsed(t *testing.T, report AgentReport) {
 		marker, report.FinalCommand, stepCommands)
 }
 
-// requireJSONArrayAtMost verifies the output contains a JSON array with at
-// most maxItems elements. The output may be a bare JSON array or an object
-// wrapping one.
-func requireJSONArrayAtMost(t *testing.T, raw string, maxItems int) {
-	t.Helper()
-	trimmed := strings.TrimSpace(raw)
-	if trimmed == "" {
-		t.Fatal("final_output is empty")
-	}
-
-	// Try parsing as a bare JSON array.
-	var arr []any
-	if err := json.Unmarshal([]byte(trimmed), &arr); err == nil {
-		if len(arr) > maxItems {
-			t.Errorf("expected at most %d items in array, got %d", maxItems, len(arr))
-		}
-		if len(arr) == 0 {
-			t.Error("expected non-empty array")
-		}
-		return
-	}
-
-	// Try parsing as an object and look for an array value.
-	var obj map[string]any
-	if err := json.Unmarshal([]byte(trimmed), &obj); err == nil {
-		for _, v := range obj {
-			if a, ok := v.([]any); ok {
-				if len(a) > maxItems {
-					t.Errorf("expected at most %d items in array, got %d", maxItems, len(a))
-				}
-				if len(a) == 0 {
-					t.Error("expected non-empty array")
-				}
-				return
-			}
-		}
-	}
-
-	// Scan for embedded JSON array.
-	for i := 0; i < len(trimmed); i++ {
-		if trimmed[i] == '[' {
-			dec := json.NewDecoder(strings.NewReader(trimmed[i:]))
-			var embedded []any
-			if err := dec.Decode(&embedded); err == nil {
-				if len(embedded) > maxItems {
-					t.Errorf("expected at most %d items in array, got %d", maxItems, len(embedded))
-				}
-				if len(embedded) == 0 {
-					t.Error("expected non-empty array")
-				}
-				return
-			}
-		}
-	}
-
-	t.Fatal("final_output contains no JSON array")
-}
-
-// requireMultiEntryOutput verifies the output contains multiple entries (at
-// least minEntries). Accepts a JSON array with N elements, or a JSON object
-// with N keys. Useful for monthly breakdowns and grouped aggregations.
-func requireMultiEntryOutput(t *testing.T, raw string, minEntries int) {
-	t.Helper()
-	trimmed := strings.TrimSpace(raw)
-	if trimmed == "" {
-		t.Fatal("final_output is empty")
-	}
-
-	// Try as JSON array.
-	var arr []any
-	if err := json.Unmarshal([]byte(trimmed), &arr); err == nil {
-		if len(arr) < minEntries {
-			t.Errorf("expected at least %d entries in array, got %d", minEntries, len(arr))
-		}
-		return
-	}
-
-	// Try as JSON object (e.g. {"2024-01": 5, "2024-02": 12}).
-	var obj map[string]any
-	if err := json.Unmarshal([]byte(trimmed), &obj); err == nil {
-		if len(obj) < minEntries {
-			t.Errorf("expected at least %d keys in object, got %d", minEntries, len(obj))
-		}
-		return
-	}
-
-	// Scan for embedded JSON array or object.
-	for i := 0; i < len(trimmed); i++ {
-		switch trimmed[i] {
-		case '[':
-			dec := json.NewDecoder(strings.NewReader(trimmed[i:]))
-			var embedded []any
-			if err := dec.Decode(&embedded); err == nil {
-				if len(embedded) < minEntries {
-					t.Errorf("expected at least %d entries in array, got %d", minEntries, len(embedded))
-				}
-				return
-			}
-		case '{':
-			dec := json.NewDecoder(strings.NewReader(trimmed[i:]))
-			var embedded map[string]any
-			if err := dec.Decode(&embedded); err == nil {
-				if len(embedded) >= minEntries {
-					return
-				}
-			}
-		}
-	}
-
-	t.Fatalf("final_output contains no JSON structure with %d+ entries:\n%.500s", minEntries, trimmed)
-}
-
 // requireJqCommand verifies the agent used jq in its final command.
 // Blind eval agents have freedom in how they construct pipelines, but
 // jq scenarios must demonstrate jq discovery, not just lucky output.
@@ -539,8 +432,8 @@ func requireJqCommand(t *testing.T, finalCommand string) {
 	}
 }
 
-// requireJSONArrayAtMostWithItems is like requireJSONArrayAtMost but
-// returns the parsed array items for further inspection.
+// requireJSONArrayAtMostWithItems extracts a non-empty array, enforces its
+// maximum length, and returns its object items for further inspection.
 func requireJSONArrayAtMostWithItems(t *testing.T, raw string, maxItems int) []map[string]any {
 	t.Helper()
 	trimmed := strings.TrimSpace(raw)
@@ -572,44 +465,60 @@ func requireJSONArrayAtMostWithItems(t *testing.T, raw string, maxItems int) []m
 // full string first, then object values, then embedded arrays.
 func extractJSONArray(t *testing.T, raw string) []any {
 	t.Helper()
-
-	// Bare JSON array.
-	var arr []any
-	if err := json.Unmarshal([]byte(raw), &arr); err == nil {
+	if arr, ok := parseJSONArray(raw); ok {
 		return arr
-	}
-
-	// Object wrapping an array value.
-	var obj map[string]any
-	if err := json.Unmarshal([]byte(raw), &obj); err == nil {
-		for _, v := range obj {
-			if a, ok := v.([]any); ok {
-				return a
-			}
-		}
-	}
-
-	// Embedded array.
-	for i := 0; i < len(raw); i++ {
-		if raw[i] == '[' {
-			dec := json.NewDecoder(strings.NewReader(raw[i:]))
-			var embedded []any
-			if err := dec.Decode(&embedded); err == nil {
-				return embedded
-			}
-		}
 	}
 
 	t.Fatal("final_output contains no JSON array")
 	return nil
 }
 
-// requireJobValueFields verifies each item has a job_value field.
+func parseJSONArray(raw string) ([]any, bool) {
+	trimmed := strings.TrimSpace(raw)
+
+	// Bare JSON array.
+	var arr []any
+	if err := json.Unmarshal([]byte(trimmed), &arr); err == nil {
+		return arr, true
+	}
+
+	// Object wrapping an array value.
+	var obj map[string]any
+	if err := json.Unmarshal([]byte(trimmed), &obj); err == nil {
+		for _, v := range obj {
+			if a, ok := v.([]any); ok {
+				return a, true
+			}
+		}
+	}
+
+	// Embedded array.
+	for i := 0; i < len(trimmed); i++ {
+		if trimmed[i] == '[' {
+			dec := json.NewDecoder(strings.NewReader(trimmed[i:]))
+			var embedded []any
+			if err := dec.Decode(&embedded); err == nil {
+				return embedded, true
+			}
+		}
+	}
+
+	return nil, false
+}
+
+// requireJobValueFields verifies each item has a numeric job_value field.
 func requireJobValueFields(t *testing.T, items []map[string]any) {
 	t.Helper()
 	for i, item := range items {
-		if _, ok := item["job_value"]; !ok {
+		value, ok := item["job_value"]
+		if !ok {
 			t.Errorf("item %d missing 'job_value' field", i)
+			continue
+		}
+		switch value.(type) {
+		case float64, json.Number:
+		default:
+			t.Errorf("item %d has non-numeric job_value %v", i, value)
 		}
 	}
 }
@@ -650,39 +559,33 @@ func requireDescendingJobValue(t *testing.T, items []map[string]any) {
 	}
 }
 
-// requireDateLikeContent verifies the output contains date-like patterns
-// (YYYY-MM, month names) consistent with a monthly breakdown. This is
-// intentionally permissive — agents may format months in various ways.
-func requireDateLikeContent(t *testing.T, raw string) {
-	t.Helper()
-
-	// YYYY-MM pattern (e.g. "2024-01", "2024-12").
-	yyyyMM := regexp.MustCompile(`20\d{2}-(?:0[1-9]|1[0-2])`)
-	if yyyyMM.MatchString(raw) {
-		return
+func checkMonthlyBreakdown(raw string) []string {
+	arr, ok := parseJSONArray(raw)
+	if !ok {
+		return []string{"final_output contains no JSON array of monthly buckets"}
+	}
+	if len(arr) == 0 {
+		return []string{"monthly breakdown is empty"}
 	}
 
-	// Month name patterns (full or abbreviated).
-	months := []string{
-		"January", "February", "March", "April", "May", "June",
-		"July", "August", "September", "October", "November", "December",
-		"Jan", "Feb", "Mar", "Apr", "Jun",
-		"Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-	}
-	lower := strings.ToLower(raw)
-	for _, m := range months {
-		if strings.Contains(lower, strings.ToLower(m)) {
-			return
+	monthPattern := regexp.MustCompile(`^2024-(0[1-9]|1[0-2])$`)
+	var problems []string
+	for i, item := range arr {
+		bucket, ok := item.(map[string]any)
+		if !ok {
+			problems = append(problems, fmt.Sprintf("monthly bucket %d is not a JSON object", i))
+			continue
+		}
+		month, ok := bucket["month"].(string)
+		if !ok || !monthPattern.MatchString(month) {
+			problems = append(problems, fmt.Sprintf("monthly bucket %d has invalid month %v", i, bucket["month"]))
+		}
+		count, ok := bucket["count"].(float64)
+		if !ok || count < 0 || count != math.Trunc(count) {
+			problems = append(problems, fmt.Sprintf("monthly bucket %d has invalid count %v", i, bucket["count"]))
 		}
 	}
-
-	// YYYY/MM pattern.
-	yyyySlashMM := regexp.MustCompile(`20\d{2}/(?:0[1-9]|1[0-2])`)
-	if yyyySlashMM.MatchString(raw) {
-		return
-	}
-
-	t.Error("final_output contains no date-like patterns (expected YYYY-MM, month names, or similar)")
+	return problems
 }
 
 // containsJSON checks whether the string contains at least one complete,
