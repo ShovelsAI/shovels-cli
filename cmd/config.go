@@ -68,6 +68,25 @@ Examples:
 			return &exitError{code: 1}
 		}
 
+		if isDryRun(cmd) {
+			path, err := config.ConfigFilePath()
+			if err != nil {
+				output.PrintErrorTyped(os.Stderr, err.Error(), 1, client.ErrorTypeClient)
+				return &exitError{code: 1}
+			}
+			preview := value
+			if key == "api-key" {
+				preview = config.MaskAPIKey(value)
+			}
+			output.PrintData(cmd.OutOrStdout(), map[string]string{
+				"status": "dry-run",
+				"key":    key,
+				"value":  preview,
+				"path":   path,
+			})
+			return nil
+		}
+
 		if err := config.SaveToFile(yamlKey, value); err != nil {
 			output.PrintErrorTyped(os.Stderr, err.Error(), 1, client.ErrorTypeClient)
 			return &exitError{code: 1}

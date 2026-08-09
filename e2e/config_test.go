@@ -243,6 +243,60 @@ func TestConfigSetOutputIsJSON(t *testing.T) {
 	}
 }
 
+func TestConfigSetDryRunLeavesFileUnchanged(t *testing.T) {
+	env, tmpDir := withIsolatedConfigDir(t)
+	configDir := filepath.Join(tmpDir, "shovels")
+	if err := os.MkdirAll(configDir, 0o700); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	configPath := filepath.Join(configDir, "config.yaml")
+	before := "api_key: sk-real-key-1234\nbase_url: https://api.shovels.ai/v2\n"
+	if err := os.WriteFile(configPath, []byte(before), 0o600); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	result := runCLIWithEnv(t, env, "--dry-run", "config", "set", "base-url", "https://example.invalid/v2")
+
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+	after, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if string(after) != before {
+		t.Errorf("--dry-run rewrote the config file\nbefore: %q\nafter:  %q", before, string(after))
+	}
+}
+
+func TestConfigSetDryRunOutputMarksPreview(t *testing.T) {
+	env := withIsolatedConfig(t)
+
+	result := runCLIWithEnv(t, env, "--dry-run", "config", "set", "base-url", "https://example.invalid/v2")
+
+	var envelope struct {
+		Data struct {
+			Status string `json:"status"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(result.Stdout), &envelope); err != nil {
+		t.Fatalf("stdout is not valid JSON: %v\nstdout: %s", err, result.Stdout)
+	}
+	if envelope.Data.Status != "dry-run" {
+		t.Errorf("expected status %q so a preview is distinguishable from a write, got %q", "dry-run", envelope.Data.Status)
+	}
+}
+
+func TestConfigSetDryRunMasksAPIKey(t *testing.T) {
+	env := withIsolatedConfig(t)
+
+	result := runCLIWithEnv(t, env, "--dry-run", "config", "set", "api-key", "sk-secret1234value")
+
+	if strings.Contains(result.Stdout, "sk-secret1234value") {
+		t.Errorf("dry-run preview leaked the full API key; stdout: %s", result.Stdout)
+	}
+}
+
 func TestNoAPIKeyOnVersionDoesNotError(t *testing.T) {
 	env := withIsolatedConfig(t)
 
