@@ -103,6 +103,7 @@ SHOVELS_API_KEY=sk-... go test -tags=eval ./evals/... -v -timeout 60m
 - The harness pins `--model sonnet`, so a change to the `claude` CLI default moves neither the cost nor the agent's capability. Sonnet is deliberate: a stronger model can reason past help-text wording a normal agent would trip on, which is the regression these evals exist to catch.
 - Model spend is ~$0.60 per scenario, so ~$8.00 for a full run. This is Anthropic API cost and is unrelated to Shovels API credits. The contractor metrics scenario is dry-run-only and adds no Shovels API credits.
 - Each scenario is capped at `--max-budget-usd 3.00`. That is a runaway guard rather than a cost control — the worst observed legitimate run is ~$0.65, so a scenario approaching the cap is looping. Failed Claude JSON envelopes are logged from stdout as well as stderr so budget and structured-output failures remain diagnosable.
+- The structured report must carry reproducible evidence: `final_command` is the exact complete command or jq pipeline, and `final_output` is its exact unmodified JSON stdout. Client-side JSON transformations use jq so the pipeline scenarios test the CLI's documented interoperability rather than an unrelated scripting language.
 - `evals/scenarios_table_test.go` guards the scenario table and its validators with no API key, no `claude` CLI, and no network, so it still runs when `TestEval` skips
 
 ## Setup
