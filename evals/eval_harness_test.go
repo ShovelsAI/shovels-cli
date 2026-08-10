@@ -31,6 +31,41 @@ func TestAgentReportSchemaMatchesGoTypes(t *testing.T) {
 	assertSchemaMatchesType(t, issues["items"].(map[string]any), reflect.TypeOf(AgentIssue{}))
 }
 
+func TestAgentReportSchemaDefinesReproducibleFinalEvidence(t *testing.T) {
+	var schema map[string]any
+	if err := json.Unmarshal([]byte(agentReportSchema), &schema); err != nil {
+		t.Fatalf("agent report schema is invalid JSON: %v", err)
+	}
+
+	properties := schema["properties"].(map[string]any)
+	commandDescription := properties["final_command"].(map[string]any)["description"].(string)
+	outputDescription := properties["final_output"].(map[string]any)["description"].(string)
+
+	for _, want := range []string{"exact complete", "pipeline", "jq"} {
+		if !strings.Contains(commandDescription, want) {
+			t.Errorf("final_command description does not mention %q: %s", want, commandDescription)
+		}
+	}
+	for _, want := range []string{"exact unmodified stdout", "valid JSON", "without prose"} {
+		if !strings.Contains(outputDescription, want) {
+			t.Errorf("final_output description does not mention %q: %s", want, outputDescription)
+		}
+	}
+}
+
+func TestSystemPromptRequiresJSONPipelineEvidence(t *testing.T) {
+	for _, want := range []string{
+		"use jq rather than Python",
+		"exact complete shell command or pipeline",
+		"exact, unmodified stdout",
+		"do not paraphrase it, truncate it, use placeholders, or wrap it in Markdown",
+	} {
+		if !strings.Contains(systemPromptTmpl, want) {
+			t.Errorf("system prompt does not contain evidence rule %q", want)
+		}
+	}
+}
+
 func assertSchemaMatchesType(t *testing.T, schema map[string]any, typ reflect.Type) {
 	t.Helper()
 

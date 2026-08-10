@@ -98,8 +98,14 @@ const agentReportSchema = `{
         "required": ["command", "purpose"]
       }
     },
-    "final_command": {"type": "string"},
-    "final_output": {"type": "string"},
+    "final_command": {
+      "type": "string",
+      "description": "The exact complete shell command or pipeline whose stdout is copied into final_output. Include every jq stage."
+    },
+    "final_output": {
+      "type": "string",
+      "description": "The exact unmodified stdout from final_command. It must be valid JSON without prose, Markdown fences, truncation, or placeholders."
+    },
     "success": {"type": "boolean"},
     "usability_rating": {"type": "integer", "minimum": 1, "maximum": 5},
     "usability_notes": {"type": "string"},
@@ -151,7 +157,10 @@ Rules:
 3. Do NOT guess ID formats. If you need an ID for a city, county, or jurisdiction, use the appropriate search command to resolve it first.
 4. The CLI requires SHOVELS_API_KEY to be set (it is already configured).
 5. All CLI output is JSON. Parse it to verify your results.
-6. After completing the task, submit the structured report requested by the caller. Each issue must include a description and a low, medium, or high severity.
+6. When the task needs client-side JSON filtering, sorting, grouping, or aggregation, use jq rather than Python or another general-purpose language.
+7. In final_command, record the exact complete shell command or pipeline that directly produced the answer, including every jq stage.
+8. In final_output, copy that command's exact, unmodified stdout. It must be valid JSON: do not paraphrase it, truncate it, use placeholders, or wrap it in Markdown. Rerun the final command if necessary to capture its stdout.
+9. After completing the task, submit the structured report requested by the caller. Each issue must include a description and a low, medium, or high severity.
 
 The usability_rating is 1-5 where 5 means the help text made the task trivial.`
 

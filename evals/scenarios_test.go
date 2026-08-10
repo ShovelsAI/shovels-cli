@@ -492,7 +492,8 @@ func requireDecisionsSearchUsed(t *testing.T, report AgentReport) {
 
 // requireJqCommand verifies the agent used jq in its final command.
 // Blind eval agents have freedom in how they construct pipelines, but
-// jq scenarios must demonstrate jq discovery, not just lucky output.
+// jq scenarios must demonstrate CLI-to-jq interoperability rather than
+// producing equivalent output with an unrelated general-purpose language.
 func requireJqCommand(t *testing.T, finalCommand string) {
 	t.Helper()
 	if !strings.Contains(finalCommand, "jq") {
