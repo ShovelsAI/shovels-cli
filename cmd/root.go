@@ -238,7 +238,7 @@ func waitForUpdate() {
 
 func init() {
 	flags := rootCmd.PersistentFlags()
-	flags.String("limit", "50", `Maximum records to return: integer 1-100000 or "all"`)
+	flags.String("limit", "50", `Maximum records to return on a cursor-paginated command or a capped search: integer 1-100000 or "all". A capped search stops at the cap its own help states`)
 	flags.Int("max-records", 10000, "Upper bound when --limit=all, range 1-100000")
 	flags.String("base-url", "https://api.shovels.ai/v2", "API base URL")
 	flags.Bool("no-retry", false, "Disable automatic retry on HTTP 429 rate-limit responses")
