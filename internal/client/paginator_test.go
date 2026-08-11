@@ -349,8 +349,9 @@ func TestPaginateCountEqualsActualItems(t *testing.T) {
 }
 
 func TestPaginateSinglePageTruncatesToLimit(t *testing.T) {
-	// Simulates endpoints like /cities/search that ignore the size param
-	// and return all matches in one response with next_cursor=null.
+	// An unclassified endpoint that over-serves the requested size. Local
+	// truncation still reports more here: only a recorded cap proves the
+	// excess is unfetchable, so every other endpoint keeps this signal.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		items := make([]json.RawMessage, 10)
 		for i := range 10 {

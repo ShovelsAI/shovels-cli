@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/shovels-ai/shovels-cli/internal/client"
+	"github.com/shovels-ai/shovels-cli/internal/contract"
 	"github.com/shovels-ai/shovels-cli/internal/output"
 	"github.com/spf13/cobra"
 )
@@ -296,6 +297,10 @@ func buildSearchQuery(cmd *cobra.Command) url.Values {
 // parseLimitConfig parses --limit and --max-records flags and returns a
 // configured LimitConfig. Returns a non-nil error (already printed to
 // stderr) if parsing or validation fails.
+//
+// A server cap comes from the command's contract record, so no command carries
+// its own copy of the value and an unclassified command is fetched as a
+// paginating one.
 func parseLimitConfig(cmd *cobra.Command) (client.LimitConfig, error) {
 	limitStr, _ := cmd.Flags().GetString("limit")
 	lc, err := client.ParseLimit(limitStr)
@@ -310,6 +315,9 @@ func parseLimitConfig(cmd *cobra.Command) (client.LimitConfig, error) {
 	}
 	if lc.All {
 		lc = lc.WithMaxRecords(maxRecords)
+	}
+	if record, ok := contract.Lookup(contractPath(cmd)); ok && record.Mode == contract.ModeServerCapped {
+		lc = lc.WithServerCap(record.Cap)
 	}
 	return lc, nil
 }

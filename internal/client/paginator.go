@@ -20,7 +20,8 @@ const DefaultMaxRecords = 10_000
 // apiPageSizeMax is the maximum page size the API accepts per request.
 const apiPageSizeMax = 100
 
-// LimitConfig holds the parsed --limit and --max-records values.
+// LimitConfig holds every bound on how many records one call collects: the
+// caller's --limit and --max-records, plus the endpoint's own cap.
 type LimitConfig struct {
 	// Limit is the requested record count, or 0 for "all".
 	Limit int
@@ -28,6 +29,12 @@ type LimitConfig struct {
 	All bool
 	// MaxRecords is the cap for --limit=all mode.
 	MaxRecords int
+
+	// ServerCap is the endpoint's fixed maximum record count, or 0 when no
+	// cap is recorded for the command. A capped endpoint ignores size and
+	// returns no cursor, so nothing the CLI sends widens the result past this
+	// many records.
+	ServerCap int
 }
 
 // ParseLimit validates and parses the --limit flag value. Accepts a positive
@@ -75,6 +82,14 @@ func (lc LimitConfig) WithMaxRecords(maxRecords int) LimitConfig {
 	return lc
 }
 
+// WithServerCap declares the endpoint's fixed maximum record count. Callers
+// pass the cap from the command's contract record, so the request, the result
+// and the classification cannot disagree about which endpoints are capped.
+func (lc LimitConfig) WithServerCap(serverCap int) LimitConfig {
+	lc.ServerCap = serverCap
+	return lc
+}
+
 // EffectiveLimit returns the total number of records to fetch.
 func (lc LimitConfig) EffectiveLimit() int {
 	if lc.All {
@@ -118,6 +133,12 @@ type PaginatedResult struct {
 	CreditsUsed      *int
 	CreditsRemaining *int
 	TotalCount       *TotalCount
+
+	// ServerCap is the endpoint's record cap, and is 0 when the result carries
+	// no cap to report: either no cap is recorded for the command, or it was
+	// classified capped and then returned a cursor, which disproves the cap
+	// for that response.
+	ServerCap int
 
 	// TrustSummaries holds the raw trust_summary value of every fetched
 	// page that carried a non-null one, in fetch order. Pages without one
@@ -167,10 +188,16 @@ func (c *Client) Paginate(ctx context.Context, path string, query url.Values, lc
 	var trustSummaries []json.RawMessage
 	firstPage := true
 
+	// capped stays true only while the endpoint behaves as classified. A
+	// cursor disproves the cap, and the result must then describe the
+	// pagination the caller got rather than the classification it arrived
+	// with.
+	capped := lc.ServerCap > 0
+
 	// finish assembles the result from the values accumulated so far, so
 	// every exit path reports the same cross-page state.
 	finish := func(items []json.RawMessage, hasMore bool) *PaginatedResult {
-		return &PaginatedResult{
+		result := &PaginatedResult{
 			Items:            items,
 			HasMore:          hasMore,
 			CreditsUsed:      creditsUsedPtr(hasCreditsUsed, totalCreditsUsed),
@@ -178,6 +205,10 @@ func (c *Client) Paginate(ctx context.Context, path string, query url.Values, lc
 			TotalCount:       totalCount,
 			TrustSummaries:   trustSummaries,
 		}
+		if capped {
+			result.ServerCap = lc.ServerCap
+		}
+		return result
 	}
 
 	for {
@@ -186,8 +217,12 @@ func (c *Client) Paginate(ctx context.Context, path string, query url.Values, lc
 			break
 		}
 
-		pageSize := min(remaining, apiPageSizeMax)
-		q.Set("size", strconv.Itoa(pageSize))
+		// A capped endpoint ignores size, so sending it advertises a bound
+		// the CLI has no way to impose.
+		if !capped {
+			pageSize := min(remaining, apiPageSizeMax)
+			q.Set("size", strconv.Itoa(pageSize))
+		}
 
 		resp, err := c.Get(ctx, path, q)
 		if err != nil {
@@ -221,16 +256,21 @@ func (c *Client) Paginate(ctx context.Context, path string, query url.Values, lc
 
 		collected = append(collected, page.Items...)
 
-		// No more pages available from the API. Truncate to the
-		// effective limit because some endpoints (e.g. /cities/search)
-		// ignore the size parameter and return all matches at once.
+		// No more pages available from the API. Truncate to the effective
+		// limit: an endpoint can serve more records than the requested size,
+		// and a capped one ignores size altogether. Only a recorded cap proves
+		// the excess is the caller's own --limit rather than a continuation
+		// someone could fetch, so every other endpoint reports more.
 		if page.NextCursor == nil || *page.NextCursor == "" {
-			hasMore := len(collected) > effective
-			if hasMore {
+			truncated := len(collected) > effective
+			if truncated {
 				collected = collected[:effective]
 			}
-			return finish(collected, hasMore), nil
+			return finish(collected, truncated && !capped), nil
 		}
+
+		// The endpoint paginates, whatever it was classified as.
+		capped = false
 
 		// Reached the requested limit with more pages available.
 		if len(collected) >= effective {
