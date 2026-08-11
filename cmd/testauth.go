@@ -3,6 +3,7 @@
 package cmd
 
 import (
+	"github.com/shovels-ai/shovels-cli/internal/contract"
 	"github.com/shovels-ai/shovels-cli/internal/output"
 	"github.com/spf13/cobra"
 )
@@ -27,4 +28,8 @@ var testAuthCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(testAuthCmd)
+
+	// Prints the resolved key and makes no request, so it reads none of the
+	// API-only flags.
+	contract.Register("_test-auth", contract.Record{Mode: contract.ModeNone})
 }
