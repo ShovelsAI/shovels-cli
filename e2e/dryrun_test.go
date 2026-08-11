@@ -186,45 +186,18 @@ func TestDryRunLimitAllShowsSize100(t *testing.T) {
 	}
 }
 
-func TestDryRunVersionNoEffect(t *testing.T) {
-	env := withIsolatedConfig(t)
-	result := runCLIWithEnv(t, env, "version", "--dry-run")
-
-	if result.ExitCode != 0 {
-		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
-	}
-
-	// Version command should produce its normal JSON output, not dry-run output.
-	var envelope struct {
-		Data map[string]any `json:"data"`
-	}
-	if err := json.Unmarshal([]byte(result.Stdout), &envelope); err != nil {
-		t.Fatalf("stdout is not valid JSON: %v\nstdout: %s", err, result.Stdout)
-	}
-	if _, ok := envelope.Data["version"]; !ok {
-		t.Error("expected version field in data, not dry-run output")
-	}
-}
-
-func TestDryRunConfigNoEffect(t *testing.T) {
+// config show reads the resolved config and issues no request, unlike its
+// config set sibling where --dry-run previews the file write.
+func TestDryRunRejectedOnConfigShow(t *testing.T) {
 	env := withIsolatedConfig(t)
 	result := runCLIWithEnv(t, env, "config", "show", "--dry-run")
 
-	if result.ExitCode != 0 {
-		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	if result.ExitCode != 1 {
+		t.Fatalf("expected exit 1, got %d; stderr: %s", result.ExitCode, result.Stderr)
 	}
-
-	// Config show should produce its normal JSON output.
-	var envelope struct {
-		Data struct {
-			BaseURL string `json:"base_url"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal([]byte(result.Stdout), &envelope); err != nil {
-		t.Fatalf("stdout is not valid JSON: %v\nstdout: %s", err, result.Stdout)
-	}
-	if envelope.Data.BaseURL == "" {
-		t.Error("expected base_url in config show output, not dry-run output")
+	p := parseStderrError(t, result.Stderr)
+	if p.Error != `--dry-run is not supported by "config show"` {
+		t.Errorf("expected the error to name --dry-run and config show, got: %s", p.Error)
 	}
 }
 

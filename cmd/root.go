@@ -101,6 +101,14 @@ Resolve a city to a geo_id, then search:
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		// Ahead of config resolution, the auth gate and the autoupdate start: a
+		// config or auth error reported for a command that was never going to
+		// honor the flag sends the caller after the wrong problem, and the
+		// autoupdate spends a release check on a command that will not run.
+		if err := rejectUnhonoredAPIOnlyFlags(cmd); err != nil {
+			return err
+		}
+
 		flagBaseURL, _ := cmd.Flags().GetString("base-url")
 
 		o := config.Overrides{

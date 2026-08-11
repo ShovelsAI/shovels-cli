@@ -24,6 +24,29 @@ func TestUnclassifiedCommandAdvertisesEveryAPIOnlyFlag(t *testing.T) {
 	}
 }
 
+// Fail open, matching the help filter: an unclassified command advertises all
+// five, and rejecting one it advertises would make help a lie.
+//
+// The case is posed rather than driven through the binary because
+// TestEveryRunnableCommandHasAValidContractRecord forbids a shipped command
+// without a record, fixtures included. A posed tree carries its own flag set,
+// so marking a flag Changed here says nothing about any other case.
+func TestUnclassifiedCommandRejectsNoAPIOnlyFlag(t *testing.T) {
+	root := &cobra.Command{Use: "shovels"}
+	root.PersistentFlags().String("limit", "50", "maximum records")
+	unclassified := &cobra.Command{Use: "unclassified", Run: func(*cobra.Command, []string) {}}
+	root.AddCommand(unclassified)
+	if err := unclassified.ParseFlags([]string{"--limit", "3"}); err != nil {
+		t.Fatalf("parsing --limit on the posed command: %v", err)
+	}
+
+	unhonored := unhonoredAPIOnlyFlags(unclassified)
+
+	if len(unhonored) != 0 {
+		t.Errorf("a command with no contract record should reject nothing, got %v", unhonored)
+	}
+}
+
 // --- Edge cases ---
 
 // version honors none of the five and renders through cobra's default usage
