@@ -134,6 +134,9 @@ func init() {
 				"zip_code":     {Type: "string", Description: "5-digit zip code"},
 				"zip_code_ext": {Type: "string", Description: "The extension of the ZIP code of the address."},
 			},
+			MetaFields: map[string]SchemaField{
+				"server_capped": {Type: "integer", Description: "The endpoint's fixed ceiling: it returns at most 20 records for one query and exposes no continuation cursor, so has_more is false wherever this key appears. --limit lowers the count below the ceiling and no value raises it; narrow --query to reach the matches it leaves out."},
+			},
 			FieldIndex: []string{
 				"data[].city",
 				"data[].county",
@@ -151,6 +154,7 @@ func init() {
 				"meta.has_more",
 				"meta.credits_used",
 				"meta.credits_remaining",
+				"meta.server_capped",
 			},
 			Filters: map[string]SchemaField{
 				"--query": {Type: "string", Description: "Search query string"},
@@ -265,6 +269,9 @@ func init() {
 				"name":   {Type: "string", Description: "City name with county and state"},
 				"state":  {Type: "string", Description: "Two-letter US state abbreviation"},
 			},
+			MetaFields: map[string]SchemaField{
+				"server_capped": {Type: "integer", Description: "The endpoint's fixed ceiling: it returns at most 15 records for one query and exposes no continuation cursor, so has_more is false wherever this key appears. --limit lowers the count below the ceiling and no value raises it; narrow --query to reach the matches it leaves out."},
+			},
 			FieldIndex: []string{
 				"data[].geo_id",
 				"data[].name",
@@ -273,6 +280,7 @@ func init() {
 				"meta.has_more",
 				"meta.credits_used",
 				"meta.credits_remaining",
+				"meta.server_capped",
 			},
 			Filters: map[string]SchemaField{
 				"--query": {Type: "string", Description: "Search query string"},
@@ -753,6 +761,9 @@ func init() {
 				"name":   {Type: "string", Description: "County name with state"},
 				"state":  {Type: "string", Description: "Two-letter US state abbreviation"},
 			},
+			MetaFields: map[string]SchemaField{
+				"server_capped": {Type: "integer", Description: "The endpoint's fixed ceiling: it returns at most 15 records for one query and exposes no continuation cursor, so has_more is false wherever this key appears. --limit lowers the count below the ceiling and no value raises it; narrow --query to reach the matches it leaves out."},
+			},
 			FieldIndex: []string{
 				"data[].geo_id",
 				"data[].name",
@@ -761,6 +772,7 @@ func init() {
 				"meta.has_more",
 				"meta.credits_used",
 				"meta.credits_remaining",
+				"meta.server_capped",
 			},
 			Filters: map[string]SchemaField{
 				"--query": {Type: "string", Description: "Search query string"},
@@ -1027,6 +1039,9 @@ func init() {
 				"name":   {Type: "string", Description: "Jurisdiction name with state"},
 				"state":  {Type: "string", Description: "Two-letter US state abbreviation"},
 			},
+			MetaFields: map[string]SchemaField{
+				"server_capped": {Type: "integer", Description: "The endpoint's fixed ceiling: it returns at most 15 records for one query and exposes no continuation cursor, so has_more is false wherever this key appears. --limit lowers the count below the ceiling and no value raises it; narrow --query to reach the matches it leaves out."},
+			},
 			FieldIndex: []string{
 				"data[].geo_id",
 				"data[].name",
@@ -1035,6 +1050,7 @@ func init() {
 				"meta.has_more",
 				"meta.credits_used",
 				"meta.credits_remaining",
+				"meta.server_capped",
 			},
 			Filters: map[string]SchemaField{
 				"--query": {Type: "string", Description: "Search query string"},

@@ -875,9 +875,9 @@ func TestContractorsGetVsSearchScopingDiffers(t *testing.T) {
 // =======================================================================
 
 // nestedExpansionCommands lists every command whose schema entry opts in to
-// nested-object expansion or extra meta fields. Every other registered
-// command must be untouched by those two features, so this list is the
-// boundary the tests below police.
+// nested-object expansion or to documenting a meta envelope array. Every other
+// registered command must be untouched by those two features, so this list is
+// the boundary the tests below police.
 var nestedExpansionCommands = map[string]bool{
 	"properties search": true,
 	"properties get":    true,
@@ -896,11 +896,14 @@ var propertiesTrustChildren = []string{
 	"trust.flags",
 }
 
-// TestNestedExpansionAndMetaFieldsAreOptIn verifies the generator's nested
-// expansion and meta_fields reach only the commands that ask for them: every
-// other command carries a flat response_fields map, no meta_fields, and a
-// field index whose entries stay one level under data[].
-func TestNestedExpansionAndMetaFieldsAreOptIn(t *testing.T) {
+// TestNestedExpansionAndMetaArraysAreOptIn verifies the generator's nested
+// expansion and meta envelope arrays reach only the commands that ask for them:
+// every other command carries a flat response_fields map, a field index whose
+// entries stay one level under data[], and no meta entry beyond the endpoint
+// ceiling. The ceiling is the one entry a command earns without asking, so
+// TestEverySchemaDisclosesTheCapItsRecordCarries is what holds it to the
+// contract records.
+func TestNestedExpansionAndMetaArraysAreOptIn(t *testing.T) {
 	for _, cmd := range SchemaCommands() {
 		if nestedExpansionCommands[cmd] {
 			continue
@@ -911,8 +914,10 @@ func TestNestedExpansionAndMetaFieldsAreOptIn(t *testing.T) {
 				t.Errorf("schema for %q has expanded nested field %q; expansion is opt-in", cmd, name)
 			}
 		}
-		if len(s.MetaFields) != 0 {
-			t.Errorf("schema for %q has %d meta_fields; meta fields are opt-in", cmd, len(s.MetaFields))
+		for name := range s.MetaFields {
+			if name != schemaCapMetaKey {
+				t.Errorf("schema for %q documents meta field %q; meta arrays are opt-in", cmd, name)
+			}
 		}
 		for _, f := range s.FieldIndex {
 			if strings.Count(f, ".") > 1 {

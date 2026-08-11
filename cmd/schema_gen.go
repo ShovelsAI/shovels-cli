@@ -5,6 +5,12 @@
 // Runs from the cmd/ directory via go generate. The spec comes from
 // SCHEMA_GEN_SPEC_FILE when that is set, and from the live API otherwise.
 //
+// The endpoint result ceilings come from internal/contract rather than from
+// either input. The spec cannot express them: it declares size and cursor for
+// the paginated searches and neither parameter for the capped ones. And a copy
+// in the overrides would be a second list, free to drift from the one the
+// request path enforces.
+//
 // Three checked-in artifacts are pinned against each other — the spec copy
 // this reads, the schema data it writes, and the --schema output the binary
 // then prints — so refreshing the schemas is one sequence, run from the
@@ -35,10 +41,21 @@ import (
 	"strings"
 	"time"
 
+	"github.com/shovels-ai/shovels-cli/internal/contract"
 	"gopkg.in/yaml.v3"
 )
 
 const openAPIURL = "https://api.shovels.ai/v2/openapi.json"
+
+// serverCapMetaKey is the meta envelope key a capped search reports its
+// endpoint's ceiling under, spelled as output.PrintPaginated writes it.
+const serverCapMetaKey = "server_capped"
+
+// serverCapDescription documents that key, with the ceiling substituted. The
+// clause about the missing cursor is the point of the entry: a ceiling beside a
+// retained has_more reads as a cursor that happens to be exhausted, which is
+// the pagination loop an agent must not plan.
+const serverCapDescription = "The endpoint's fixed ceiling: it returns at most %d records for one query and exposes no continuation cursor, so has_more is false wherever this key appears. --limit lowers the count below the ceiling and no value raises it; narrow --query to reach the matches it leaves out."
 
 // schemaField mirrors cmd.SchemaField for code generation.
 type schemaField struct {
@@ -359,13 +376,11 @@ func expandNested(components map[string]any, def commandDef, fields map[string]s
 	return nil
 }
 
-// buildMetaFields documents the elements of each meta envelope array the
-// command adds. Commands that add none get a nil map, which the schema output
-// omits entirely.
+// buildMetaFields documents the meta envelope entries the command adds beyond
+// count, has_more, and credits: the elements of each array it collects, and the
+// ceiling disclosure of a command whose record caps its endpoint. Commands that
+// add none get a nil map, which the schema output omits entirely.
 func buildMetaFields(components map[string]any, def commandDef) (map[string]schemaField, error) {
-	if len(def.MetaArrays) == 0 {
-		return nil, nil
-	}
 	meta := make(map[string]schemaField)
 	for _, arr := range def.MetaArrays {
 		elements := schemaProperties(components, arr.Schema)
@@ -379,6 +394,17 @@ func buildMetaFields(components map[string]any, def commandDef) (map[string]sche
 			}
 			meta[arr.Name+"[]."+name] = fieldFromProperty(elem, components)
 		}
+	}
+
+	if record, ok := contract.Lookup(def.Command); ok && record.Mode == contract.ModeServerCapped {
+		meta[serverCapMetaKey] = schemaField{
+			Type:        "integer",
+			Description: fmt.Sprintf(serverCapDescription, record.Cap),
+		}
+	}
+
+	if len(meta) == 0 {
+		return nil, nil
 	}
 	return meta, nil
 }
@@ -549,7 +575,10 @@ func mergeFields(base map[string]schemaField, overrides map[string]overrideField
 //   - batch-get commands return a non-paginated batch envelope with count,
 //     credits, and a missing list of unresolved IDs, and never has_more.
 //   - credit-exempt paginated commands return count and has_more without credits.
-//   - all other commands are paginated, with count, has_more, and credits.
+//   - every other command carries count, has_more, and credits. A command
+//     whose endpoint caps the result set is one of them: the cap does not
+//     remove has_more, it pins it to false, and the ceiling reaches the index
+//     through the meta fields appended below.
 //
 // Any meta fields the command adds beyond that standard set follow, sorted.
 func buildFieldIndex(fields, metaFields map[string]schemaField, def commandDef) []string {
