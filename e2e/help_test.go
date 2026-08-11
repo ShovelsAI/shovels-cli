@@ -1164,6 +1164,17 @@ func TestRootLimitDescriptionCoversBothClassesThatHonorIt(t *testing.T) {
 		"stops at the cap its own help states")
 }
 
+// One flag object carries one description, so root's --dry-run text has to
+// cover both what the flag previews on an API command and the config file write
+// it previews on config set.
+func TestRootDryRunDescriptionCoversRequestAndConfigWrite(t *testing.T) {
+	line := flagHelpLine(t, "--dry-run")
+
+	assertContainsAll(t, line, "root --dry-run",
+		"without calling the API or consuming credits",
+		"on config set", "instead of saving it")
+}
+
 // rootExample is one `shovels ...` invocation embedded in root's help: the
 // command path it names and the long flags it passes to it.
 type rootExample struct {
