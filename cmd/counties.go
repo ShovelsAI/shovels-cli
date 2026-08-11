@@ -51,7 +51,7 @@ var countiesSearchCmd = &cobra.Command{
 	Long: `Search the Shovels county database. Returns county objects with geo_id, name,
 and state fields. Use the geo_id value in --geo-id flags on permits and
 contractors searches.
-
+` + serverCappedNote("counties search") + `
 Required flags:
   --query, -q TEXT   County name to search for, e.g. "Los Angeles" or "Cook" (required)
 

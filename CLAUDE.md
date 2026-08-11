@@ -43,7 +43,8 @@ internal/
 
 - **JSON-only output.** No tables, no colors. Every response is valid JSON to stdout.
 - **Errors to stderr.** Structured JSON errors go to stderr so stdout is always parseable.
-- **`--limit N` abstracts pagination.** The CLI handles cursor mechanics internally. Default: 50. `--limit all` fetches everything.
+- **`--limit N` bounds the record set a command collects.** The CLI handles cursor mechanics internally. Default: 50. `--limit all` fetches up to `--max-records`. A command that collects no such set rejects the flag.
+- **The address, city, county and jurisdiction searches are capped by the endpoint.** 20 results for addresses, 15 for the other three, no cursor on any, so `--limit` only lowers those counts.
 - **Never interactive.** No prompts, no spinners, no progress bars. Fail loudly with clear messages.
 - **Meaningful exit codes:** 0=success, 1=client error, 2=auth error, 3=rate-limit, 4=credits-exhausted, 5=transient/server error.
 - **`--help` text is for LLMs.** Write descriptions as if an AI agent is reading them — specific, example-rich, no jargon.
@@ -175,4 +176,4 @@ shovels permits search --geo-id <resolved_id> --permit-from 2024-01-01 --permit-
 - All HTTP calls go through `internal/client/` — commands never call `net/http` directly
 - Flag names match API query parameter names where possible (e.g., `--permit-tags` maps to `permit_tags`)
 - Use snake_case in JSON output keys (match API response format)
-- Wrap API responses: `{"data": [...], "meta": {"count": N, "has_more": bool, "credits_used": N, "credits_remaining": N}}`
+- Wrap API responses: `{"data": [...], "meta": {"count": N, "has_more": bool, "credits_used": N, "credits_remaining": N}}`. A capped search adds `"server_capped": N` and reports `has_more` false, since no cursor can reach past the cap
