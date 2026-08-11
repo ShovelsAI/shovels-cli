@@ -330,7 +330,11 @@ func TestCoverageGeoIDForwardedVerbatim(t *testing.T) {
 	}
 }
 
-func TestCoverageIgnoresGlobalLimit(t *testing.T) {
+// Coverage reports every field's tier for the window, so there is no record
+// count to bound. The assertion on queries is what pins rejection ahead of the
+// request: a rejection reached afterwards has already spent the round trip on a
+// result the caller is not getting.
+func TestCoverageRejectsGlobalLimitBeforeRequesting(t *testing.T) {
 	handler, queries, _ := makeCoverageHandler([]coverageItem{{Field: "fees", Tier: "missing"}})
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
@@ -343,16 +347,19 @@ func TestCoverageIgnoresGlobalLimit(t *testing.T) {
 		"--coverage-to", "2024-12-31",
 		"--limit", "5",
 	)
-	if result.ExitCode != 0 {
-		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+
+	if result.ExitCode != 1 {
+		t.Fatalf("expected exit 1, got %d; stderr: %s", result.ExitCode, result.Stderr)
 	}
-	q := (*queries)[0]
-	if _, ok := q["size"]; ok {
-		t.Errorf("coverage must ignore --limit and not send size, got %v", q["size"])
+	if len(*queries) != 0 {
+		t.Errorf("expected no request, got %d", len(*queries))
 	}
 }
 
-func TestCoverageIgnoresGlobalMaxRecords(t *testing.T) {
+// --max-records is the other bound coverage has nothing to apply. It is a
+// separate entry in the API-only set, so a set that named only --limit would
+// leave this one silently accepted and ignored.
+func TestCoverageRejectsGlobalMaxRecordsBeforeRequesting(t *testing.T) {
 	handler, queries, _ := makeCoverageHandler([]coverageItem{{Field: "fees", Tier: "missing"}})
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
@@ -365,19 +372,12 @@ func TestCoverageIgnoresGlobalMaxRecords(t *testing.T) {
 		"--coverage-to", "2024-12-31",
 		"--max-records", "5",
 	)
-	if result.ExitCode != 0 {
-		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+
+	if result.ExitCode != 1 {
+		t.Fatalf("expected exit 1, got %d; stderr: %s", result.ExitCode, result.Stderr)
 	}
-	if len(*queries) != 1 {
-		t.Fatalf("expected 1 request, got %d", len(*queries))
-	}
-	q := (*queries)[0]
-	if _, ok := q["size"]; ok {
-		t.Errorf("coverage must ignore --max-records and not send size, got %v", q["size"])
-	}
-	// The request still carries the normal coverage params.
-	if q["geo_type"][0] != "zipcode" || q["geo_id"][0] != "92024" {
-		t.Errorf("expected normal coverage params, got geo_type=%q geo_id=%q", q["geo_type"][0], q["geo_id"][0])
+	if len(*queries) != 0 {
+		t.Errorf("expected no request, got %d", len(*queries))
 	}
 }
 

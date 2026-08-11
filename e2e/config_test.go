@@ -287,11 +287,29 @@ func TestConfigSetDryRunOutputMarksPreview(t *testing.T) {
 	}
 }
 
+// config set is the one local command that honors --dry-run, so the preview must
+// be reached rather than rejected. Asserting the preview came out is also what
+// keeps the masking check honest: a rejected command prints nothing to stdout,
+// and stdout without the key would otherwise read as a pass.
 func TestConfigSetDryRunMasksAPIKey(t *testing.T) {
 	env := withIsolatedConfig(t)
 
 	result := runCLIWithEnv(t, env, "--dry-run", "config", "set", "api-key", "sk-secret1234value")
 
+	if result.ExitCode != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+	}
+	var envelope struct {
+		Data struct {
+			Status string `json:"status"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(result.Stdout), &envelope); err != nil {
+		t.Fatalf("stdout is not valid JSON: %v\nstdout: %s", err, result.Stdout)
+	}
+	if envelope.Data.Status != "dry-run" {
+		t.Fatalf("expected a %q preview, got status %q; stdout: %s", "dry-run", envelope.Data.Status, result.Stdout)
+	}
 	if strings.Contains(result.Stdout, "sk-secret1234value") {
 		t.Errorf("dry-run preview leaked the full API key; stdout: %s", result.Stdout)
 	}
