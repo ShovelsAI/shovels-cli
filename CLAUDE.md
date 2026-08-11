@@ -57,6 +57,7 @@ internal/
 | Layer | Command | Notes |
 |-------|---------|-------|
 | Unit | `go test ./...` | No network calls, no API key. Mock HTTP client; the schema generator guard reads the pinned `cmd/testdata/openapi.json` |
+| Unit, fixtures compiled | `go test -tags=e2e ./cmd/...` | The same `cmd` suite with the `_test-*` fixture commands compiled in. The command-contract guard walks the cobra tree, and the fixtures are only in that tree under this tag, so their classification is checked nowhere else |
 | E2E | `go test -tags=e2e ./e2e/...` | Builds binary, invokes as subprocess. **No API key needed** — every case is served by an httptest stub. Runs in CI on every PR |
 | Integration | `go test -count=1 -tags=integration ./integration/...` | Hits the live API. Requires `SHOVELS_API_KEY` and **fails loudly** without one |
 | LLM Evals | `go test -tags=eval ./evals/... -v -timeout 60m` | Blind LLM usability tests, requires `SHOVELS_API_KEY` + `claude` CLI |

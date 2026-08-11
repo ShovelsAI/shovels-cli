@@ -31,6 +31,14 @@ jobs:
       - name: Run e2e tests
         run: go test -count=1 -tags=e2e ./e2e/...
 
+      # The command-contract guard walks the cobra tree and fails on a runnable
+      # command with no contract record. The `_test-*` fixture commands are
+      # `//go:build e2e`, so the plain unit run cannot see them and the e2e run
+      # above does not compile ./cmd tests: the guard is only fixture-aware under
+      # this third invocation.
+      - name: Run cmd tests with the fixture commands compiled
+        run: go test -count=1 -tags=e2e ./cmd/...
+
   lint:
     name: Lint
     runs-on: ubuntu-latest

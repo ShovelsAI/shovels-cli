@@ -28,4 +28,11 @@ go vet -tags=e2e ./e2e/...
 echo "==> Running unit tests..."
 go test ./...
 
+# The command-contract guard walks the cobra tree and fails on a runnable command
+# with no contract record. The `_test-*` fixture commands are `//go:build e2e`, so
+# the run above cannot see them and `-tags=e2e ./e2e/...` does not compile ./cmd
+# tests: the guard is only fixture-aware here. Keyless, offline, ~1s.
+echo "==> Running cmd tests with the fixture commands compiled..."
+go test -tags=e2e ./cmd/...
+
 echo "==> All checks passed."
