@@ -3,6 +3,7 @@
 package e2e
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -924,21 +925,28 @@ func TestPropertiesGetHelp(t *testing.T) {
 // it.
 var apiOnlyFlags = []string{"--limit", "--max-records", "--no-retry", "--timeout", "--dry-run"}
 
-// globalFlagsHelp runs a command's --help and returns its Global Flags section,
-// which the sections after it are separated from by a blank line. Asserting
-// against the section rather than the whole output keeps a flag named in a
-// description or an example from reading as an advertised flag.
-func globalFlagsHelp(t *testing.T, args ...string) string {
+// helpText runs a command's --help and returns everything it printed.
+func helpText(t *testing.T, args ...string) string {
 	t.Helper()
 
 	result := runCLI(t, append(args, "--help")...)
 	if result.ExitCode != 0 {
-		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+		t.Fatalf("%v --help: expected exit 0, got %d; stderr: %s", args, result.ExitCode, result.Stderr)
 	}
+	return result.Stdout
+}
 
-	_, after, found := strings.Cut(result.Stdout, "\nGlobal Flags:\n")
+// globalFlagsHelp returns a command's Global Flags section, which the sections
+// after it are separated from by a blank line. Asserting against the section
+// rather than the whole output keeps a flag named in a description or an
+// example from reading as an advertised flag.
+func globalFlagsHelp(t *testing.T, args ...string) string {
+	t.Helper()
+
+	help := helpText(t, args...)
+	_, after, found := strings.Cut(help, "\nGlobal Flags:\n")
 	if !found {
-		t.Fatalf("%v --help has no Global Flags section:\n%s", args, result.Stdout)
+		t.Fatalf("%v --help has no Global Flags section:\n%s", args, help)
 	}
 	section, _, _ := strings.Cut(after, "\n\n")
 	return section
@@ -1045,4 +1053,43 @@ func TestCompletionLeafHelpAdvertisesNoAPIOnlyFlag(t *testing.T) {
 func TestParentHelpAdvertisesTheUnionOfItsSubcommands(t *testing.T) {
 	assertAdvertisesExactly(t, globalFlagsHelp(t, "contractors"), "contractors", apiOnlyFlags...)
 	assertAdvertisesExactly(t, globalFlagsHelp(t, "config"), "config", "--dry-run")
+}
+
+// assertContainsAll checks the text carries every wanted substring, naming the
+// claim each one stands for.
+func assertContainsAll(t *testing.T, text, subject string, wants ...string) {
+	t.Helper()
+
+	for _, want := range wants {
+		if !strings.Contains(text, want) {
+			t.Errorf("%s should state %q, got:\n%s", subject, want, text)
+		}
+	}
+}
+
+// --- Pagination contract: happy paths ---
+
+// Each capped search publishes its own cap rather than a generic "capped", so
+// an agent knows how many rows the query can ever return. Every other measured
+// cap must be absent, or one shared number would satisfy all four.
+func TestCappedSearchHelpStatesItsOwnCapAndNoPagination(t *testing.T) {
+	for _, search := range cappedSearches() {
+		t.Run(search.name, func(t *testing.T) {
+			out := helpText(t, strings.Fields(search.name)...)
+
+			assertContainsAll(t, out, search.name+" --help",
+				"not paginated", "no continuation cursor",
+				fmt.Sprintf("at most %d results", search.cap))
+
+			for _, other := range cappedSearches() {
+				if other.cap == search.cap {
+					continue
+				}
+				stated := fmt.Sprintf("at most %d results", other.cap)
+				if strings.Contains(out, stated) {
+					t.Errorf("%s --help should not state %q, which is %s's cap", search.name, stated, other.name)
+				}
+			}
+		})
+	}
 }
