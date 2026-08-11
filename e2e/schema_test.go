@@ -4,6 +4,7 @@ package e2e
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -961,10 +962,12 @@ func TestSchemaPropertiesMoneyFieldsUseCents(t *testing.T) {
 	}
 }
 
-// TestSchemaNestedExpansionIsOptIn verifies nested expansion and meta_fields
-// reach only the commands that ask for them: every other command's --schema
-// prints a flat response_fields map, no meta_fields, and a field index whose
-// entries stay one level under data[].
+// TestSchemaNestedExpansionIsOptIn verifies nested expansion and meta envelope
+// arrays reach only the commands that ask for them: every other command's
+// --schema prints a flat response_fields map, a field index whose entries stay
+// one level under data[], and no meta entry beyond the endpoint ceiling. The
+// ceiling is the one entry a command earns without asking, and
+// TestSchemaCappedSearchDocumentsTheCapAndTheMissingCursor is what reads it.
 func TestSchemaNestedExpansionIsOptIn(t *testing.T) {
 	expanded := map[string]bool{"properties search": true, "properties get": true}
 
@@ -976,15 +979,12 @@ func TestSchemaNestedExpansionIsOptIn(t *testing.T) {
 		t.Run(path, func(t *testing.T) {
 			stdout := mustSchema(t, nil, strings.Split(path, " ")...)
 
-			var raw map[string]any
-			if err := json.Unmarshal([]byte(stdout), &raw); err != nil {
-				t.Fatalf("stdout is not valid JSON: %v", err)
-			}
-			if _, ok := raw["meta_fields"]; ok {
-				t.Errorf("meta_fields appeared on %q, which never opted in", path)
-			}
-
 			out := parseSchema(t, stdout)
+			for name := range out.MetaFields {
+				if name != schemaCapMetaKey {
+					t.Errorf("meta field %q appeared on %q, which never opted in", name, path)
+				}
+			}
 			for name := range out.ResponseFields {
 				if strings.Contains(name, ".") {
 					t.Errorf("nested field %q appeared on %q, which never opted in", name, path)
@@ -1088,4 +1088,119 @@ func TestSchemaPropertiesGetTakesPositionalIDs(t *testing.T) {
 // the paginated envelope convention even with its extra meta fields.
 func TestSchemaPropertiesSearchMetaConvention(t *testing.T) {
 	assertSearchMeta(t, parseSchema(t, mustSchema(t, nil, "properties", "search")))
+}
+
+// =======================================================================
+// Capped searches: the pagination contract on the offline surface
+// =======================================================================
+
+// schemaCapMetaKey is the meta envelope key a capped search's schema documents
+// its endpoint's ceiling under.
+const schemaCapMetaKey = "server_capped"
+
+// noCursorClause is the part of the disclosure that keeps a ceiling from
+// reading as a cursor someone has exhausted.
+const noCursorClause = "exposes no continuation cursor"
+
+// capDescription returns the description of the cap entry a schema documents
+// under meta.
+func capDescription(t *testing.T, out schemaOutput) string {
+	t.Helper()
+
+	entry, ok := out.MetaFields[schemaCapMetaKey].(map[string]any)
+	if !ok {
+		t.Fatalf("%s meta_fields missing %q, got %v", out.Command, schemaCapMetaKey, out.MetaFields)
+	}
+	desc, ok := entry["description"].(string)
+	if !ok {
+		t.Fatalf("%s meta field %q has no description string", out.Command, schemaCapMetaKey)
+	}
+	return desc
+}
+
+// assertCapDisclosure verifies a schema publishes the given ceiling and says the
+// endpoint has no cursor to follow past it. The ceiling alone leaves an agent
+// free to read a has_more of false as a cursor it has exhausted and plan the
+// loop anyway, so both halves are the disclosure.
+func assertCapDisclosure(t *testing.T, out schemaOutput, ceiling int) {
+	t.Helper()
+
+	desc := capDescription(t, out)
+	if want := fmt.Sprintf("at most %d records", ceiling); !strings.Contains(desc, want) {
+		t.Errorf("%s cap description should state %q, got: %s", out.Command, want, desc)
+	}
+	if !strings.Contains(desc, noCursorClause) {
+		t.Errorf("%s cap description should state the endpoint %s, got: %s", out.Command, noCursorClause, desc)
+	}
+}
+
+// TestSchemaCappedSearchDocumentsTheCapAndTheMissingCursor verifies every capped
+// search's --schema documents its endpoint's ceiling under meta, indexed as the
+// envelope key the runtime emits, with the missing cursor stated alongside the
+// number.
+func TestSchemaCappedSearchDocumentsTheCapAndTheMissingCursor(t *testing.T) {
+	for _, search := range cappedSearches() {
+		search := search
+		t.Run(search.name, func(t *testing.T) {
+			out := parseSchema(t, mustSchema(t, nil, strings.Fields(search.name)...))
+
+			assertCapDisclosure(t, out, search.cap)
+
+			if entry := "meta." + schemaCapMetaKey; !fieldIndexSet(out)[entry] {
+				t.Errorf("field_index missing %q", entry)
+			}
+		})
+	}
+}
+
+// TestSchemaCursorPaginatedSearchDocumentsNoCap verifies a search that follows a
+// cursor keeps the envelope an agent can page through: has_more indexed under
+// meta, and no ceiling entry beside it to say the cursor cannot be followed.
+func TestSchemaCursorPaginatedSearchDocumentsNoCap(t *testing.T) {
+	out := parseSchema(t, mustSchema(t, nil, "permits", "search"))
+
+	index := fieldIndexSet(out)
+
+	if !index["meta.has_more"] {
+		t.Error("permits search field_index should document meta.has_more")
+	}
+	if entry := "meta." + schemaCapMetaKey; index[entry] {
+		t.Errorf("permits search field_index should not document %q", entry)
+	}
+	if _, ok := out.MetaFields[schemaCapMetaKey]; ok {
+		t.Errorf("permits search meta_fields should not document %q, got %v", schemaCapMetaKey, out.MetaFields)
+	}
+}
+
+// TestSchemaCappedSearchDisclosesCapWithoutAPIKey verifies the disclosure is
+// reachable on the credit-free pre-flight it exists for: with no key configured
+// the ceiling still prints and no endpoint is touched. The stub answers 500 so a
+// request slipping through fails the command as well as the hit count.
+func TestSchemaCappedSearchDisclosesCapWithoutAPIKey(t *testing.T) {
+	for _, search := range cappedSearches() {
+		search := search
+		t.Run(search.name, func(t *testing.T) {
+			var hits atomic.Int32
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				hits.Add(1)
+				w.WriteHeader(500)
+				w.Write([]byte(`{"detail":"schema output must not reach the API"}`))
+			}))
+			defer srv.Close()
+
+			env := withIsolatedConfigNoAuth(t)
+			args := append([]string{"--base-url", srv.URL}, strings.Fields(search.name)...)
+
+			result := runCLIWithEnv(t, env, append(args, "--schema")...)
+			if result.ExitCode != 0 {
+				t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
+			}
+
+			assertCapDisclosure(t, parseSchema(t, result.Stdout), search.cap)
+
+			if got := hits.Load(); got != 0 {
+				t.Errorf("expected zero API requests, got %d", got)
+			}
+		})
+	}
 }
