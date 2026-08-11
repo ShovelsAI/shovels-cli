@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/shovels-ai/shovels-cli/internal/client"
+	"github.com/shovels-ai/shovels-cli/internal/contract"
 	"github.com/shovels-ai/shovels-cli/internal/output"
 	"github.com/spf13/cobra"
 )
@@ -102,4 +103,11 @@ var testHTTPCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(testHTTPCmd)
+
+	// One request through a client built from the transport flags, with no
+	// --dry-run branch.
+	contract.Register("_test-http", contract.Record{
+		Honored: []string{contract.FlagNoRetry, contract.FlagTimeout},
+		Mode:    contract.ModeNone,
+	})
 }

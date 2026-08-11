@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/shovels-ai/shovels-cli/internal/client"
+	"github.com/shovels-ai/shovels-cli/internal/contract"
 	"github.com/shovels-ai/shovels-cli/internal/output"
 	"github.com/spf13/cobra"
 )
@@ -77,4 +78,11 @@ var testPaginateCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(testPaginateCmd)
+
+	// Cursor-paginated like the real search commands, but with no --dry-run
+	// branch, so --dry-run is absent from what it honors.
+	contract.Register("_test-paginate", contract.Record{
+		Honored: []string{contract.FlagLimit, contract.FlagMaxRecords, contract.FlagNoRetry, contract.FlagTimeout},
+		Mode:    contract.ModeCursor,
+	})
 }
