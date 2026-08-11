@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -18,8 +17,8 @@ type flagGroup struct {
 // setGroupedUsage overrides a command's usage function to render local flags
 // organized into named groups instead of a single flat alphabetical list.
 // Flags not listed in any group (including --help) appear in an "Other Flags"
-// section. Inherited (global) flags render in the standard "Global Flags"
-// section.
+// section. Inherited (global) flags render in a "Global Flags" section holding
+// the ones the command's contract record honors.
 func setGroupedUsage(cmd *cobra.Command, groups []flagGroup) {
 	cmd.SetUsageFunc(func(c *cobra.Command) error {
 		w := c.OutOrStderr()
@@ -69,8 +68,7 @@ func writeGroupedUsage(w io.Writer, cmd *cobra.Command, groups []flagGroup) {
 
 	// Render inherited (global) flags.
 	if cmd.HasAvailableInheritedFlags() {
-		fmt.Fprintf(w, "\nGlobal Flags:\n%s",
-			strings.TrimRight(cmd.InheritedFlags().FlagUsages(), " \n")+"\n")
+		fmt.Fprintf(w, "\nGlobal Flags:\n%s\n", globalFlagUsages(cmd))
 	}
 }
 

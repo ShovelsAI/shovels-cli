@@ -85,4 +85,10 @@ func init() {
 		Honored: []string{contract.FlagLimit, contract.FlagMaxRecords, contract.FlagNoRetry, contract.FlagTimeout},
 		Mode:    contract.ModeCursor,
 	})
+
+	// Help renders through the same path as the cursor searches this fixture
+	// stands in for. Those honor every API-only flag, so this fixture's
+	// narrower contract is what makes the grouped path's filtering observable
+	// through the binary. It has no local flags to group.
+	setGroupedUsage(testPaginateCmd, nil)
 }
