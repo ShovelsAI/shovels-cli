@@ -1055,6 +1055,49 @@ func TestParentHelpAdvertisesTheUnionOfItsSubcommands(t *testing.T) {
 	assertAdvertisesExactly(t, globalFlagsHelp(t, "config"), "config", "--dry-run")
 }
 
+// flagDeclarations maps each flag a help text declares to the line declaring
+// it, which is where the flag's description is published. Only the sections
+// after the usage line are read: before it is prose, where a flag can be named
+// in an example without the command accepting it.
+func flagDeclarations(help string) map[string]string {
+	declarations := map[string]string{}
+
+	_, sections, found := strings.Cut(help, "\nUsage:\n")
+	if !found {
+		return declarations
+	}
+	for _, line := range strings.Split(sections, "\n") {
+		if !strings.HasPrefix(line, " ") {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) == 0 {
+			continue
+		}
+		// A shorthand precedes the long form as "-q, --query".
+		if len(fields) > 1 && strings.HasPrefix(fields[0], "-") && strings.HasSuffix(fields[0], ",") {
+			fields = fields[1:]
+		}
+		if strings.HasPrefix(fields[0], "--") {
+			declarations[fields[0]] = line
+		}
+	}
+	return declarations
+}
+
+// flagHelpLine returns the line a command's help declares the named flag on.
+// Root declares the five under "Flags:" and every other command inherits them
+// under "Global Flags:", so the section header is not what locates them.
+func flagHelpLine(t *testing.T, flag string, args ...string) string {
+	t.Helper()
+
+	line, ok := flagDeclarations(helpText(t, args...))[flag]
+	if !ok {
+		t.Fatalf("%v --help declares no %s", args, flag)
+	}
+	return line
+}
+
 // assertContainsAll checks the text carries every wanted substring, naming the
 // claim each one stands for.
 func assertContainsAll(t *testing.T, text, subject string, wants ...string) {
@@ -1091,5 +1134,121 @@ func TestCappedSearchHelpStatesItsOwnCapAndNoPagination(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// permits search follows a real cursor, so --limit bounds the records collected
+// across pages and no cap sentence applies to it.
+func TestPaginatedSearchHelpStatesTheCursorLimitAndNoCap(t *testing.T) {
+	line := flagHelpLine(t, "--limit", "permits", "search")
+	out := helpText(t, "permits", "search")
+
+	assertContainsAll(t, line, "permits search --limit", "Maximum records to return on a cursor-paginated command")
+	for _, capped := range []string{"at most 20 results", "at most 15 results", "not paginated"} {
+		if strings.Contains(out, capped) {
+			t.Errorf("permits search --help should not state %q", capped)
+		}
+	}
+}
+
+// --- Pagination contract: edge cases ---
+
+// One flag object carries one description, so root's --limit text has to hold
+// for both classes that honor the flag. Naming only the cursor class would
+// contradict the capped searches, which keep --limit and state their own bound.
+func TestRootLimitDescriptionCoversBothClassesThatHonorIt(t *testing.T) {
+	line := flagHelpLine(t, "--limit")
+
+	assertContainsAll(t, line, "root --limit",
+		"cursor-paginated command or a capped search",
+		"stops at the cap its own help states")
+}
+
+// rootExample is one `shovels ...` invocation embedded in root's help: the
+// command path it names and the long flags it passes to it.
+type rootExample struct {
+	path  string
+	flags []string
+}
+
+// rootExamples extracts the invocations from a help text. A segment runs from
+// "shovels " to the end of its line or the first pipe, its path is the run of
+// command-shaped words that opens it, and its flags are the long flags that
+// follow. An invocation opening on a placeholder ("shovels <geo> coverage")
+// names no path to run and is left out.
+func rootExamples(help string) []rootExample {
+	var examples []rootExample
+
+	for _, line := range strings.Split(help, "\n") {
+		for _, segment := range strings.Split(line, "shovels ")[1:] {
+			segment, _, _ = strings.Cut(segment, "|")
+
+			var path []string
+			var flags []string
+			inPath := true
+			for _, token := range strings.Fields(segment) {
+				if flag, isFlag := strings.CutPrefix(token, "--"); isFlag {
+					name, _, _ := strings.Cut(flag, "=")
+					flags = append(flags, "--"+name)
+					inPath = false
+					continue
+				}
+				if inPath && isBareWord(token) {
+					path = append(path, token)
+					continue
+				}
+				inPath = false
+			}
+			if len(path) > 0 {
+				examples = append(examples, rootExample{path: strings.Join(path, " "), flags: flags})
+			}
+		}
+	}
+	return examples
+}
+
+// isBareWord reports whether a token has the shape of a command name: lowercase
+// letters and dashes, which no placeholder, quoted value or shell fragment in
+// these examples has. A positional argument of that shape joins the path, and
+// cobra renders the same command's help either way.
+func isBareWord(token string) bool {
+	for _, r := range token {
+		if (r < 'a' || r > 'z') && r != '-' {
+			return false
+		}
+	}
+	return token != ""
+}
+
+// An example passing a flag its command does not accept is a documented failure:
+// a command outside the flag's contract rejects it, and an unregistered flag
+// never parses. Both show up as the flag being absent from that command's own
+// flag sections.
+func TestRootHelpExamplesPassOnlyFlagsTheirCommandDeclares(t *testing.T) {
+	checked := map[string][]string{}
+
+	for _, example := range rootExamples(helpText(t)) {
+		result := runCLI(t, append(strings.Fields(example.path), "--help")...)
+		if result.ExitCode != 0 {
+			// Prose reads as an invocation too ("shovels is a CLI for ...").
+			continue
+		}
+
+		declared := flagDeclarations(result.Stdout)
+		for _, flag := range example.flags {
+			if _, ok := declared[flag]; !ok {
+				t.Errorf("root --help example runs %q with %s, which that command does not declare", example.path, flag)
+			}
+			checked[example.path] = append(checked[example.path], flag)
+		}
+	}
+
+	for path, flag := range map[string]string{
+		"permits search":     "--geo-id",
+		"contractors search": "--tags",
+	} {
+		if !slices.Contains(checked[path], flag) {
+			t.Errorf("expected the examples to cover %q with %s, checked %v", path, flag, checked)
+		}
 	}
 }
