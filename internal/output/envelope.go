@@ -15,6 +15,13 @@ import (
 // keys, values, numbers, strings, arrays and nulls all survive -- though the
 // encoder may change its byte-level formatting. The key is omitted entirely
 // when no fetched page carried a summary.
+//
+// meta.server_capped is the endpoint's fixed record ceiling, present only when
+// the endpoint caps its result set. The disclosure describes the endpoint
+// rather than the result, so a query matching fewer records than the ceiling
+// carries it too. A reader never sees the key beside a live continuation: a
+// capped endpoint returns no cursor, so has_more is false wherever the key
+// appears.
 func PrintPaginated(w io.Writer, result *client.PaginatedResult) {
 	meta := map[string]any{
 		"count":    len(result.Items),
@@ -31,6 +38,9 @@ func PrintPaginated(w io.Writer, result *client.PaginatedResult) {
 	}
 	if len(result.TrustSummaries) > 0 {
 		meta["trust_summaries"] = result.TrustSummaries
+	}
+	if result.ServerCap > 0 {
+		meta["server_capped"] = result.ServerCap
 	}
 
 	env := Envelope{

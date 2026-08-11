@@ -154,9 +154,11 @@ func TestCitiesSearchWithLimit(t *testing.T) {
 		t.Errorf("expected count=5, got %d", count)
 	}
 
+	// The truncation is this CLI's own --limit, not a page boundary: the
+	// endpoint returned everything it has, so nothing more is fetchable.
 	hasMore := parsed.Meta["has_more"].(bool)
-	if !hasMore {
-		t.Error("expected has_more=true when server returned more items than the limit")
+	if hasMore {
+		t.Error("expected has_more=false: local truncation is not a continuation")
 	}
 }
 

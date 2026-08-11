@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 	"net/url"
 	"os"
 
@@ -102,7 +101,6 @@ func runCountiesSearch(cmd *cobra.Command, args []string) error {
 	}
 
 	if isDryRun(cmd) {
-		q.Set("size", fmt.Sprintf("%d", lc.FirstPageSize()))
 		return printDryRun(cmd, "/counties/search", q)
 	}
 
