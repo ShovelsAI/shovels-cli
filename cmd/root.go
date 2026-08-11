@@ -243,7 +243,7 @@ func init() {
 	flags.String("base-url", "https://api.shovels.ai/v2", "API base URL")
 	flags.Bool("no-retry", false, "Disable automatic retry on HTTP 429 rate-limit responses")
 	flags.String("timeout", "30s", "Per-request timeout as a Go duration, e.g. 10s, 1m, 2m30s")
-	flags.Bool("dry-run", false, "Print the resolved HTTP request as JSON without calling the API or consuming credits")
+	flags.Bool("dry-run", false, "Print the resolved HTTP request as JSON without calling the API or consuming credits; on config set, print the pending config file write instead of saving it")
 
 	// Emit JSON to stderr on flag-parsing errors instead of cobra's plain text.
 	rootCmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
