@@ -49,13 +49,6 @@ var transportOnlyInvocations = map[string]transportOnlyInvocation{
 	"contractors get": {args: []string{"contractors", "get", "CONTRACTOR1"}, path: "/contractors"},
 	"usage":           {args: []string{"usage"}, path: "/usage"},
 
-	"contractors metrics": {
-		args: []string{"contractors", "metrics", "CONTRACTOR1",
-			"--metric-from", "2024-01-01", "--metric-to", "2024-12-31",
-			"--property-type", "residential", "--tag", "solar"},
-		path: "/contractors/CONTRACTOR1/metrics",
-	},
-
 	"cities coverage":        coverageInvocation("cities", "CITYID"),
 	"counties coverage":      coverageInvocation("counties", "COUNTYID"),
 	"jurisdictions coverage": coverageInvocation("jurisdictions", "JURID"),
@@ -320,8 +313,8 @@ func TestPaginationAssertionRejectsAPaginatingCommand(t *testing.T) {
 // --- Boundary conditions ---
 
 // The get commands fetch by ID in a single request and never reach the
-// paginator, so the assertion has to cover them alongside the metrics, coverage
-// and usage commands.
+// paginator, so the assertion has to cover them alongside the coverage and
+// usage commands.
 func TestTransportOnlyPathsIncludeTheBatchGetCommands(t *testing.T) {
 	paths := transportOnlyPaths()
 
