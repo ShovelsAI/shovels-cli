@@ -53,9 +53,9 @@ func TestConfigSetHonorsDryRunAlone(t *testing.T) {
 }
 
 func TestTransportOnlyRecordHonorsNeitherPaginationFlag(t *testing.T) {
-	record, ok := Lookup("contractors metrics")
+	record, ok := Lookup("usage")
 	if !ok {
-		t.Fatal("contractors metrics has no contract record")
+		t.Fatal("usage has no contract record")
 	}
 
 	if record.Honors(FlagLimit) || record.Honors(FlagMaxRecords) {

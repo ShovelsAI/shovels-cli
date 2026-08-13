@@ -274,7 +274,7 @@ The `--limit` flag abstracts cursor-based pagination on the commands that follow
 
 `addresses search` returns at most 20 results and `cities search`, `counties search` and `jurisdictions search` at most 15, with no continuation cursor. `--limit` only lowers those counts; nothing raises them, so reaching the matches a cap leaves out means narrowing `--query`. Their envelope carries `"server_capped": N` with `"has_more": false`.
 
-A command whose result size the endpoint fixes — `usage`, `<geo> coverage`, `contractors metrics`, and the `get` commands — does not accept `--limit` or `--max-records` and fails when passed either. Each command's `--help` lists the global flags it honors.
+A command whose result size the endpoint fixes — `usage`, `<geo> coverage`, and the `get` commands — does not accept `--limit` or `--max-records` and fails when passed either. Each command's `--help` lists the global flags it honors.
 
 ## Global flags
 

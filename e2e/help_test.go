@@ -987,10 +987,13 @@ func TestPermitsSearchHelpAdvertisesEveryAPIOnlyFlag(t *testing.T) {
 	assertAdvertisesExactly(t, section, "permits search", apiOnlyFlags...)
 }
 
-func TestContractorsMetricsHelpAdvertisesTransportFlagsOnly(t *testing.T) {
+// permits search renders inherited flags through writeGroupedUsage; contractors
+// metrics takes cobra's default template, so the pair covers a leaf command
+// honoring all five on each renderer.
+func TestContractorsMetricsHelpAdvertisesEveryAPIOnlyFlag(t *testing.T) {
 	section := globalFlagsHelp(t, "contractors", "metrics")
 
-	assertAdvertisesExactly(t, section, "contractors metrics", "--no-retry", "--timeout", "--dry-run")
+	assertAdvertisesExactly(t, section, "contractors metrics", apiOnlyFlags...)
 }
 
 // --- Edge cases ---
