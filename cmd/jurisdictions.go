@@ -51,7 +51,7 @@ var jurisdictionsSearchCmd = &cobra.Command{
 	Long: `Search the Shovels jurisdiction database. Returns jurisdiction objects with geo_id,
 name, and state fields. Use the geo_id value in --geo-id flags on permits and
 contractors searches.
-` + serverCappedNote("jurisdictions search") + `
+
 Required flags:
   --query, -q TEXT   Jurisdiction name to search for, e.g. "Portland" or "Miami-Dade" (required)
 
