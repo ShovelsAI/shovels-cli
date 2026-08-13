@@ -182,23 +182,29 @@ func TestSiblingSearchesAcceptRepeatedTagsLive(t *testing.T) {
 	}
 }
 
-// TestContractorMetricsCreditExemptAllPropertyTypeLive pins the two endpoint
-// behaviors the OpenAPI contract does not express: "all" is an accepted
-// property type, and a successful metrics response carries no credit headers.
-// The local e2e suite owns cursor and limit mechanics; this request only verifies
-// the live facts its stub cannot prove. The ID is the ENG-4070 reproduction
-// fixture; a 404 means the fixture churned and must be replaced with another
-// known contractor, not that the assertion should be weakened. Credit-exempt
-// (measured).
-func TestContractorMetricsCreditExemptAllPropertyTypeLive(t *testing.T) {
-	result := runCLI(t,
-		"contractors", "metrics", "zhcjmaxpIp",
-		"--metric-from", "2020-01-01",
-		"--metric-to", "2024-12-31",
-		"--property-type", "all",
-		"--tag", "electrical",
-		"--limit", "1",
-	)
+// contractorMetricsPaginatedSince is the release in which contractor metrics
+// moved onto the paginator and began printing count and has_more. Older
+// binaries print an empty meta and are not wrong to.
+const contractorMetricsPaginatedSince = "0.9.0"
+
+// contractorMetricsArgs asks for one row of metrics with property_type=all. The
+// ID is a known contractor; a 404 means the fixture churned and must be replaced
+// with another, not that an assertion should be weakened.
+var contractorMetricsArgs = []string{
+	"contractors", "metrics", "zhcjmaxpIp",
+	"--metric-from", "2020-01-01",
+	"--metric-to", "2024-12-31",
+	"--property-type", "all",
+	"--tag", "electrical",
+	"--limit", "1",
+}
+
+// TestContractorMetricsAcceptsAllPropertyTypeLive pins the endpoint behavior the
+// OpenAPI contract does not express: "all" is an accepted property type. Every
+// binary that asks gets the same answer, so this holds against a published
+// release as readily as against HEAD. Credit-exempt (measured).
+func TestContractorMetricsAcceptsAllPropertyTypeLive(t *testing.T) {
+	result := runCLI(t, contractorMetricsArgs...)
 
 	if result.ExitCode != 0 {
 		t.Fatalf("contractor metrics rejected property_type=all: exit %d\nstderr: %s",
@@ -206,6 +212,24 @@ func TestContractorMetricsCreditExemptAllPropertyTypeLive(t *testing.T) {
 	}
 	if strings.TrimSpace(result.Stderr) != "" {
 		t.Errorf("expected empty stderr on success, got: %s", result.Stderr)
+	}
+}
+
+// TestContractorMetricsEnvelopeIsPaginatedAndCreditExempt covers what the CLI
+// prints for a credit-exempt paginated endpoint: count and has_more, and neither
+// credit field. The local e2e suite owns cursor and limit mechanics against a
+// stub; what only the live call can show is that a real response carries no
+// credits to report.
+//
+// The envelope is what contractor metrics began printing when it moved onto the
+// paginator; before that it printed an empty meta.
+func TestContractorMetricsEnvelopeIsPaginatedAndCreditExempt(t *testing.T) {
+	requireVersionAtLeast(t, contractorMetricsPaginatedSince)
+
+	result := runCLI(t, contractorMetricsArgs...)
+
+	if result.ExitCode != 0 {
+		t.Fatalf("contractor metrics failed: exit %d\nstderr: %s", result.ExitCode, result.Stderr)
 	}
 
 	var env envelope

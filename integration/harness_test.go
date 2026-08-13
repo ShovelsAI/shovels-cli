@@ -15,24 +15,173 @@
 // because it depends on what the live API does. Anything that can be pinned
 // locally belongs in cmd/ or e2e/, which cost nothing to run.
 //
+// Most assertions here hold against any binary: what the API accepts and
+// returns does not depend on which version asked, and that is the suite's
+// reason to exist.
+//
+// The exception is an assertion about output the CLI only began producing in a
+// known version. It is written beside the code that satisfies it, so it is
+// false for every release published earlier and true from that version on.
+// Those call requireVersionAtLeast, naming the version. Output shape that
+// predates the oldest release this lane runs — the data/meta envelope itself,
+// the version payload, stdout staying empty on error — needs no gate and is
+// asserted everywhere.
+//
+// The distinction is not cosmetic: a released-lane failure is reported as "the
+// current release is already broken for users", so an ungated assertion that
+// cannot hold there raises that alarm every night until the next release, in
+// the same words a real contract break would use.
+//
 // Cost, measured: a search costs 1 credit, a 422 costs 0, and contractor metrics,
-// coverage, and version are credit-exempt. One pass is 9 authenticated requests
-// (5 searches, the sentinel, contractor metrics, coverage, version) and 5 billable
-// credits. Running against two binaries doubles both, but not the OpenAPI fetch,
-// which is unauthenticated and runs once in its own job.
+// coverage, and version are credit-exempt. One pass is 10 authenticated requests
+// (5 searches, the sentinel, contractor metrics twice, coverage, version) and 5
+// billable credits; a binary predating an assertion's version skips it and makes
+// one fewer. Resolving a supplied binary's version reaches no API at all: with
+// no key in its scratch HOME, `version` reports the build stamp alone. The
+// OpenAPI fetch is unauthenticated and runs once in its own job rather than per
+// binary.
 package integration
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"testing"
 )
 
 // binaryPath is the shovels binary under test.
 var binaryPath string
+
+// binaryVersion is what the binary under test reports for itself: a semver for
+// a published release, "dev" for a build of this tree.
+var binaryVersion string
+
+// requireVersionAtLeast skips an assertion about output the CLI began producing
+// in a known version, when the binary under test predates it.
+//
+// Such an assertion is written beside the code that satisfies it, so it is false
+// for every release published earlier and true from that version on. Running it
+// against an older download reports the release broken on the day the assertion
+// merges, which is how a healthy v0.8.4 spent three nights filing contract-drift
+// issues against itself.
+//
+// The version is the gate, not the origin of the binary. Skipping every download
+// would retire the assertion from the released lane permanently, including for
+// the releases that do satisfy it — trading a false alarm for a blind spot, in
+// the one lane that speaks for what users are running.
+//
+// It skips rather than passing quietly: the lane must say which assertions it
+// did not make, or a green run reads as one that checked everything.
+func requireVersionAtLeast(t *testing.T, minimum string) {
+	t.Helper()
+	if binaryVersion == devVersion {
+		return
+	}
+	if compareVersions(binaryVersion, minimum) < 0 {
+		t.Skipf("asserts output introduced in v%s; the binary under test reports v%s", minimum, binaryVersion)
+	}
+}
+
+// devVersion is what a binary built from source reports, per cmd/root.go's
+// buildVersion default. It always satisfies a minimum: a build of this tree is
+// the code the assertion was written beside.
+const devVersion = "dev"
+
+// compareVersions orders two semver versions, returning -1, 0 or 1.
+//
+// A prerelease sorts BEFORE the version it qualifies: 0.9.0-rc.1 precedes
+// 0.9.0, so a release candidate is not credited with output the release it
+// precedes introduced. Splitting on "." alone gets this backwards — "0-rc" is
+// one more component than "0", which reads as the larger version.
+func compareVersions(a, b string) int {
+	aNumeric, aPre := splitPrerelease(a)
+	bNumeric, bPre := splitPrerelease(b)
+
+	aParts := strings.Split(aNumeric, ".")
+	bParts := strings.Split(bNumeric, ".")
+	for i := 0; i < len(aParts) || i < len(bParts); i++ {
+		an, bn := versionPart(aParts, i), versionPart(bParts, i)
+		if an != bn {
+			if an < bn {
+				return -1
+			}
+			return 1
+		}
+	}
+
+	switch {
+	case aPre && !bPre:
+		return -1
+	case !aPre && bPre:
+		return 1
+	}
+	return 0
+}
+
+// splitPrerelease separates the numeric core of a version from any prerelease
+// or build suffix, reporting whether one was present.
+func splitPrerelease(v string) (numeric string, prerelease bool) {
+	v = strings.TrimPrefix(v, "v")
+	if i := strings.IndexAny(v, "-+"); i >= 0 {
+		return v[:i], true
+	}
+	return v, false
+}
+
+// versionPart returns the numeric value of one dotted component, 0 when the
+// component is absent or non-numeric.
+func versionPart(parts []string, i int) int {
+	if i >= len(parts) {
+		return 0
+	}
+	n, err := strconv.Atoi(parts[i])
+	if err != nil {
+		return 0
+	}
+	return n
+}
+
+// resolveBinaryVersion asks the binary what it is. The suite gates on the
+// version rather than on how the path arrived, so a build of this tree handed
+// over by SHOVELS_TEST_BINARY is asserted against rather than skipped with a
+// reason that would not be true of it.
+//
+// It runs with an empty scratch HOME and CI=1 for the same reasons runCLI does,
+// and reaches no API: with no key resolvable, `version` reports the build stamp
+// alone. A shared HOME would not do — an ambient config file there would give it
+// a key and turn this into a live call.
+func resolveBinaryVersion() (string, error) {
+	home, err := os.MkdirTemp("", "shovels-version-home-*")
+	if err != nil {
+		return "", fmt.Errorf("creating a scratch HOME: %w", err)
+	}
+	defer os.RemoveAll(home)
+
+	cmd := exec.Command(binaryPath, "version")
+	cmd.Env = []string{"CI=1", "HOME=" + home, "PATH=" + os.Getenv("PATH")}
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("running `%s version`: %w", binaryPath, err)
+	}
+
+	var envelope struct {
+		Data struct {
+			Version string `json:"version"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(out, &envelope); err != nil {
+		return "", fmt.Errorf("parsing `%s version` output %q: %w", binaryPath, out, err)
+	}
+	if envelope.Data.Version == "" {
+		return "", fmt.Errorf("`%s version` reported no version: %s", binaryPath, out)
+	}
+	return envelope.Data.Version, nil
+}
 
 // TestMain resolves the binary once. SHOVELS_TEST_BINARY lets the same
 // assertions run against a downloaded release rather than a build of HEAD,
@@ -51,6 +200,10 @@ func TestMain(m *testing.M) {
 			os.Exit(1)
 		}
 		binaryPath = abs
+		if binaryVersion, err = resolveBinaryVersion(); err != nil {
+			fmt.Fprintf(os.Stderr, "cannot determine the version of SHOVELS_TEST_BINARY %q: %v\n", abs, err)
+			os.Exit(1)
+		}
 		code := m.Run()
 		os.Exit(code)
 	}
@@ -69,6 +222,7 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "binary build failed: %v\n", err)
 		os.Exit(1)
 	}
+	binaryVersion = devVersion
 
 	code := m.Run()
 	os.RemoveAll(tmpDir)
