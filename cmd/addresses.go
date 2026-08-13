@@ -32,7 +32,7 @@ var addressesSearchCmd = &cobra.Command{
 	Short: "Search addresses by street name, city, state, or zip code",
 	Long: `Search the Shovels address database. The query matches against street name,
 city, state, and zip code fields.
-` + serverCappedNote("addresses search") + `
+
 Required flags:
   --query, -q TEXT   Address search string, e.g. "123 Main St" or "90210" (required)
 

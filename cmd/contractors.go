@@ -199,8 +199,7 @@ var contractorsPermitsCmd = &cobra.Command{
 	Use:   "permits ID",
 	Short: "List building permits filed by a specific contractor",
 	Long: `Retrieve building permits associated with a contractor. Accepts exactly one
-contractor ID as a positional argument. Results are paginated; use --limit to
-control how many records are returned.
+contractor ID as a positional argument.
 
 Note: ID is a positional argument, not a flag.
   Correct:   shovels contractors permits ABC123
@@ -278,8 +277,7 @@ var contractorsEmployeesCmd = &cobra.Command{
 	Use:   "employees ID",
 	Short: "List employees associated with a specific contractor",
 	Long: `Retrieve employees associated with a contractor. Accepts exactly one
-contractor ID as a positional argument. Results are paginated; use --limit to
-control how many records are returned.
+contractor ID as a positional argument.
 
 Note: ID is a positional argument, not a flag.
   Correct:   shovels contractors employees ABC123
@@ -346,9 +344,7 @@ var contractorsMetricsCmd = &cobra.Command{
 	Use:   "metrics ID",
 	Short: "Get monthly performance metrics for a specific contractor",
 	Long: `Retrieve monthly performance metrics for a specific contractor. Accepts exactly
-one contractor ID as a positional argument. All four flags are required. Results
-are cursor-paginated; use --limit to control how many records are returned, or
---limit all to fetch up to the --max-records cap.
+one contractor ID as a positional argument. All four flags are required.
 
 Note: ID is a positional argument, not a flag.
   Correct:   shovels contractors metrics ABC123 --metric-from ...

@@ -51,7 +51,7 @@ var citiesSearchCmd = &cobra.Command{
 	Long: `Search the Shovels city database. Returns city objects with geo_id, name,
 and state fields. Use the geo_id value in --geo-id flags on permits and
 contractors searches.
-` + serverCappedNote("cities search") + `
+
 Required flags:
   --query, -q TEXT   City name to search for, e.g. "Miami" or "San Francisco" (required)
 
