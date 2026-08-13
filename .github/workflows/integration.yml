@@ -7,12 +7,15 @@ name: Integration
 #
 # Nightly instead, on the default branch, plus manual dispatch before a release.
 #
-# Cost per binary, measured: 6 authenticated requests (3 positive searches, the
-# sentinel, coverage, version) and 3 billable credits — a search costs 1, a 422
-# costs 0, and coverage and /meta/release are credit-exempt. The matrix runs two
-# binaries, so ~12 authenticated requests and ~6 credits a night. The OpenAPI
-# canary is unauthenticated, free, and binary-independent, so it runs once in
-# its own job. Credits govern the bill; request count governs timeout exposure.
+# Cost, measured: 10 authenticated requests per binary (5 searches, the
+# sentinel, contractor metrics twice, coverage, version) for 5 billable credits.
+# latest-stable reads the download's version first (no API call: no key, so
+# `version` reports the build stamp alone) and skips any assertion that release
+# predates. A search costs 1, a 422 costs 0, and contractor metrics, coverage and
+# /meta/release are credit-exempt. That is ~20 authenticated requests and ~10
+# credits a night. The OpenAPI canary is unauthenticated, free, and
+# binary-independent, so it runs once in its own job.
+# Credits govern the bill; request count governs timeout exposure.
 
 on:
   schedule:
