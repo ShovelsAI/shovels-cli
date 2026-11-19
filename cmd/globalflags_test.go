@@ -88,3 +88,14 @@ func TestGroupedUsageAdvertisesOnlyTheHonoredGlobalFlags(t *testing.T) {
 		t.Errorf("grouped usage should not advertise the unhonored --limit, got:\n%s", usage.String())
 	}
 }
+
+// standInGlobalFlags registers, on a command built in a test, the persistent
+// flags root.go's init puts on the real root, so a run function that reads
+// them can be exercised without the root command and its PersistentPreRunE.
+func standInGlobalFlags(cmd *cobra.Command) {
+	cmd.Flags().Bool("dry-run", false, "")
+	cmd.Flags().String("timeout", "30s", "")
+	cmd.Flags().Bool("no-retry", false, "")
+	cmd.Flags().String("limit", "50", "")
+	cmd.Flags().Int("max-records", 10000, "")
+}
