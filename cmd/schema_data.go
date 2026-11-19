@@ -36,9 +36,8 @@ func init() {
 				"meta.credits_remaining",
 			},
 			Filters: map[string]SchemaField{
-				"--include-count": {Type: "boolean", Description: "Request total result count in meta.total_count"},
-				"--tag":           {Type: "string", Description: "Permit tag: solar, roofing, electrical, etc."},
-				"GEO_ID":          {Type: "string", Description: "Geographic ID as positional argument"},
+				"--tag":  {Type: "string", Description: "Permit tag: solar, roofing, electrical, etc."},
+				"GEO_ID": {Type: "string", Description: "Geographic ID as positional argument"},
 			},
 		},
 		"addresses metrics monthly": {
@@ -71,11 +70,10 @@ func init() {
 				"meta.credits_remaining",
 			},
 			Filters: map[string]SchemaField{
-				"--include-count": {Type: "boolean", Description: "Request total result count in meta.total_count"},
-				"--metric-from":   {Type: "date", Description: "Start date in YYYY-MM-DD format"},
-				"--metric-to":     {Type: "date", Description: "End date in YYYY-MM-DD format"},
-				"--tag":           {Type: "string", Description: "Permit tag: solar, roofing, electrical, etc."},
-				"GEO_ID":          {Type: "string", Description: "Geographic ID as positional argument"},
+				"--metric-from": {Type: "date", Description: "Start date in YYYY-MM-DD format"},
+				"--metric-to":   {Type: "date", Description: "End date in YYYY-MM-DD format"},
+				"--tag":         {Type: "string", Description: "Permit tag: solar, roofing, electrical, etc."},
+				"GEO_ID":        {Type: "string", Description: "Geographic ID as positional argument"},
 			},
 		},
 		"addresses residents": {
@@ -215,7 +213,6 @@ func init() {
 				"meta.credits_remaining",
 			},
 			Filters: map[string]SchemaField{
-				"--include-count": {Type: "boolean", Description: "Request total result count in meta.total_count"},
 				"--property-type": {Type: "string", Description: "Property type: residential, commercial, industrial, agricultural, vacant land, exempt, miscellaneous, office, recreational"},
 				"--tag":           {Type: "string", Description: "Permit tag: solar, roofing, electrical, etc."},
 				"GEO_ID":          {Type: "string", Description: "Geographic ID as positional argument"},
@@ -253,7 +250,6 @@ func init() {
 				"meta.credits_remaining",
 			},
 			Filters: map[string]SchemaField{
-				"--include-count": {Type: "boolean", Description: "Request total result count in meta.total_count"},
 				"--metric-from":   {Type: "date", Description: "Start date in YYYY-MM-DD format"},
 				"--metric-to":     {Type: "date", Description: "End date in YYYY-MM-DD format"},
 				"--property-type": {Type: "string", Description: "Property type: residential, commercial, industrial, agricultural, vacant land, exempt, miscellaneous, office, recreational"},
@@ -707,7 +703,6 @@ func init() {
 				"meta.credits_remaining",
 			},
 			Filters: map[string]SchemaField{
-				"--include-count": {Type: "boolean", Description: "Request total result count in meta.total_count"},
 				"--property-type": {Type: "string", Description: "Property type: residential, commercial, industrial, agricultural, vacant land, exempt, miscellaneous, office, recreational"},
 				"--tag":           {Type: "string", Description: "Permit tag: solar, roofing, electrical, etc."},
 				"GEO_ID":          {Type: "string", Description: "Geographic ID as positional argument"},
@@ -745,7 +740,6 @@ func init() {
 				"meta.credits_remaining",
 			},
 			Filters: map[string]SchemaField{
-				"--include-count": {Type: "boolean", Description: "Request total result count in meta.total_count"},
 				"--metric-from":   {Type: "date", Description: "Start date in YYYY-MM-DD format"},
 				"--metric-to":     {Type: "date", Description: "End date in YYYY-MM-DD format"},
 				"--property-type": {Type: "string", Description: "Property type: residential, commercial, industrial, agricultural, vacant land, exempt, miscellaneous, office, recreational"},
@@ -985,7 +979,6 @@ func init() {
 				"meta.credits_remaining",
 			},
 			Filters: map[string]SchemaField{
-				"--include-count": {Type: "boolean", Description: "Request total result count in meta.total_count"},
 				"--property-type": {Type: "string", Description: "Property type: residential, commercial, industrial, agricultural, vacant land, exempt, miscellaneous, office, recreational"},
 				"--tag":           {Type: "string", Description: "Permit tag: solar, roofing, electrical, etc."},
 				"GEO_ID":          {Type: "string", Description: "Geographic ID as positional argument"},
@@ -1023,7 +1016,6 @@ func init() {
 				"meta.credits_remaining",
 			},
 			Filters: map[string]SchemaField{
-				"--include-count": {Type: "boolean", Description: "Request total result count in meta.total_count"},
 				"--metric-from":   {Type: "date", Description: "Start date in YYYY-MM-DD format"},
 				"--metric-to":     {Type: "date", Description: "End date in YYYY-MM-DD format"},
 				"--property-type": {Type: "string", Description: "Property type: residential, commercial, industrial, agricultural, vacant land, exempt, miscellaneous, office, recreational"},

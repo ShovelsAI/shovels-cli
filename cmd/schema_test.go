@@ -602,6 +602,22 @@ func TestCurrentMetricsLackDateFilters(t *testing.T) {
 	}
 }
 
+// TestGeoMetricsSchemasLackIncludeCount verifies none of the eight geo
+// metrics schemas advertises --include-count: no metrics endpoint declares
+// include_count, and the commands no longer register the flag.
+func TestGeoMetricsSchemasLackIncludeCount(t *testing.T) {
+	for _, c := range geoMetricsCommands(t) {
+		cmd := commandPathFromCobra(c)
+		s := LookupSchema(cmd)
+		if s == nil {
+			t.Fatalf("schema for %q not found", cmd)
+		}
+		if _, ok := s.Filters["--include-count"]; ok {
+			t.Errorf("schema for %q should not have --include-count filter", cmd)
+		}
+	}
+}
+
 // TestEnrichedFieldsHaveUnits verifies that fields with unit overrides
 // have their unit populated in the generated schema.
 func TestEnrichedFieldsHaveUnits(t *testing.T) {
