@@ -120,16 +120,10 @@ total job value, inspection pass rate, and active/in-review permit counts.
 Required flags:
   --tag TEXT   Permit tag: solar, roofing, electrical, plumbing, etc. (required)
 
-Optional flags:
-  --include-count   Request total result count in meta.total_count
-
 Examples:
   Current solar metrics for an address:
     GEO=$(shovels addresses search -q "123 Main St, Miami, FL" | jq -r '.data[0].geo_id')
     shovels addresses metrics current "$GEO" --tag solar
-
-  With total count:
-    shovels addresses metrics current ABC123 --tag solar --include-count
 
 Workflow — resolve address, then query metrics:
   GEO=$(shovels addresses search -q "456 Oak Ave, Portland, OR" | jq -r '.data[0].geo_id')
@@ -157,9 +151,6 @@ Required flags:
   --tag TEXT          Permit tag: solar, roofing, electrical, plumbing, etc. (required)
   --metric-from DATE Start date in YYYY-MM-DD format (required)
   --metric-to DATE   End date in YYYY-MM-DD format (required)
-
-Optional flags:
-  --include-count     Request total result count in meta.total_count
 
 Examples:
   Monthly solar metrics for an address in 2024:

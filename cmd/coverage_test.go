@@ -25,11 +25,7 @@ func newTestCoverageCmd(geoType string) (*cobra.Command, *bytes.Buffer) {
 		SilenceErrors: true,
 	}
 	registerCoverageFlags(cmd)
-	cmd.Flags().Bool("dry-run", false, "")
-	cmd.Flags().String("timeout", "30s", "")
-	cmd.Flags().Bool("no-retry", false, "")
-	cmd.Flags().String("limit", "50", "")
-	cmd.Flags().Int("max-records", 10000, "")
+	standInGlobalFlags(cmd)
 
 	var out bytes.Buffer
 	cmd.SetOut(&out)

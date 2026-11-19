@@ -147,16 +147,10 @@ Required flags:
   --tag TEXT            Permit tag: solar, roofing, electrical, plumbing, etc. (required)
   --property-type TEXT  Property type: residential, commercial, industrial, agricultural, vacant land, exempt, miscellaneous, office, recreational (required)
 
-Optional flags:
-  --include-count       Request total result count in meta.total_count
-
 Examples:
   Current solar metrics for a jurisdiction:
     GEO=$(shovels jurisdictions search -q "Portland" | jq -r '.data[0].geo_id')
     shovels jurisdictions metrics current "$GEO" --tag solar --property-type residential
-
-  With total count:
-    shovels jurisdictions metrics current ABC123 --tag solar --property-type residential --include-count
 
 Workflow — resolve jurisdiction, then query metrics:
   GEO=$(shovels jurisdictions search -q "Miami-Dade" | jq -r '.data[0].geo_id')
@@ -185,9 +179,6 @@ Required flags:
   --property-type TEXT  Property type: residential, commercial, industrial, agricultural, vacant land, exempt, miscellaneous, office, recreational (required)
   --metric-from DATE   Start date in YYYY-MM-DD format (required)
   --metric-to DATE     End date in YYYY-MM-DD format (required)
-
-Optional flags:
-  --include-count       Request total result count in meta.total_count
 
 Examples:
   Monthly solar metrics for a jurisdiction in 2024:

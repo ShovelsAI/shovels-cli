@@ -85,19 +85,7 @@ func makeMetricsHandler(pathPrefix string, totalItems int, monthly bool, credits
 		resp := struct {
 			Items      []json.RawMessage `json:"items"`
 			NextCursor *string           `json:"next_cursor"`
-			TotalCount *struct {
-				Value    int    `json:"value"`
-				Relation string `json:"relation"`
-			} `json:"total_count,omitempty"`
 		}{Items: items, NextCursor: nextCursor}
-
-		// Include total_count on first page when include_count is requested.
-		if r.URL.Query().Get("include_count") == "true" && start == 0 {
-			resp.TotalCount = &struct {
-				Value    int    `json:"value"`
-				Relation string `json:"relation"`
-			}{Value: totalItems, Relation: "eq"}
-		}
 
 		json.NewEncoder(w).Encode(resp)
 	})
@@ -277,46 +265,59 @@ func TestCitiesMetricsCurrentWithLimit(t *testing.T) {
 	}
 }
 
-func TestCitiesMetricsCurrentIncludeCount(t *testing.T) {
-	handler, queries := makeMetricsHandler("/cities", 5, false, 5, 9995)
-	srv := httptest.NewServer(handler)
-	defer srv.Close()
+// geoMetricsInvocations lists the eight geo metrics commands with the flags
+// each requires, so a test can run every one with the one flag it is about.
+var geoMetricsInvocations = []struct {
+	name string
+	args []string
+}{
+	{"addresses metrics current", []string{"addresses", "metrics", "current", "aGeo1OpaqueId", "--tag", "solar"}},
+	{"addresses metrics monthly", []string{"addresses", "metrics", "monthly", "aGeo1OpaqueId", "--tag", "solar", "--metric-from", "2024-01-01", "--metric-to", "2024-12-31"}},
+	{"cities metrics current", []string{"cities", "metrics", "current", "aGeo1OpaqueId", "--tag", "solar", "--property-type", "residential"}},
+	{"cities metrics monthly", []string{"cities", "metrics", "monthly", "aGeo1OpaqueId", "--tag", "solar", "--property-type", "residential", "--metric-from", "2024-01-01", "--metric-to", "2024-12-31"}},
+	{"counties metrics current", []string{"counties", "metrics", "current", "aGeo1OpaqueId", "--tag", "solar", "--property-type", "residential"}},
+	{"counties metrics monthly", []string{"counties", "metrics", "monthly", "aGeo1OpaqueId", "--tag", "solar", "--property-type", "residential", "--metric-from", "2024-01-01", "--metric-to", "2024-12-31"}},
+	{"jurisdictions metrics current", []string{"jurisdictions", "metrics", "current", "aGeo1OpaqueId", "--tag", "solar", "--property-type", "residential"}},
+	{"jurisdictions metrics monthly", []string{"jurisdictions", "metrics", "monthly", "aGeo1OpaqueId", "--tag", "solar", "--property-type", "residential", "--metric-from", "2024-01-01", "--metric-to", "2024-12-31"}},
+}
 
-	env := withIsolatedConfig(t)
-	result := runCLIWithEnv(t, env,
-		"--base-url", srv.URL,
-		"cities", "metrics", "current", "ABC123",
-		"--tag", "solar",
-		"--property-type", "residential",
-		"--include-count",
-	)
+// TestGeoMetricsRejectIncludeCount: none of the eight metrics endpoints
+// declares include_count, so the flag that sent it is gone and a caller who
+// still passes it gets the CLI's unknown-flag JSON error. The current and
+// monthly variants reach that error through different flag error functions,
+// so every command is run rather than one per variant. The parser answers
+// before any request is built, and the stub proves it: a request reaching it
+// fails the test instead of leaving the binary to find a real server.
+func TestGeoMetricsRejectIncludeCount(t *testing.T) {
+	for _, inv := range geoMetricsInvocations {
+		t.Run(inv.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				t.Errorf("a request reached the server: %s %s", r.Method, r.URL)
+				w.WriteHeader(http.StatusTeapot)
+			}))
+			defer srv.Close()
+			env := withIsolatedConfig(t)
+			args := append([]string{"--base-url", srv.URL}, inv.args...)
 
-	if result.ExitCode != 0 {
-		t.Fatalf("expected exit 0, got %d; stderr: %s", result.ExitCode, result.Stderr)
-	}
+			result := runCLIWithEnv(t, env, append(args, "--include-count")...)
 
-	parsed := parseEnvelope(t, result.Stdout)
-
-	// Verify include_count was sent to API.
-	if len(*queries) != 1 {
-		t.Fatalf("expected 1 API request, got %d", len(*queries))
-	}
-	q := (*queries)[0]
-	if q["include_count"][0] != "true" {
-		t.Errorf("expected include_count=true in query, got %q", q["include_count"][0])
-	}
-
-	// Verify total_count in meta.
-	tc, ok := parsed.Meta["total_count"]
-	if !ok {
-		t.Fatal("expected total_count in meta when --include-count is set")
-	}
-	tcMap, ok := tc.(map[string]any)
-	if !ok {
-		t.Fatalf("expected total_count to be an object, got %T", tc)
-	}
-	if int(tcMap["value"].(float64)) != 5 {
-		t.Errorf("expected total_count.value=5, got %v", tcMap["value"])
+			if result.ExitCode != 1 {
+				t.Fatalf("expected exit 1, got %d; stderr: %s", result.ExitCode, result.Stderr)
+			}
+			p := parseStderrError(t, result.Stderr)
+			if p.Code != 1 {
+				t.Errorf("expected error code 1, got %d", p.Code)
+			}
+			if p.ErrorType != "client_error" {
+				t.Errorf("expected error_type %q, got %q", "client_error", p.ErrorType)
+			}
+			if !strings.Contains(p.Error, "unknown flag: --include-count") {
+				t.Errorf("expected error to name the unknown flag, got: %s", p.Error)
+			}
+			if strings.TrimSpace(result.Stdout) != "" {
+				t.Errorf("stdout should be empty for a flag error, got: %s", result.Stdout)
+			}
+		})
 	}
 }
 
