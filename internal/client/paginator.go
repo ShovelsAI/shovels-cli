@@ -242,6 +242,16 @@ func (c *Client) Paginate(ctx context.Context, path string, query url.Values, lc
 				ErrorType: ErrorTypeClient,
 			}
 		}
+		// The response contract requires an items array. Treat an omitted
+		// or null field as a failed page so callers cannot mistake a
+		// truncated result for a complete search.
+		if page.Items == nil {
+			return nil, &APIError{
+				Message:   "invalid paginated response: expected an items array",
+				ExitCode:  ExitClientError,
+				ErrorType: ErrorTypeClient,
+			}
+		}
 
 		// Capture total_count from the first page only; subsequent pages
 		// do not include it even when include_count was requested.

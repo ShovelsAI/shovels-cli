@@ -532,6 +532,52 @@ func TestPaginateMidPaginationErrorNoPartialOutput(t *testing.T) {
 	}
 }
 
+func TestPermitsSearchRejectsIncompletePages(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		lastPage string
+	}{
+		{"missing items", `{"size":0,"next_cursor":null}`},
+		{"null items", `{"items":null,"size":0,"next_cursor":null}`},
+		{"empty results", `{"items":[],"size":0,"next_cursor":null}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var requests atomic.Int32
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				requests.Add(1)
+				if r.URL.Query().Get("cursor") == "" {
+					fmt.Fprint(w, `{"items":[{"id":"permit_1"}],"size":1,"next_cursor":"second"}`)
+					return
+				}
+				fmt.Fprint(w, tc.lastPage)
+			}))
+			defer srv.Close()
+
+			result := runCLIWithEnv(t, withIsolatedConfig(t),
+				"permits", "search", "--geo-id", "CA",
+				"--permit-from", "2026-01-01", "--permit-to", "2026-02-01",
+				"--base-url", srv.URL, "--no-retry",
+			)
+			if got := requests.Load(); got != 2 {
+				t.Fatalf("expected two pages, got %d", got)
+			}
+			if tc.name == "empty results" {
+				if result.ExitCode != 0 || !strings.Contains(result.Stdout, "permit_1") {
+					t.Fatalf("expected the complete result, got %+v", result)
+				}
+				return
+			}
+			if result.ExitCode != 1 || strings.TrimSpace(result.Stdout) != "" {
+				t.Fatalf("expected exit 1 with no partial results, got %+v", result)
+			}
+			err := parseStderrError(t, result.Stderr)
+			if err.ErrorType != "client_error" || !strings.Contains(err.Error, "items") {
+				t.Fatalf("expected a structured response error naming items, got %+v", err)
+			}
+		})
+	}
+}
+
 // --- Edge cases (non-paginated) ---
 
 func TestNonPaginatedEnvelopeHasNoCountOrHasMore(t *testing.T) {
