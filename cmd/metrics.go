@@ -129,7 +129,6 @@ func runMetricsCurrent(cfg metricsConfig) func(*cobra.Command, []string) error {
 			propertyType, _ := cmd.Flags().GetString("property-type")
 			q.Set("property_type", propertyType)
 		}
-		setBoolFlag(cmd, "include-count", "include_count", q)
 
 		endpoint := fmt.Sprintf("/%s/%s/metrics/current", cfg.resource, args[0])
 
@@ -218,7 +217,6 @@ func runMetricsMonthly(cfg metricsConfig) func(*cobra.Command, []string) error {
 			propertyType, _ := cmd.Flags().GetString("property-type")
 			q.Set("property_type", propertyType)
 		}
-		setBoolFlag(cmd, "include-count", "include_count", q)
 
 		endpoint := fmt.Sprintf("/%s/%s/metrics/monthly", cfg.resource, args[0])
 
@@ -247,20 +245,18 @@ func runMetricsMonthly(cfg metricsConfig) func(*cobra.Command, []string) error {
 }
 
 // registerMetricsCurrentFlags registers shared flags for a current metrics
-// command: --tag, --include-count, and optionally --property-type.
+// command: --tag, and optionally --property-type.
 // Also installs the date flag rejection handler.
 func registerMetricsCurrentFlags(cmd *cobra.Command, withPropertyType bool) {
 	cmd.Flags().String("tag", "", "Permit tag: solar, roofing, electrical, plumbing, etc. (required)")
 	if withPropertyType {
 		cmd.Flags().String("property-type", "", "Property type: residential, commercial, industrial, agricultural, vacant land, exempt, miscellaneous, office, recreational (required)")
 	}
-	cmd.Flags().Bool("include-count", false, "Request total result count (capped at 10,000). Returned as total_count in meta on first page")
 	rejectDateFlagsOnCurrent(cmd)
 }
 
 // registerMetricsMonthlyFlags registers shared flags for a monthly metrics
-// command: --tag, --metric-from, --metric-to, --include-count, and optionally
-// --property-type.
+// command: --tag, --metric-from, --metric-to, and optionally --property-type.
 func registerMetricsMonthlyFlags(cmd *cobra.Command, withPropertyType bool) {
 	cmd.Flags().String("tag", "", "Permit tag: solar, roofing, electrical, plumbing, etc. (required)")
 	if withPropertyType {
@@ -268,7 +264,6 @@ func registerMetricsMonthlyFlags(cmd *cobra.Command, withPropertyType bool) {
 	}
 	cmd.Flags().String("metric-from", "", "Start date in YYYY-MM-DD format (required)")
 	cmd.Flags().String("metric-to", "", "End date in YYYY-MM-DD format (required)")
-	cmd.Flags().Bool("include-count", false, "Request total result count (capped at 10,000). Returned as total_count in meta on first page")
 }
 
 // handleAPIError maps API errors to stderr output and exit codes.

@@ -711,24 +711,20 @@ func buildFilters(def commandDef) map[string]schemaField {
 		filters["GEO_ID"] = schemaField{Type: "string", Description: "Geographic ID as positional argument"}
 		filters["--tag"] = schemaField{Type: "string", Description: "Permit tag: solar, roofing, electrical, etc."}
 		filters["--property-type"] = schemaField{Type: "string", Description: "Property type: residential, commercial, industrial, agricultural, vacant land, exempt, miscellaneous, office, recreational"}
-		filters["--include-count"] = schemaField{Type: "boolean", Description: "Request total result count in meta.total_count"}
 	case "metrics_prop_monthly":
 		filters["GEO_ID"] = schemaField{Type: "string", Description: "Geographic ID as positional argument"}
 		filters["--tag"] = schemaField{Type: "string", Description: "Permit tag: solar, roofing, electrical, etc."}
 		filters["--property-type"] = schemaField{Type: "string", Description: "Property type: residential, commercial, industrial, agricultural, vacant land, exempt, miscellaneous, office, recreational"}
 		filters["--metric-from"] = schemaField{Type: "date", Description: "Start date in YYYY-MM-DD format"}
 		filters["--metric-to"] = schemaField{Type: "date", Description: "End date in YYYY-MM-DD format"}
-		filters["--include-count"] = schemaField{Type: "boolean", Description: "Request total result count in meta.total_count"}
 	case "metrics_noprop":
 		filters["GEO_ID"] = schemaField{Type: "string", Description: "Geographic ID as positional argument"}
 		filters["--tag"] = schemaField{Type: "string", Description: "Permit tag: solar, roofing, electrical, etc."}
-		filters["--include-count"] = schemaField{Type: "boolean", Description: "Request total result count in meta.total_count"}
 	case "metrics_noprop_monthly":
 		filters["GEO_ID"] = schemaField{Type: "string", Description: "Geographic ID as positional argument"}
 		filters["--tag"] = schemaField{Type: "string", Description: "Permit tag: solar, roofing, electrical, etc."}
 		filters["--metric-from"] = schemaField{Type: "date", Description: "Start date in YYYY-MM-DD format"}
 		filters["--metric-to"] = schemaField{Type: "date", Description: "End date in YYYY-MM-DD format"}
-		filters["--include-count"] = schemaField{Type: "boolean", Description: "Request total result count in meta.total_count"}
 	case "contractor_metrics":
 		filters["ID"] = schemaField{Type: "string", Description: "Contractor ID as positional argument"}
 		filters["--tag"] = schemaField{Type: "string", Description: "Permit tag: solar, roofing, electrical, etc."}
