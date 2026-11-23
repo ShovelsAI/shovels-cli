@@ -260,3 +260,45 @@ jobs:
             gh issue close "$existing" --repo "$REPO" \
               --comment "Recovered: the declared parameter shapes match again. Run: $RUN_URL"
           fi
+
+  keepalive:
+    name: Keep the schedule enabled
+    # A fork that turns Actions on has no key, so its nightly only fails.
+    # Without this guard the job would keep that failing schedule alive.
+    if: github.repository == 'ShovelsAI/shovels-cli'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # GitHub disables scheduled workflows in a public repository after 60 days
+    # with no repository activity, and a disabled nightly looks exactly like a
+    # quiet one. Re-enabling an already enabled workflow through the API
+    # restarts that count without a commit (the mechanism
+    # liskin/gh-workflow-keepalive relies on). It cannot recover a workflow
+    # that is already disabled, since this job only runs while the schedule
+    # does.
+    #
+    # Job-level permissions replace the workflow-level block, so this token
+    # holds actions: write and nothing else, and no other job holds actions:
+    # write. No environment, no secret and no checkout: nothing here needs the
+    # API key or runs code from the ref.
+    #
+    # No `needs:` on purpose. The failure reports above see only their own
+    # job, so a failure here leaves the contract issues alone, and a contract
+    # failure still lets this job run.
+    permissions:
+      actions: write
+    steps:
+      - name: Re-enable this workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          workflow="repos/$REPO/actions/workflows/integration.yml"
+          # Someone may have disabled the workflow by hand while this run was
+          # queued, to stop it on purpose. Re-enabling would undo that.
+          state=$(gh api "$workflow" --jq .state)
+          if [ "$state" != "active" ]; then
+            echo "Integration is $state; leaving it as it is."
+            exit 0
+          fi
+          gh api -X PUT "$workflow/enable"
